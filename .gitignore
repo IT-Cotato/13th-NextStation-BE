@@ -3,3 +3,55 @@
 /.idea/
 # Editor-based HTTP Client requests
 /httpRequests/
+
+# Gradle
+.gradle/
+build/
+gradle/
+!gradle/wrapper/gradle-wrapper.jar
+gradlew
+gradlew.bat
+
+# IntelliJ IDEA
+*.iml
+*.iws
+*.ipr
+out/
+.DS_Store
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Application
+*.log
+*.jar
+*.exe
+
+# Environment
+.env
+.env.local
+
+# OS
+Thumbs.db
+
+# Maven (사용하지 않음)
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+
+# Package Files
+*.rar
+*.zip
+*.tar.gz
+*.rar
+*.7z
