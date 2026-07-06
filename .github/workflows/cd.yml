@@ -1,0 +1,122 @@
+# CD: develop 브랜치에 머지되면 이미지를 빌드해 Docker Hub에 올리고,
+# EC2에 compose 파일을 복사한 뒤 최신 이미지로 컨테이너를 재배포한다.
+# 배포 후 헬스체크로 앱이 정상 기동됐는지 확인한다.
+name: CD
+
+on:
+  push:
+    branches: [ develop ]   # develop에 push될 때 실행
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/nextstation-be
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. 저장소 코드 체크아웃
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # 2. JDK 17(Corretto) 설정
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+
+      # 3. Gradle 캐싱 (의존성/래퍼 캐시로 빌드 속도 향상)
+      - name: Gradle Caching
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # 4. gradlew 실행 권한 부여
+      - name: Grant Execute Permission For Gradlew
+        run: chmod +x gradlew
+
+      # 5. Gradle 빌드 (테스트 제외)
+      - name: Build With Gradle
+        run: ./gradlew build -x test
+
+      # 6. Docker Hub 로그인
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 6-1. buildx 빌더 준비 (기본 docker 드라이버는 --push 미지원)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 7. 이미지 빌드 후 Docker Hub에 push
+      #    --platform linux/amd64: EC2(amd64)에서 확실히 돌도록 아키텍처 고정
+      - name: Build & Push image
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t ${{ env.IMAGE_NAME }}:latest \
+            -t ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --push .
+
+      # 8. compose 파일을 EC2로 복사
+      - name: Copy docker-compose to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose-prod.yml"
+          target: "/home/ec2-user/app/"
+          overwrite: true
+
+      # 9. EC2에 SSH 접속해 재배포 + 헬스체크
+      - name: Deploy with Docker Compose
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DOCKER_USERNAME,DOCKER_PASSWORD
+          script: |
+            cd /home/ec2-user/app
+
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+            # 최신 이미지 받아서 컨테이너 재시작
+            docker compose -f docker-compose-prod.yml pull
+            docker compose -f docker-compose-prod.yml up -d
+            docker image prune -f
+
+            # 배포 후 헬스체크
+            echo "Waiting for application health check..."
+            HEALTH_URL='${{ secrets.BACKEND_HEALTH_URL }}'
+            if [ -z "$HEALTH_URL" ]; then
+              echo "BACKEND_HEALTH_URL secret is not set. Skipping health check."
+              exit 0
+            fi
+
+            i=1
+            while [ "$i" -le 30 ]; do
+              if curl -fsS "$HEALTH_URL"; then
+                echo "Application is healthy."
+                exit 0
+              fi
+              echo "Health check attempt $i failed. Retrying in 10s..."
+              i=$((i + 1))
+              sleep 10
+            done
+
+            echo "Deployment health check failed. Recent logs:"
+            docker compose -f docker-compose-prod.yml logs --tail=200
+            exit 1
