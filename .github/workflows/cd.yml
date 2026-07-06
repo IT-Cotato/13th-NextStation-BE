@@ -79,18 +79,17 @@ jobs:
       - name: Deploy with Docker Compose
         uses: appleboy/ssh-action@v1.0.3
         env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKERHUB_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: DOCKERHUB_USERNAME,DOCKERHUB_PASSWORD
+          envs: DOCKER_USERNAME,DOCKER_PASSWORD
           script: |
             cd /home/ec2-user/app
 
-            # docker-compose-prod.yml의 ${DOCKERHUB_USERNAME} 치환 + private 이미지 pull을 위한 로그인
-            echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
             # 최신 이미지 받아서 컨테이너 재시작
             docker compose -f docker-compose-prod.yml pull
