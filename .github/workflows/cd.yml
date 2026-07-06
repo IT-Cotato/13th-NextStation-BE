@@ -17,6 +17,8 @@ jobs:
       # 1. 저장소 코드 체크아웃
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # 2. JDK 17(Corretto) 설정
       - name: Set up JDK 17
