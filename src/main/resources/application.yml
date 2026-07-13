@@ -5,7 +5,6 @@ spring:
     active: local
   jpa:
     hibernate:
-      ddl-auto: update # validation으로 변경 필요
     properties:
       hibernate:
         format_sql: true
