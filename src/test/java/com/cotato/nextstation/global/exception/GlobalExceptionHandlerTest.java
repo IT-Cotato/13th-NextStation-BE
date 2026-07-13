@@ -70,4 +70,11 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_405_METHOD_NOT_ALLOWED"));
     }
+
+    @Test
+    void 존재하지_않는_경로는_500이_아닌_404를_반환한다() throws Exception {
+        mockMvc.perform(get("/test/no-such-path"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_NOT_FOUND"));
+    }
 }
