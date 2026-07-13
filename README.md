@@ -6,7 +6,7 @@
 
 <br>
 
-## 👥 팀원 소개
+## 팀원 소개
 
 <table align="center">
   <tr>
@@ -40,7 +40,7 @@
   </tr>
 </table>
 
-## 📝 문서
+## 문서
 
 <p align="left">
   <a href="https://rose-food-7e0.notion.site/Git-Convention-372ff5c94641800c84c2e480f01b26ab?source=copy_link"><img src="https://img.shields.io/badge/Git%20Convention-181717?style=for-the-badge&logo=git&logoColor=white"/></a>
@@ -49,7 +49,7 @@
 
 <br>
 
-## 🚀 로컬 개발환경 실행
+## 로컬 개발환경 실행
 
 ### 사전 요구사항
 * `Docker` / `Docker Compose`
