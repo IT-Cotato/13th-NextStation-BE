@@ -20,11 +20,10 @@ reviews:
   profile: chill
   # CodeRabbit이 문제를 발견했을 때 'Request Changes' 리뷰를 제출하여 머지를 차단할지 여부입니다.
   # false로 설정하면 CodeRabbit은 코멘트만 남기고 머지를 차단하지 않습니다.
-  request_changes_workflow: false
+  request_changes_workflow: true
   # PR의 전체적인 변경 사항에 대한 고수준의 요약(summary)을 생성할지 여부입니다.
   high_level_summary: true
   # 변경된 각 파일에 대한 요약을 생성할지 여부입니다.
-  # PR이 너무 길어지는 것을 방지하기 위해 비활성화했습니다.
   changed_files_summary: false
   # 코드의 실행 흐름을 보여주는 시퀀스 다이어그램을 생성할지 여부입니다.
   # PR이 너무 길어지는 것을 방지하기 위해 비활성화했습니다.
