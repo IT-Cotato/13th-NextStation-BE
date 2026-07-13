@@ -455,9 +455,11 @@ Member member = memberRepository.findById(memberId)
 
 ### GlobalExceptionHandler
 
-- 검증 예외(`MethodArgumentNotValidException`)는 필드별 에러 메시지를 `Map`으로 모아 반환한다.
+- 검증 예외(`MethodArgumentNotValidException`)는 필드 에러와 클래스 레벨(글로벌) 에러를 모두 `Map`으로 모아 반환한다.
 - 비즈니스 예외(`CustomException`)는 담긴 `ErrorCode`로 응답한다.
-- 그 외 예상치 못한 예외는 `Exception` 핸들러에서 처리하고, `INTERNAL_SERVER_ERROR`로 응답하며 스택 트레이스를 `error` 레벨로 로깅한다.
+- Spring MVC가 던지는 표준 예외(JSON 파싱 오류, 파라미터 누락/타입 불일치, 지원하지 않는 HTTP 메서드, 존재하지 않는 경로)는 각각의 의미에 맞는 4xx로 개별 처리한다. **`Exception.class` 캐치올 하나로 뭉뚱그려 500으로 처리하지 않는다.**
+- 상태 코드는 하드코딩하지 않고 `ErrorCode.getHttpStatus()`를 사용한다.
+- 그 외 예상치 못한 예외만 `Exception` 핸들러에서 처리하고, `INTERNAL_SERVER_ERROR`로 응답하며 스택 트레이스를 `error` 레벨로 로깅한다.
 
 ```java
 @Slf4j
@@ -470,8 +472,11 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(error ->
                 reasons.put(error.getField(), error.getDefaultMessage())
         );
+        ex.getBindingResult().getGlobalErrors().forEach(error ->
+                reasons.put(error.getObjectName(), error.getDefaultMessage())
+        );
         CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.VALIDATION_ERROR, reasons);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.status(GlobalErrorCode.VALIDATION_ERROR.getHttpStatus()).body(response);
     }
 
     @ExceptionHandler(CustomException.class)
@@ -479,6 +484,46 @@ public class GlobalExceptionHandler {
         log.warn("CustomException: code={}, message={}", ex.getErrorCode().getCode(), ex.getMessage());
         CommonResponse<Void> response = CommonResponse.error(ex.getErrorCode());
         return ResponseEntity.status(ex.getErrorCode().getHttpStatus()).body(response);
+    }
+
+    // 요청 본문 JSON 파싱 실패 -> 400
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<CommonResponse<Void>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+        log.warn("HttpMessageNotReadableException: {}", ex.getMessage());
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.INVALID_REQUEST);
+        return ResponseEntity.status(GlobalErrorCode.INVALID_REQUEST.getHttpStatus()).body(response);
+    }
+
+    // 필수 파라미터 누락 -> 400
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<CommonResponse<Void>> handleMissingServletRequestParameterException(MissingServletRequestParameterException ex) {
+        log.warn("MissingServletRequestParameterException: {}", ex.getMessage());
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.INVALID_REQUEST);
+        return ResponseEntity.status(GlobalErrorCode.INVALID_REQUEST.getHttpStatus()).body(response);
+    }
+
+    // 파라미터 타입 불일치 -> 400
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<CommonResponse<Void>> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
+        log.warn("MethodArgumentTypeMismatchException: {}", ex.getMessage());
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.INVALID_REQUEST);
+        return ResponseEntity.status(GlobalErrorCode.INVALID_REQUEST.getHttpStatus()).body(response);
+    }
+
+    // 지원하지 않는 HTTP 메서드 -> 405
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<CommonResponse<Void>> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException ex) {
+        log.warn("HttpRequestMethodNotSupportedException: {}", ex.getMessage());
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.METHOD_NOT_ALLOWED);
+        return ResponseEntity.status(GlobalErrorCode.METHOD_NOT_ALLOWED.getHttpStatus()).body(response);
+    }
+
+    // 존재하지 않는 경로 -> 404
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<CommonResponse<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
+        log.warn("NoResourceFoundException: {}", ex.getMessage());
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.NOT_FOUND);
+        return ResponseEntity.status(GlobalErrorCode.NOT_FOUND.getHttpStatus()).body(response);
     }
 
     @ExceptionHandler(Exception.class)
@@ -548,11 +593,16 @@ public class CommonResponse<T> {
         this.reasons = reasons;
     }
 
-    // 성공 응답
+    // 성공 응답 (기본 200 OK)
     public static <T> CommonResponse<T> success(T data) {
+        return success(HttpStatus.OK, data);
+    }
+
+    // 성공 응답 (상태코드 지정, 예: 201 Created)
+    public static <T> CommonResponse<T> success(HttpStatus status, T data) {
         return new CommonResponse<>(
                 true,
-                HttpStatus.OK.value(),
+                status.value(),
                 "SUCCESS",
                 "요청이 성공적으로 처리되었습니다.",
                 data,
@@ -582,7 +632,8 @@ public class CommonResponse<T> {
 
 ### 사용 규칙
 
-- Controller에서 성공 응답은 `CommonResponse.success(data)`로 반환한다.
+- Controller에서 성공 응답은 `CommonResponse.success(data)`로 반환한다. (기본 200 OK)
+- 200이 아닌 상태 코드로 응답해야 하는 경우(예: 생성 API의 201 Created)에는 `CommonResponse.success(HttpStatus.CREATED, data)`를 사용해, body의 `status` 필드와 실제 HTTP 상태 코드가 일치하도록 한다.
 - 에러 응답은 직접 생성하지 않고, 예외를 던져 `GlobalExceptionHandler`가 `CommonResponse.error(...)`로 변환하도록 위임한다.
 - 응답 코드(`code`)는 `status`(HTTP 코드)와 별개로, 클라이언트가 케이스를 구분할 수 있는 값으로 사용한다.
 - 반환 데이터가 없는 경우에도 래핑하며, 타입은 `CommonResponse<Void>`를 사용한다.

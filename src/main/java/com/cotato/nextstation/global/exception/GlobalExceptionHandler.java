@@ -5,9 +5,14 @@ import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,9 +30,12 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(error ->
                 reasons.put(error.getField(), error.getDefaultMessage())
         );
+        ex.getBindingResult().getGlobalErrors().forEach(error ->
+                reasons.put(error.getObjectName(), error.getDefaultMessage())
+        );
 
         CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.VALIDATION_ERROR, reasons);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.status(GlobalErrorCode.VALIDATION_ERROR.getHttpStatus()).body(response);
     }
 
     /**
@@ -40,6 +48,61 @@ public class GlobalExceptionHandler {
 
         CommonResponse<Void> response = CommonResponse.error(ex.getErrorCode());
         return ResponseEntity.status(status).body(response);
+    }
+
+    /**
+     * 요청 본문이 비어있거나 JSON 형식이 잘못된 경우 -> 400 Bad Request 반환
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<CommonResponse<Void>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+        log.warn("HttpMessageNotReadableException: {}", ex.getMessage());
+
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.INVALID_REQUEST);
+        return ResponseEntity.status(GlobalErrorCode.INVALID_REQUEST.getHttpStatus()).body(response);
+    }
+
+    /**
+     * 필수 요청 파라미터가 누락된 경우 -> 400 Bad Request 반환
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<CommonResponse<Void>> handleMissingServletRequestParameterException(MissingServletRequestParameterException ex) {
+        log.warn("MissingServletRequestParameterException: {}", ex.getMessage());
+
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.INVALID_REQUEST);
+        return ResponseEntity.status(GlobalErrorCode.INVALID_REQUEST.getHttpStatus()).body(response);
+    }
+
+    /**
+     * 요청 파라미터의 타입이 일치하지 않는 경우 -> 400 Bad Request 반환
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<CommonResponse<Void>> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
+        log.warn("MethodArgumentTypeMismatchException: {}", ex.getMessage());
+
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.INVALID_REQUEST);
+        return ResponseEntity.status(GlobalErrorCode.INVALID_REQUEST.getHttpStatus()).body(response);
+    }
+
+    /**
+     * 지원하지 않는 HTTP 메서드로 요청한 경우 -> 405 Method Not Allowed 반환
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<CommonResponse<Void>> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException ex) {
+        log.warn("HttpRequestMethodNotSupportedException: {}", ex.getMessage());
+
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.METHOD_NOT_ALLOWED);
+        return ResponseEntity.status(GlobalErrorCode.METHOD_NOT_ALLOWED.getHttpStatus()).body(response);
+    }
+
+    /**
+     * 존재하지 않는 경로로 요청한 경우 -> 404 Not Found 반환
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<CommonResponse<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
+        log.warn("NoResourceFoundException: {}", ex.getMessage());
+
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.NOT_FOUND);
+        return ResponseEntity.status(GlobalErrorCode.NOT_FOUND.getHttpStatus()).body(response);
     }
 
     /**

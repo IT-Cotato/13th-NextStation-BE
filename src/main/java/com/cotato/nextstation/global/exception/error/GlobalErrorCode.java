@@ -23,6 +23,9 @@ public enum GlobalErrorCode implements ErrorCode {
     // 404 Not Found
     NOT_FOUND(HttpStatus.NOT_FOUND, "CLIENT_ERROR_404_NOT_FOUND", "리소스를 찾을 수 없습니다."),
 
+    // 405 Method Not Allowed
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "CLIENT_ERROR_405_METHOD_NOT_ALLOWED", "허용되지 않은 HTTP 메서드입니다."),
+
     // 409 Conflict
     DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "CLIENT_ERROR_409_DUPLICATE_RESOURCE", "이미 존재하는 리소스입니다."),
 
