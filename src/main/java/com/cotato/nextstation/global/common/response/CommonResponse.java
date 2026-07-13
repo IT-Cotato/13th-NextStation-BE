@@ -38,11 +38,16 @@ public class CommonResponse<T> {
         this.reasons = reasons;
     }
 
-    // 성공 응답
+    // 성공 응답 (기본 200 OK)
     public static <T> CommonResponse<T> success(T data) {
+        return success(HttpStatus.OK, data);
+    }
+
+    // 성공 응답 (상태코드 지정, 예: 201 Created)
+    public static <T> CommonResponse<T> success(HttpStatus status, T data) {
         return new CommonResponse<>(
                 true,
-                HttpStatus.OK.value(),
+                status.value(),
                 "SUCCESS",
                 "요청이 성공적으로 처리되었습니다.",
                 data,
