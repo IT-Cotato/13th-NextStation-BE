@@ -68,7 +68,7 @@ class DepartureStationControllerTest {
     }
 
     @Test
-    @DisplayName("출발역이 10개를 초과하면 400을 반환한다")
+    @DisplayName("출발역이 10개를 초과하면 409를 반환한다")
     void addDepartureStation_maxExceeded() throws Exception {
         DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L, "집");
         given(departureStationCommandService.addDepartureStation(eq(1L), any()))
@@ -78,8 +78,8 @@ class DepartureStationControllerTest {
                         .header(MEMBER_ID_HEADER, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_MAX_DEPARTURE_STATIONS_EXCEEDED"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_409_MAX_DEPARTURE_STATIONS_EXCEEDED"));
     }
 
     @Test
