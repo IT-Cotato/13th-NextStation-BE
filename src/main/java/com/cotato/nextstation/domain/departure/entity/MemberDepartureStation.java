@@ -28,7 +28,7 @@ import java.time.LocalDateTime;
 @EntityListeners(AuditingEntityListener.class)
 public class MemberDepartureStation extends BaseEntity {
 
-    // 다른 파트 소유 엔티티(member/station)는 A안에 따라 Long id 컬럼으로만 매핑한다.
+    // 연관관계 매핑 대신 FK 식별자(Long)만 보관한다.
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
