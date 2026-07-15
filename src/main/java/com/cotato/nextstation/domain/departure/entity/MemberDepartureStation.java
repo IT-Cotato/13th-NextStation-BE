@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,7 +17,13 @@ import java.time.LocalDateTime;
 
 @Entity
 @Getter
-@Table(name = "member_departure_station")
+@Table(
+        name = "member_departure_station",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_member_departure_station_member_order",
+                columnNames = {"member_id", "order_num"}
+        )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 public class MemberDepartureStation extends BaseEntity {
