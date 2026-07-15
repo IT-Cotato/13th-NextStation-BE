@@ -2,12 +2,27 @@ spring:
   application:
     name: nextstation
   profiles:
-    active: local
+    active: local # 배포 환경에서는 SPRING_PROFILES_ACTIVE 환경변수로 덮어씀 (local/prod)
   jpa:
     hibernate:
     properties:
       hibernate:
         format_sql: true
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          # SMTP 서버 응답 지연 시 요청 스레드가 무한 대기하지 않도록 타임아웃 지정
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+    auth-code-expiration-millis: 1800000 # 이메일 인증코드 유효시간, 30분 (ms)
 
 logging:
   level:
