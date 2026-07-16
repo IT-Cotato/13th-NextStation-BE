@@ -10,7 +10,6 @@ import com.cotato.nextstation.domain.auth.util.VerificationCodeGenerator;
 import com.cotato.nextstation.domain.auth.util.VerificationMailSender;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,7 +20,6 @@ import java.time.LocalDateTime;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class EmailVerificationCommandService {
 
@@ -34,9 +32,21 @@ public class EmailVerificationCommandService {
     private final EmailVerificationRepository emailVerificationRepository;
     private final EmailVerificationRateLimitRepository rateLimitRepository;
     private final VerificationMailSender verificationMailSender;
-
-    @Value("${spring.mail.auth-code-expiration-millis}")
     private final long codeExpirationMillis;
+
+    public EmailVerificationCommandService(
+            MemberRepository memberRepository,
+            EmailVerificationRepository emailVerificationRepository,
+            EmailVerificationRateLimitRepository rateLimitRepository,
+            VerificationMailSender verificationMailSender,
+            @Value("${spring.mail.auth-code-expiration-millis}") long codeExpirationMillis
+    ) {
+        this.memberRepository = memberRepository;
+        this.emailVerificationRepository = emailVerificationRepository;
+        this.rateLimitRepository = rateLimitRepository;
+        this.verificationMailSender = verificationMailSender;
+        this.codeExpirationMillis = codeExpirationMillis;
+    }
 
     // 회원가입 인증
     public void sendSignupVerificationCode(String email) {
