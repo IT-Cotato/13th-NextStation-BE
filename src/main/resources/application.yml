@@ -2,7 +2,7 @@ spring:
   application:
     name: nextstation
   profiles:
-    active: local # 배포 환경에서는 SPRING_PROFILES_ACTIVE 환경변수로 덮어씀 (local/prod)
+    active: local
   jpa:
     hibernate:
     properties:
@@ -22,7 +22,7 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
-    auth-code-expiration-millis: 1800000 # 이메일 인증코드 유효시간, 30분 (ms)
+    auth-code-expiration-millis: 600000 # 이메일 인증번호 유효시간, 10분
 
 logging:
   level:
