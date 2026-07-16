@@ -1,11 +1,7 @@
 package com.cotato.nextstation.domain.place.entity;
 
 import com.cotato.nextstation.global.entity.BaseTimeEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,6 +15,10 @@ public class Place extends BaseTimeEntity {
 
     @Column(name = "station_id", nullable = false)
     private Long stationId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     @Column(nullable = false)
     private String description;
@@ -38,20 +38,17 @@ public class Place extends BaseTimeEntity {
     @Column(name = "y_coordinate", nullable = false)
     private Long yCoordinate;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private PlaceCategory category;
 
     @Builder
-    public Place(Long stationId, String description, String placeName, String address,
-                 String contactNumber, Long xCoordinate, Long yCoordinate, PlaceCategory category) {
+    public Place(Long stationId,  Category category, String description, String placeName, String address,
+                 String contactNumber, Long xCoordinate, Long yCoordinate) {
         this.stationId = stationId;
+        this.category = category;
         this.description = description;
         this.placeName = placeName;
         this.address = address;
         this.contactNumber = contactNumber;
         this.xCoordinate = xCoordinate;
         this.yCoordinate = yCoordinate;
-        this.category = category;
     }
 }
