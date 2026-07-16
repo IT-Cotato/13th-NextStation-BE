@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 
-// 인증코드 자체는 EmailVerification(JPA)에 저장하고, 여기선 발송 rate limit(시간당/일일 카운터, lock)만 Redis로 관리한다.
+// 인증번호 자체는 EmailVerification(JPA)에 저장하고, 여기선 발송 rate limit(시간당/일일 카운터, lock)만 Redis로 관리한다.
 @Repository
 @RequiredArgsConstructor
 public class EmailVerificationRateLimitRepository {

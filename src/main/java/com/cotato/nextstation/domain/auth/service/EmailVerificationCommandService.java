@@ -50,7 +50,7 @@ public class EmailVerificationCommandService {
 
     // 회원가입 인증
     public void sendSignupVerificationCode(String email) {
-        log.info("이메일 인증코드 발송 요청: type={}, email={}", VerificationType.SIGNUP, email);
+        log.info("이메일 인증번호 발송 요청: type={}, email={}", VerificationType.SIGNUP, email);
 
         validateNotAlreadyRegistered(email);
         checkRateLimit(VerificationType.SIGNUP, email);
@@ -66,7 +66,7 @@ public class EmailVerificationCommandService {
         emailVerificationRepository.save(emailVerification);
 
         verificationMailSender.sendVerificationCode(email, code);
-        log.info("이메일 인증코드 발송 완료: type={}, email={}", VerificationType.SIGNUP, email);
+        log.info("이메일 인증번호 발송 완료: type={}, email={}", VerificationType.SIGNUP, email);
     }
 
     // 이미 가입한 이메일인지 확인
@@ -79,20 +79,20 @@ public class EmailVerificationCommandService {
     // 인증 한도 초과 여부 확인
     private void checkRateLimit(VerificationType type, String email) {
         if (rateLimitRepository.existsLock(type, email)) {
-            log.warn("잠금 상태에서 인증코드 재요청: type={}, email={}", type, email);
+            log.warn("잠금 상태에서 인증번호 재요청: type={}, email={}", type, email);
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED);
         }
 
         long hourlyCount = rateLimitRepository.incrementHourlyCount(type, email);
         if (hourlyCount > HOURLY_LIMIT) {
-            log.warn("시간당 인증코드 발송 한도 초과: type={}, email={}, count={}", type, email, hourlyCount);
+            log.warn("시간당 인증번호 발송 한도 초과: type={}, email={}, count={}", type, email, hourlyCount);
             rateLimitRepository.setLock(type, email, HOURLY_LOCK_DURATION);
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED);
         }
 
         long dailyCount = rateLimitRepository.incrementDailyCount(type, email);
         if (dailyCount > DAILY_LIMIT) {
-            log.warn("일일 인증코드 발송 한도 초과: type={}, email={}, count={}", type, email, dailyCount);
+            log.warn("일일 인증번호 발송 한도 초과: type={}, email={}, count={}", type, email, dailyCount);
             rateLimitRepository.setLock(type, email, DAILY_LOCK_DURATION);
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED);
         }
@@ -102,7 +102,7 @@ public class EmailVerificationCommandService {
     private void invalidatePreviousPendingVerification(String email, VerificationType type) {
         emailVerificationRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(email, type, VerificationStatus.PENDING)
                 .ifPresent(previous -> {
-                    log.debug("기존 PENDING 인증코드 무효화: id={}, type={}, email={}", previous.getId(), type, email);
+                    log.debug("기존 PENDING 인증번호 무효화: id={}, type={}, email={}", previous.getId(), type, email);
                     previous.expire();
                 });
     }
