@@ -40,7 +40,7 @@ public class PlaceReviewImage extends BaseEntity {
     private LocalDateTime createdAt;
 
     @Builder
-    public PlaceReviewImage(Place place, PlaceReview placeReview, String imageUrl) {
+    public PlaceReviewImage(PlaceReview placeReview, String imageUrl) {
         this.placeReview = placeReview;
         this.imageUrl = imageUrl;
         this.createdAt = LocalDateTime.now();
