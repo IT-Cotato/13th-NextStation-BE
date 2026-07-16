@@ -12,8 +12,13 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class EmailVerificationRateLimitRepository {
 
+    // 시간당 발송 횟수 카운터 키 (TTL 1시간)
     private static final String HOURLY_COUNT_KEY_FORMAT = "email:verify:count:hour:%s:%s";
+
+    // 일일 발송 횟수 카운터 키 (TTL 1일)
     private static final String DAILY_COUNT_KEY_FORMAT = "email:verify:count:day:%s:%s";
+
+    // 한도 초과 시 재요청 자체를 막는 잠금 키 (TTL = 잠금 기간)
     private static final String LOCK_KEY_FORMAT = "email:verify:lock:%s:%s";
     private static final String LOCK_VALUE = "LOCKED";
 
@@ -31,6 +36,7 @@ public class EmailVerificationRateLimitRepository {
         return Boolean.TRUE.equals(redisTemplate.hasKey(lockKey(type, email)));
     }
 
+    // 한도를 초과한 이메일을 lockDuration 동안 잠가 재요청을 차단한다.
     public void setLock(VerificationType type, String email, Duration lockDuration) {
         redisTemplate.opsForValue().set(lockKey(type, email), LOCK_VALUE, lockDuration);
     }
