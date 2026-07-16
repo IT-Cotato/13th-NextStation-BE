@@ -1,30 +1,39 @@
 package com.cotato.nextstation.domain.auth.service;
 
+import com.cotato.nextstation.domain.auth.entity.EmailVerification;
+import com.cotato.nextstation.domain.auth.entity.VerificationStatus;
 import com.cotato.nextstation.domain.auth.entity.VerificationType;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
+import com.cotato.nextstation.domain.auth.repository.EmailVerificationRepository;
 import com.cotato.nextstation.domain.auth.util.VerificationMailSender;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
 public class EmailVerificationCommandService {
 
+    private static final int MAX_ATTEMPT_COUNT = 5;
+
     private final MemberRepository memberRepository;
+    private final EmailVerificationRepository emailVerificationRepository;
     private final EmailVerificationWriter emailVerificationWriter;
     private final VerificationMailSender verificationMailSender;
     private final long codeExpirationMillis;
 
     public EmailVerificationCommandService(
             MemberRepository memberRepository,
+            EmailVerificationRepository emailVerificationRepository,
             EmailVerificationWriter emailVerificationWriter,
             VerificationMailSender verificationMailSender,
             @Value("${spring.mail.auth-code-expiration-millis}") long codeExpirationMillis
     ) {
         this.memberRepository = memberRepository;
+        this.emailVerificationRepository = emailVerificationRepository;
         this.emailVerificationWriter = emailVerificationWriter;
         this.verificationMailSender = verificationMailSender;
         this.codeExpirationMillis = codeExpirationMillis;
@@ -43,6 +52,40 @@ public class EmailVerificationCommandService {
 
         verificationMailSender.sendVerificationCode(email, code);
         log.info("이메일 인증번호 발송 완료: type={}, email={}", VerificationType.SIGNUP, email);
+    }
+
+    // 회원가입 인증번호 확인
+    @Transactional
+    public void verifySignupCode(String email, String code) {
+        log.info("이메일 인증번호 확인 요청: type={}, email={}", VerificationType.SIGNUP, email);
+
+        EmailVerification verification = emailVerificationRepository
+                .findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(email, VerificationType.SIGNUP, VerificationStatus.PENDING)
+                .orElseThrow(() -> {
+                    log.warn("유효한 인증번호 발송 내역 없음: type={}, email={}", VerificationType.SIGNUP, email);
+                    return new CustomException(AuthErrorCode.EMAIL_VERIFICATION_NOT_FOUND);
+                });
+
+        if (verification.isExpired()) {
+            log.warn("만료된 인증번호로 확인 시도: type={}, email={}", VerificationType.SIGNUP, email);
+            verification.expire();
+            throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_EXPIRED);
+        }
+
+        if (!verification.getVerificationCode().equals(code)) {
+            verification.increaseAttemptCount();
+            log.warn("인증번호 불일치: type={}, email={}, attemptCount={}", VerificationType.SIGNUP, email, verification.getAttemptCount());
+
+            if (verification.getAttemptCount() >= MAX_ATTEMPT_COUNT) {
+                verification.fail();
+                log.warn("인증번호 확인 시도 횟수 초과: type={}, email={}", VerificationType.SIGNUP, email);
+                throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_ATTEMPT_EXCEEDED);
+            }
+            throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_CODE_MISMATCH);
+        }
+
+        verification.verify();
+        log.info("이메일 인증번호 확인 완료: type={}, email={}", VerificationType.SIGNUP, email);
     }
 
     // 이미 가입한 이메일인지 확인
