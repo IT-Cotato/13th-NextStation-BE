@@ -52,8 +52,8 @@ com.cotato.nextstation
 └── global
     ├── config
     ├── common
-    │   ├── response      // CommonResponse 등 공통 응답
-    │   └── entity        // BaseEntity 등
+    │   └── response      // CommonResponse 등 공통 응답
+    ├── entity            // BaseEntity, BaseTimeEntity 등
     ├── exception         // 공통 예외, GlobalExceptionHandler
     ├── security
     └── util
@@ -399,8 +399,12 @@ public interface ErrorCode {
 @RequiredArgsConstructor
 public enum GlobalErrorCode implements ErrorCode {
 
+    INVALID_REQUEST(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_INVALID_REQUEST", "유효하지 않은 요청입니다."),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_VALIDATION_ERROR", "요청 값이 유효하지 않습니다."),
+    NOT_FOUND(HttpStatus.NOT_FOUND, "CLIENT_ERROR_404_NOT_FOUND", "리소스를 찾을 수 없습니다."),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "CLIENT_ERROR_405_METHOD_NOT_ALLOWED", "허용되지 않은 HTTP 메서드입니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR_500_INTERNAL_SERVER_ERROR", "서버 내부 오류입니다."),
+    // ... 그 외 코드는 GlobalErrorCode.java 참고
     ;
 
     private final HttpStatus httpStatus;
