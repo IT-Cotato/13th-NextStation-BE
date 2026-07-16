@@ -25,16 +25,14 @@ import io.swagger.v3.oas.annotations.servers.Server;
 public class SwaggerConfig {
 
 
-    /**
-     * Auth 관련 API (인증/인가)
-     */
+    // Auth 관련 API (인증/인가)
     @Bean
     public GroupedOpenApi authApi() {
         return GroupedOpenApi.builder()
                 .group("Auth")
                 .displayName("Authentication API")
                 .packagesToScan("com.cotato.nextstation.domain.auth.controller")
-                .pathsToMatch("/api/auth/**")
+                .pathsToMatch("/api/v1/auth/**")
                 .build();
     }
 
