@@ -1,9 +1,7 @@
 package com.cotato.nextstation.domain.place.entity;
 
 import com.cotato.nextstation.global.entity.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,8 +16,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Category extends BaseEntity {
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, unique = true)
-    private String code;
+    private CategoryCode code;
 
     @Column(nullable = false)
     private String name;
@@ -29,16 +28,5 @@ public class Category extends BaseEntity {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @Builder
-    public Category(String code, String name, String defaultImageUrl) {
-        this.code = code;
-        this.name = name;
-        this.defaultImageUrl = defaultImageUrl;
-    }
-
-    public void updateDefaultImage(String defaultImageUrl) {
-        this.defaultImageUrl = defaultImageUrl;
-        this.updatedAt = LocalDateTime.now();
-    }
+    
 }
