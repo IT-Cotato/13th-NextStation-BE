@@ -12,8 +12,6 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
             "WHERE pr.place.id = :placeId " +
-            "AND pr.isDeleted = false " +
-            "AND j.isDeleted = false " +
             "ORDER BY pr.createdAt DESC")
     List<PlaceReview> findVisibleReviewsByPlaceId(@Param("placeId") Long placeId);
 }
