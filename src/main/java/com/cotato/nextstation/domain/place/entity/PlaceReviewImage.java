@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "place_photos")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PlacePhoto extends BaseTimeEntity {
+public class PlaceReviewImage extends BaseTimeEntity {
 
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -41,7 +41,7 @@ public class PlacePhoto extends BaseTimeEntity {
     private String imageUrl;
 
     @Builder
-    public PlacePhoto(Place place, PlaceReview placeReview, String imageUrl) {
+    public PlaceReviewImage(Place place, PlaceReview placeReview, String imageUrl) {
         this.place = place;
         this.placeReview = placeReview;
         this.imageUrl = imageUrl;
