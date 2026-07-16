@@ -2,12 +2,7 @@ package com.cotato.nextstation.domain.place.entity;
 
 import com.cotato.nextstation.global.entity.BaseTimeEntity;
 import com.cotato.nextstation.domain.journal.entity.Journal;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,7 +10,13 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "place_review")
+@Table(
+        name = "place_review",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_place_review_journal_place",
+                columnNames = {"journal_id", "place_id"}
+        )
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PlaceReview extends BaseTimeEntity {
