@@ -236,7 +236,8 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 - 기본 생성자는 `@NoArgsConstructor(access = AccessLevel.PROTECTED)`로 외부 무분별한 생성을 막는다.
 - **`@Setter`를 지양**하고, 의미 있는 변경 메서드를 제공한다. (`updateName()`, `changeEmail()`)
 - 생성은 `@Builder` 또는 정적 팩토리 메서드를 사용한다.
-- 공통 필드(생성/수정 시각)는 `BaseEntity`로 분리한다.
+- 공통 필드(id)는 `BaseEntity`로 분리한다.
+- 공통 필드(생성/수정시각)은 `BaseTimeEntity`로 분리한다.
 
 ```java
 @Entity
@@ -244,11 +245,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends BaseEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+    
     @Column(nullable = false, length = 50)
     private String name;
 
@@ -275,15 +272,11 @@ public class Member extends BaseEntity {
 ```java
 @Getter
 @MappedSuperclass
-@EntityListeners(AuditingEntityListener.class)
-public abstract class BaseEntity {
+public class BaseEntity {
 
-    @CreatedDate
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
-
-    @LastModifiedDate
-    private LocalDateTime updatedAt;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 }
 ```
 
