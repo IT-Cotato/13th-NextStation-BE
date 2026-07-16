@@ -33,4 +33,14 @@ public class Category extends BaseEntity {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    public static Category of(CategoryCode code, String name, String defaultImageUrl) {
+        return new Category(code, name, defaultImageUrl);
+    }
+
+    private Category(CategoryCode code, String name, String defaultImageUrl) {
+        this.code = code;
+        this.name = name;
+        this.defaultImageUrl = defaultImageUrl;
+    }
+
 }

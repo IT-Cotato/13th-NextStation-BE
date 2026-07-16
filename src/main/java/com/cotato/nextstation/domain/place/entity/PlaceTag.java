@@ -23,4 +23,13 @@ public class PlaceTag extends BaseEntity {
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
+
+    public static PlaceTag of(PlaceTagName name, boolean isActive) {
+        return new PlaceTag(name, isActive);
+    }
+
+    private PlaceTag(PlaceTagName name, boolean isActive) {
+        this.name = name;
+        this.isActive = isActive;
+    }
 }

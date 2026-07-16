@@ -31,4 +31,13 @@ public class PlaceTagMapping extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_tag_id", nullable = false)
     private PlaceTag placeTag;
+
+    public static PlaceTagMapping of(Place place, PlaceTag placeTag) {
+        return new PlaceTagMapping(place, placeTag);
+    }
+
+    private PlaceTagMapping(Place place, PlaceTag placeTag) {
+        this.place = place;
+        this.placeTag = placeTag;
+    }
 }
