@@ -1,4 +1,4 @@
-package com.cotato.nextstation.domain.place.entity;
+package com.cotato.nextstation.domain.place.enums;
 
 public enum ImageSourceType {
     PLACE,   // 실제 장소 촬영 이미지 (운영자 등록)

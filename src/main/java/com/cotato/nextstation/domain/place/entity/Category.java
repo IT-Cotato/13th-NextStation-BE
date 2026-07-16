@@ -1,9 +1,9 @@
 package com.cotato.nextstation.domain.place.entity;
 
+import com.cotato.nextstation.domain.place.enums.CategoryCode;
 import com.cotato.nextstation.global.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
@@ -28,5 +28,5 @@ public class Category extends BaseEntity {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-    
+
 }

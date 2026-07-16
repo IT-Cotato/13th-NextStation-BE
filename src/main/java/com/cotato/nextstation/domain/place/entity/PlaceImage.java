@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.place.entity;
 
+import com.cotato.nextstation.domain.place.enums.ImageSourceType;
 import com.cotato.nextstation.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

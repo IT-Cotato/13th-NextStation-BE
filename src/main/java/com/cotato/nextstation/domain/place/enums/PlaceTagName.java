@@ -1,4 +1,4 @@
-package com.cotato.nextstation.domain.place.entity;
+package com.cotato.nextstation.domain.place.enums;
 
 // 장소에 부여할 태그 목록
 public enum PlaceTagName {

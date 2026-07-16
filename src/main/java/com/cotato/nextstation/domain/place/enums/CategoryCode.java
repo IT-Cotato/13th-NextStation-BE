@@ -1,4 +1,4 @@
-package com.cotato.nextstation.domain.place.entity;
+package com.cotato.nextstation.domain.place.enums;
 
 public enum CategoryCode {
     CAFE,      // 카페
