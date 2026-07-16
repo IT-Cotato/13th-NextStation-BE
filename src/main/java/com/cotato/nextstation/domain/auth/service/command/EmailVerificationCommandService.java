@@ -1,10 +1,11 @@
-package com.cotato.nextstation.domain.auth.service;
+package com.cotato.nextstation.domain.auth.service.command;
 
 import com.cotato.nextstation.domain.auth.entity.EmailVerification;
 import com.cotato.nextstation.domain.auth.entity.VerificationStatus;
 import com.cotato.nextstation.domain.auth.entity.VerificationType;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.repository.EmailVerificationRepository;
+import com.cotato.nextstation.domain.auth.service.EmailVerificationWriter;
 import com.cotato.nextstation.domain.auth.util.VerificationMailSender;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
@@ -17,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class EmailVerificationCommandService {
 
-    private static final int MAX_ATTEMPT_COUNT = 5;
+    private static final int MAX_ATTEMPT_COUNT = 5; // 최대 인증번호 확인 횟수
 
     private final MemberRepository memberRepository;
     private final EmailVerificationRepository emailVerificationRepository;
@@ -39,7 +40,7 @@ public class EmailVerificationCommandService {
         this.codeExpirationMillis = codeExpirationMillis;
     }
 
-    // 회원가입 인증
+    // 회원가입 인증번호 발송
     public void sendSignupVerificationCode(String email) {
         log.info("이메일 인증번호 발송 요청: type={}, email={}", VerificationType.SIGNUP, email);
 
