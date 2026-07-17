@@ -54,13 +54,12 @@ class CourseCommandServiceTest {
     @DisplayName("코스를 생성하면 코스와 장소들이 저장된다")
     void createCourse_success() {
         // given
-        CourseCreateRequest request = new CourseCreateRequest("성수 코스", 100L, null, List.of(10L, 20L, 30L));
+        CourseCreateRequest request = new CourseCreateRequest("성수 코스", 100L, List.of(10L, 20L, 30L));
         Course saved = course("성수 코스");
         List<CoursePlace> places = List.of(coursePlace(10L, 1), coursePlace(20L, 2), coursePlace(30L, 3));
         given(courseConverter.toCourse(1L, request)).willReturn(saved);
         given(courseRepository.save(saved)).willReturn(saved);
         given(courseConverter.toCoursePlaces(saved.getId(), request.placeIds())).willReturn(places);
-        given(coursePlaceRepository.saveAll(places)).willReturn(places);
 
         // when
         courseCommandService.createCourse(1L, request);
@@ -68,19 +67,19 @@ class CourseCommandServiceTest {
         // then
         verify(courseRepository).save(saved);
         verify(coursePlaceRepository).saveAll(places);
-        verify(courseConverter).toResponse(saved, places);
+        verify(courseConverter).toCreateResponse(saved);
     }
 
     @Test
     @DisplayName("같은 장소가 중복된 요청으로 코스를 생성하면 예외가 발생하고 저장하지 않는다")
     void createCourse_duplicatePlaces() {
         // given
-        CourseCreateRequest request = new CourseCreateRequest("성수 코스", 100L, null, List.of(10L, 10L, 20L));
+        CourseCreateRequest request = new CourseCreateRequest("성수 코스", 100L, List.of(10L, 10L, 20L));
 
         // when & then
         assertThatThrownBy(() -> courseCommandService.createCourse(1L, request))
                 .isInstanceOf(CustomException.class)
-                .hasMessageContaining(CourseErrorCode.INVALID_COURSE_PLACES.getMessage());
+                .hasMessageContaining(CourseErrorCode.DUPLICATE_COURSE_PLACES.getMessage());
         verify(courseRepository, never()).save(any());
         verify(coursePlaceRepository, never()).saveAll(any());
     }
@@ -90,26 +89,40 @@ class CourseCommandServiceTest {
     void updateCourseName_success() {
         // given
         Course course = course("이전 이름");
-        given(courseRepository.findByIdAndMemberIdAndIsDeletedFalse(1L, 1L)).willReturn(Optional.of(course));
-        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(List.of());
+        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.of(course));
 
         // when
         courseCommandService.updateCourseName(1L, 1L, new CourseNameUpdateRequest("새 이름"));
 
         // then
         assertThat(course.getName()).isEqualTo("새 이름");
+        verify(courseConverter).toNameResponse(course);
     }
 
     @Test
-    @DisplayName("없거나 타인 소유 코스의 이름을 수정하면 예외가 발생한다")
+    @DisplayName("없는 코스의 이름을 수정하면 예외가 발생한다")
     void updateCourseName_notFound() {
         // given
-        given(courseRepository.findByIdAndMemberIdAndIsDeletedFalse(1L, 1L)).willReturn(Optional.empty());
+        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> courseCommandService.updateCourseName(1L, 1L, new CourseNameUpdateRequest("새 이름")))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("타인 소유 코스의 이름을 수정하면 권한 예외가 발생하고 이름이 바뀌지 않는다")
+    void updateCourseName_forbidden() {
+        // given — 코스 소유자는 1번 회원, 요청자는 2번 회원
+        Course course = course("이전 이름");
+        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.of(course));
+
+        // when & then
+        assertThatThrownBy(() -> courseCommandService.updateCourseName(2L, 1L, new CourseNameUpdateRequest("새 이름")))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_FORBIDDEN.getMessage());
+        assertThat(course.getName()).isEqualTo("이전 이름");
     }
 
     @Test
@@ -121,7 +134,7 @@ class CourseCommandServiceTest {
         CoursePlace place20 = coursePlace(20L, 2);
         CoursePlace place30 = coursePlace(30L, 3);
         List<CoursePlace> places = List.of(place10, place20, place30);
-        given(courseRepository.findByIdAndMemberIdAndIsDeletedFalse(1L, 1L)).willReturn(Optional.of(course));
+        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.of(course));
         given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(places);
 
         // when
@@ -134,12 +147,22 @@ class CourseCommandServiceTest {
     }
 
     @Test
+    @DisplayName("중복된 장소로 순서를 수정하면 중복 예외가 발생한다")
+    void updateCoursePlaceOrder_duplicatePlaces() {
+        // when & then
+        assertThatThrownBy(() -> courseCommandService.updateCoursePlaceOrder(
+                1L, 1L, new CoursePlaceOrderUpdateRequest(List.of(10L, 10L, 20L))))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.DUPLICATE_COURSE_PLACES.getMessage());
+    }
+
+    @Test
     @DisplayName("코스에 없는 장소로 순서를 수정하면 예외가 발생한다")
     void updateCoursePlaceOrder_mismatch() {
         // given
         Course course = course("코스");
         List<CoursePlace> places = List.of(coursePlace(10L, 1), coursePlace(20L, 2), coursePlace(30L, 3));
-        given(courseRepository.findByIdAndMemberIdAndIsDeletedFalse(1L, 1L)).willReturn(Optional.of(course));
+        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.of(course));
         given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(places);
 
         // when & then

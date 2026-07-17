@@ -49,10 +49,9 @@ public class Course extends BaseTimeEntity {
     private boolean isDeleted;
 
     @Builder
-    private Course(Long memberId, Long stationId, Long conceptTourId, String name) {
+    private Course(Long memberId, Long stationId, String name) {
         this.memberId = memberId;
         this.stationId = stationId;
-        this.conceptTourId = conceptTourId;
         this.name = name;
         this.viewCount = 0;
         this.saveCount = 0;

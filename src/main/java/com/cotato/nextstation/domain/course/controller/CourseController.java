@@ -3,7 +3,8 @@ package com.cotato.nextstation.domain.course.controller;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseNameUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRequest;
-import com.cotato.nextstation.domain.course.dto.response.CourseResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.service.CourseCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import jakarta.validation.Valid;
@@ -30,14 +31,14 @@ public class CourseController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CommonResponse<CourseResponse> createCourse(
+    public CommonResponse<CourseCreateResponse> createCourse(
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @Valid @RequestBody CourseCreateRequest request) {
         return CommonResponse.success(HttpStatus.CREATED, courseCommandService.createCourse(memberId, request));
     }
 
     @PatchMapping("/{courseId}/name")
-    public CommonResponse<CourseResponse> updateCourseName(
+    public CommonResponse<CourseNameResponse> updateCourseName(
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @PathVariable Long courseId,
             @Valid @RequestBody CourseNameUpdateRequest request) {
@@ -45,10 +46,11 @@ public class CourseController {
     }
 
     @PatchMapping("/{courseId}/places/order")
-    public CommonResponse<CourseResponse> updateCoursePlaceOrder(
+    public CommonResponse<Void> updateCoursePlaceOrder(
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @PathVariable Long courseId,
             @Valid @RequestBody CoursePlaceOrderUpdateRequest request) {
-        return CommonResponse.success(courseCommandService.updateCoursePlaceOrder(memberId, courseId, request));
+        courseCommandService.updateCoursePlaceOrder(memberId, courseId, request);
+        return CommonResponse.success(null);
     }
 }

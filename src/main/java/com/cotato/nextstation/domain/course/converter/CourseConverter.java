@@ -1,8 +1,8 @@
 package com.cotato.nextstation.domain.course.converter;
 
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
-import com.cotato.nextstation.domain.course.dto.response.CoursePlaceResponse;
-import com.cotato.nextstation.domain.course.dto.response.CourseResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,6 @@ public class CourseConverter {
         return Course.builder()
                 .memberId(memberId)
                 .stationId(request.stationId())
-                .conceptTourId(request.conceptTourId())
                 .name(request.name())
                 .build();
     }
@@ -32,23 +31,11 @@ public class CourseConverter {
                 .toList();
     }
 
-    public CourseResponse toResponse(Course course, List<CoursePlace> coursePlaces) {
-        return new CourseResponse(
-                course.getId(),
-                course.getName(),
-                course.getStationId(),
-                course.getConceptTourId(),
-                course.getJournalId(),
-                course.getViewCount(),
-                course.getSaveCount(),
-                course.getCreatedAt(),
-                toPlaceResponses(coursePlaces)
-        );
+    public CourseCreateResponse toCreateResponse(Course course) {
+        return new CourseCreateResponse(course.getId(), course.getName(), course.getCreatedAt());
     }
 
-    private List<CoursePlaceResponse> toPlaceResponses(List<CoursePlace> coursePlaces) {
-        return coursePlaces.stream()
-                .map(coursePlace -> new CoursePlaceResponse(coursePlace.getPlaceId(), coursePlace.getOrderNum()))
-                .toList();
+    public CourseNameResponse toNameResponse(Course course) {
+        return new CourseNameResponse(course.getId(), course.getName());
     }
 }

@@ -7,5 +7,5 @@ import java.util.Optional;
 
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
-    Optional<Course> findByIdAndMemberIdAndIsDeletedFalse(Long id, Long memberId);
+    Optional<Course> findByIdAndIsDeletedFalse(Long id);
 }
