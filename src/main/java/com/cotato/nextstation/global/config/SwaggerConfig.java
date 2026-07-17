@@ -18,34 +18,21 @@ import io.swagger.v3.oas.annotations.servers.Server;
         ),
         servers = {
                 @Server(url = "http://localhost:8080", description = "Local Development"),
+                @Server(url = "https://3.37.77.188.nip.io", description = "Production Server"),
         }
 )
 @Configuration
 public class SwaggerConfig {
 
-    /**
-     * User 관련 API
-     */
-    @Bean
-    public GroupedOpenApi userApi() {
-        return GroupedOpenApi.builder()
-                .group("User")
-                .displayName("User API")
-                .packagesToScan("com.cotato.nextstation.domain.user.controller")
-                .pathsToMatch("/api/users/**")
-                .build();
-    }
 
-    /**
-     * Auth 관련 API (인증/인가)
-     */
+    // Auth 관련 API (인증/인가)
     @Bean
     public GroupedOpenApi authApi() {
         return GroupedOpenApi.builder()
                 .group("Auth")
                 .displayName("Authentication API")
                 .packagesToScan("com.cotato.nextstation.domain.auth.controller")
-                .pathsToMatch("/api/auth/**")
+                .pathsToMatch("/api/v1/auth/**")
                 .build();
     }
 
