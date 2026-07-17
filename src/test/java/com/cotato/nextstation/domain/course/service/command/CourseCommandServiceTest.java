@@ -1,4 +1,4 @@
-package com.cotato.nextstation.domain.course.service;
+package com.cotato.nextstation.domain.course.service.command;
 
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;

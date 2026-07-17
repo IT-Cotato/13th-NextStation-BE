@@ -5,7 +5,7 @@ import com.cotato.nextstation.domain.course.dto.request.CourseNameUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
-import com.cotato.nextstation.domain.course.service.CourseCommandService;
+import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

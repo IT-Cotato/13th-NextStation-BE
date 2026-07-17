@@ -6,7 +6,7 @@ import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRe
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
-import com.cotato.nextstation.domain.course.service.CourseCommandService;
+import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
