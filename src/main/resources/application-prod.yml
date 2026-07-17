@@ -11,8 +11,18 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+  mail:
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
 
 logging:
   level:
     com.cotato.nextstation: INFO
     org.hibernate.SQL: warn
+
+jwt:
+  secret: ${JWT_SECRET}
