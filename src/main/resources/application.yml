@@ -22,7 +22,7 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
-    auth-code-expiration-millis: 600000 # 이메일 인증번호 유효시간, 10분
+    auth-code-expiration-millis: 180000 # 이메일 인증번호 유효시간, 3분
 
 logging:
   level:

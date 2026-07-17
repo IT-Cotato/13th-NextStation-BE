@@ -46,7 +46,7 @@ public class VerificationMailSender {
 
             mailSender.send(mimeMessage);
         } catch (MessagingException | MailException e) {
-            log.warn("이메일 발송 실패: to={}", to, e);
+            log.warn("이메일 발송 실패: to={}", EmailMasker.mask(to), e);
             throw new CustomException(GlobalErrorCode.EXTERNAL_API_ERROR);
         }
     }
