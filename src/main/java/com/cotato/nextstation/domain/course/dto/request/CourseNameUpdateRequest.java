@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+@Schema(description = "코스 이름 수정 요청")
 public record CourseNameUpdateRequest(
 
         @Schema(description = "새 코스 이름 (최대 20자)", example = "나만의 보문역 코스")
