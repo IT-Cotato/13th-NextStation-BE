@@ -11,8 +11,18 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  mail:
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
 
 logging:
   level:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-secret-key-change-me-32-bytes-minimum}
