@@ -38,15 +38,15 @@ public class Place extends BaseTimeEntity {
     private String contactNumber;
 
     @Column(name = "x_coordinate", nullable = false)
-    private Long xCoordinate;
+    private Double xCoordinate;
 
     @Column(name = "y_coordinate", nullable = false)
-    private Long yCoordinate;
+    private Double yCoordinate;
 
 
     @Builder
     public Place(Long stationId,  Category category, String description, String placeName, String address,
-                 String contactNumber, Long xCoordinate, Long yCoordinate) {
+                 String contactNumber, Double xCoordinate, Double yCoordinate) {
         this.stationId = stationId;
         this.category = category;
         this.description = description;
