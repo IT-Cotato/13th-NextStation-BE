@@ -5,7 +5,6 @@ import com.cotato.nextstation.domain.place.dto.response.PlaceReviewPreviewRespon
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceImage;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
-import com.cotato.nextstation.domain.place.entity.PlaceTagMapping;
 import org.springframework.stereotype.Component;
 import java.util.List;
 

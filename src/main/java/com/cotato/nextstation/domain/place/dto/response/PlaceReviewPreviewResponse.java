@@ -6,6 +6,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record PlaceReviewPreviewResponse(
         Long reviewId,
         String writerNickname,
-        String content
+        String review
 ) {
 }
