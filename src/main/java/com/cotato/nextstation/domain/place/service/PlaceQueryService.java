@@ -11,6 +11,7 @@ import com.cotato.nextstation.domain.place.repository.PlaceRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -19,6 +20,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PlaceQueryService {
+
+    private static final int REVIEW_PREVIEW_SIZE = 3;
 
     private final PlaceRepository placeRepository;
     private final PlaceImageRepository placeImageRepository;
@@ -30,8 +33,9 @@ public class PlaceQueryService {
                 .orElseThrow(() -> new CustomException(PlaceErrorCode.PLACE_NOT_FOUND));
 
         List<PlaceImage> placeImages = placeImageRepository.findByPlaceOrderBySortOrderAsc(place);
-        List<PlaceReview> reviews = placeReviewRepository.findVisibleReviewsByPlaceId(placeId);
-
+        List<PlaceReview> reviews = placeReviewRepository.findVisibleReviewsByPlaceId(
+                placeId, PageRequest.of(0, REVIEW_PREVIEW_SIZE)
+        );
         return placeConverter.toDetailResponse(place, placeImages, reviews);
     }
 }

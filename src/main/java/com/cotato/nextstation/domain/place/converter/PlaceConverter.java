@@ -11,7 +11,6 @@ import java.util.List;
 @Component
 public class PlaceConverter {
 
-    private static final int REVIEW_PREVIEW_SIZE = 3;
 
     public PlaceDetailResponse toDetailResponse(
             Place place,
@@ -43,7 +42,6 @@ public class PlaceConverter {
 
     private List<PlaceReviewPreviewResponse> toReviewPreviews(List<PlaceReview> reviews) {
         return reviews.stream()
-                .limit(REVIEW_PREVIEW_SIZE)
                 .map(this::toReviewPreview)
                 .toList();
     }

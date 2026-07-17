@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.place.repository;
 
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,5 +15,5 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
             "ORDER BY pr.createdAt DESC")
-    List<PlaceReview> findVisibleReviewsByPlaceId(@Param("placeId") Long placeId);
+    List<PlaceReview> findVisibleReviewsByPlaceId(@Param("placeId") Long placeId, Pageable pageable);
 }
