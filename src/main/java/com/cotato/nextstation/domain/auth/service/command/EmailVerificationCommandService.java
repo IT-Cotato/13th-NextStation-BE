@@ -6,6 +6,7 @@ import com.cotato.nextstation.domain.auth.entity.VerificationType;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.repository.EmailVerificationRepository;
 import com.cotato.nextstation.domain.auth.service.EmailVerificationWriter;
+import com.cotato.nextstation.domain.auth.util.EmailMasker;
 import com.cotato.nextstation.domain.auth.util.VerificationMailSender;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
@@ -42,7 +43,7 @@ public class EmailVerificationCommandService {
 
     // 회원가입 인증번호 발송
     public void sendSignupVerificationCode(String email) {
-        log.info("이메일 인증번호 발송 요청: type={}, email={}", VerificationType.SIGNUP, email);
+        log.info("이메일 인증번호 발송 요청: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
 
         validateNotAlreadyRegistered(email);
 
@@ -52,41 +53,41 @@ public class EmailVerificationCommandService {
         String code = emailVerificationWriter.issue(email, VerificationType.SIGNUP, codeExpirationMillis);
 
         verificationMailSender.sendVerificationCode(email, code);
-        log.info("이메일 인증번호 발송 완료: type={}, email={}", VerificationType.SIGNUP, email);
+        log.info("이메일 인증번호 발송 완료: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
     }
 
     // 회원가입 인증번호 확인
     @Transactional
     public void verifySignupCode(String email, String code) {
-        log.info("이메일 인증번호 확인 요청: type={}, email={}", VerificationType.SIGNUP, email);
+        log.info("이메일 인증번호 확인 요청: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
 
         EmailVerification verification = emailVerificationRepository
                 .findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(email, VerificationType.SIGNUP, VerificationStatus.PENDING)
                 .orElseThrow(() -> {
-                    log.warn("유효한 인증번호 발송 내역 없음: type={}, email={}", VerificationType.SIGNUP, email);
+                    log.warn("유효한 인증번호 발송 내역 없음: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
                     return new CustomException(AuthErrorCode.EMAIL_VERIFICATION_NOT_FOUND);
                 });
 
         if (verification.isExpired()) {
-            log.warn("만료된 인증번호로 확인 시도: type={}, email={}", VerificationType.SIGNUP, email);
+            log.warn("만료된 인증번호로 확인 시도: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
             verification.expire();
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_EXPIRED);
         }
 
         if (!verification.getVerificationCode().equals(code)) {
             verification.increaseAttemptCount();
-            log.warn("인증번호 불일치: type={}, email={}, attemptCount={}", VerificationType.SIGNUP, email, verification.getAttemptCount());
+            log.warn("인증번호 불일치: type={}, email={}, attemptCount={}", VerificationType.SIGNUP, EmailMasker.mask(email), verification.getAttemptCount());
 
             if (verification.getAttemptCount() >= MAX_ATTEMPT_COUNT) {
                 verification.fail();
-                log.warn("인증번호 확인 시도 횟수 초과: type={}, email={}", VerificationType.SIGNUP, email);
+                log.warn("인증번호 확인 시도 횟수 초과: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
                 throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_ATTEMPT_EXCEEDED);
             }
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_CODE_MISMATCH);
         }
 
         verification.verify();
-        log.info("이메일 인증번호 확인 완료: type={}, email={}", VerificationType.SIGNUP, email);
+        log.info("이메일 인증번호 확인 완료: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
     }
 
     // 이미 가입한 이메일인지 확인
