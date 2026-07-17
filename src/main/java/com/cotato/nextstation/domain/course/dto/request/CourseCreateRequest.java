@@ -9,7 +9,7 @@ import java.util.List;
 public record CourseCreateRequest(
 
         @NotBlank(message = "코스 이름은 필수입니다.")
-        @Size(max = 20, message = "코스 이름은 20자 이하여야 합니다.")
+        @Size(max = 20, message = "코스 이름은 최대 20자까지 입력할 수 있어요.")
         String name,
 
         @NotNull(message = "역 ID는 필수입니다.")
