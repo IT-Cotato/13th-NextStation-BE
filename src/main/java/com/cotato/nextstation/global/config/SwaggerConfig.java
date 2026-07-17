@@ -47,4 +47,26 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // 코스 관련 API
+    @Bean
+    public GroupedOpenApi courseApi() {
+        return GroupedOpenApi.builder()
+                .group("Course")
+                .displayName("Course API")
+                .packagesToScan("com.cotato.nextstation.domain.course.controller")
+                .pathsToMatch("/api/v1/courses/**")
+                .build();
+    }
+
+    // 출발역 즐겨찾기 관련 API
+    @Bean
+    public GroupedOpenApi departureStationApi() {
+        return GroupedOpenApi.builder()
+                .group("DepartureStation")
+                .displayName("Departure Station API")
+                .packagesToScan("com.cotato.nextstation.domain.departure.controller")
+                .pathsToMatch("/api/v1/departure-stations/**")
+                .build();
+    }
+
 }
