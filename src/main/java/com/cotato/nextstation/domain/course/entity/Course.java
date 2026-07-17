@@ -8,12 +8,14 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @Table(name = "course")
+@SQLRestriction("is_deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Course extends BaseTimeEntity {
 

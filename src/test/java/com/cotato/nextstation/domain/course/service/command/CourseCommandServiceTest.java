@@ -89,7 +89,7 @@ class CourseCommandServiceTest {
     void updateCourseName_success() {
         // given
         Course course = course("이전 이름");
-        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.of(course));
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
 
         // when
         courseCommandService.updateCourseName(1L, 1L, new CourseNameUpdateRequest("새 이름"));
@@ -103,7 +103,7 @@ class CourseCommandServiceTest {
     @DisplayName("없는 코스의 이름을 수정하면 예외가 발생한다")
     void updateCourseName_notFound() {
         // given
-        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.empty());
+        given(courseRepository.findById(1L)).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> courseCommandService.updateCourseName(1L, 1L, new CourseNameUpdateRequest("새 이름")))
@@ -116,7 +116,7 @@ class CourseCommandServiceTest {
     void updateCourseName_forbidden() {
         // given — 코스 소유자는 1번 회원, 요청자는 2번 회원
         Course course = course("이전 이름");
-        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.of(course));
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
 
         // when & then
         assertThatThrownBy(() -> courseCommandService.updateCourseName(2L, 1L, new CourseNameUpdateRequest("새 이름")))
@@ -134,7 +134,7 @@ class CourseCommandServiceTest {
         CoursePlace place20 = coursePlace(20L, 2);
         CoursePlace place30 = coursePlace(30L, 3);
         List<CoursePlace> places = List.of(place10, place20, place30);
-        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.of(course));
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
         given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(places);
 
         // when
@@ -162,7 +162,7 @@ class CourseCommandServiceTest {
         // given
         Course course = course("코스");
         List<CoursePlace> places = List.of(coursePlace(10L, 1), coursePlace(20L, 2), coursePlace(30L, 3));
-        given(courseRepository.findByIdAndIsDeletedFalse(1L)).willReturn(Optional.of(course));
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
         given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(places);
 
         // when & then

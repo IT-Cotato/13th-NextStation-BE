@@ -60,7 +60,8 @@ public class CourseCommandService {
     }
 
     private Course findOwnedCourse(Long memberId, Long courseId) {
-        Course course = courseRepository.findByIdAndIsDeletedFalse(courseId)
+        // 삭제된 코스는 Course의 @SQLRestriction 으로 조회에서 자동 제외된다.
+        Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
         if (!course.getMemberId().equals(memberId)) {
             throw new CustomException(CourseErrorCode.COURSE_FORBIDDEN);
