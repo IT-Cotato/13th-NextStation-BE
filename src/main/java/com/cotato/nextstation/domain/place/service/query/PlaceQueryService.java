@@ -5,9 +5,11 @@ import com.cotato.nextstation.domain.place.dto.response.PlaceDetailResponse;
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceImage;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
+import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
 import com.cotato.nextstation.domain.place.exception.PlaceErrorCode;
 import com.cotato.nextstation.domain.place.repository.PlaceImageRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceRepository;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -26,16 +28,21 @@ public class PlaceQueryService {
     private final PlaceRepository placeRepository;
     private final PlaceImageRepository placeImageRepository;
     private final PlaceReviewRepository placeReviewRepository;
+    private final PlaceReviewImageRepository placeReviewImageRepository;
     private final PlaceConverter placeConverter;
 
     public PlaceDetailResponse getPlaceDetail(Long placeId) {
         Place place = placeRepository.findById(placeId)
                 .orElseThrow(() -> new CustomException(PlaceErrorCode.PLACE_NOT_FOUND));
 
+
         List<PlaceImage> placeImages = placeImageRepository.findByPlaceOrderBySortOrderAsc(place);
         List<PlaceReview> reviews = placeReviewRepository.findVisibleReviewsByPlaceId(
                 placeId, PageRequest.of(0, REVIEW_PREVIEW_SIZE)
         );
-        return placeConverter.toDetailResponse(place, placeImages, reviews);
+
+        List<Long> reviewIds = reviews.stream().map(PlaceReview::getId).toList();
+        List<PlaceReviewImage> reviewImages = placeReviewImageRepository.findByPlaceReviewIdIn(reviewIds);
+        return placeConverter.toDetailResponse(place, placeImages, reviews, reviewImages);
     }
 }

@@ -5,8 +5,11 @@ import com.cotato.nextstation.domain.place.dto.response.PlaceReviewPreviewRespon
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceImage;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
+import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
 import org.springframework.stereotype.Component;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class PlaceConverter {
@@ -15,8 +18,16 @@ public class PlaceConverter {
     public PlaceDetailResponse toDetailResponse(
             Place place,
             List<PlaceImage> placeImages,
-            List<PlaceReview> reviews
+            List<PlaceReview> reviews,
+            List<PlaceReviewImage> reviewImages
     ) {
+
+        Map<Long, List<String>> imagesByReviewId = reviewImages.stream()
+                .collect(Collectors.groupingBy(
+                        image -> image.getPlaceReview().getId(),
+                        Collectors.mapping(PlaceReviewImage::getImageUrl, Collectors.toList())
+                ));
+
         return new PlaceDetailResponse(
                 place.getId(),
                 place.getPlaceName(),
@@ -25,7 +36,7 @@ public class PlaceConverter {
                 place.getAddress(),
                 place.getContactNumber(),
                 toImageUrls(place, placeImages),
-                toReviewPreviews(reviews)
+                toReviewPreviews(reviews, imagesByReviewId)
         );
     }
 
@@ -40,17 +51,24 @@ public class PlaceConverter {
                 .toList();
     }
 
-    private List<PlaceReviewPreviewResponse> toReviewPreviews(List<PlaceReview> reviews) {
+    private List<PlaceReviewPreviewResponse> toReviewPreviews(
+            List<PlaceReview> reviews,
+                    Map<Long, List<String >> imagesByReviewId
+    ){
         return reviews.stream()
-                .map(this::toReviewPreview)
+                .map(review -> toReviewPreview(review, imagesByReviewId))
                 .toList();
     }
 
-    private PlaceReviewPreviewResponse toReviewPreview(PlaceReview review) {
+    private PlaceReviewPreviewResponse toReviewPreview(PlaceReview review, Map<Long, List<String>> imagesByReviewId) {
         return new PlaceReviewPreviewResponse(
                 review.getId(),
+                review.getJournal().getMember().getId(),
                 review.getJournal().getMember().getNickname(),
-                review.getReview()
+                review.getJournal().getMember().getProfileImageUrl(),
+                review.getReview(),
+                imagesByReviewId.getOrDefault(review.getId(), List.of()),
+                review.getCreatedAt()
         );
     }
 }
