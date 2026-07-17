@@ -57,7 +57,7 @@ public class EmailVerificationCommandService {
     }
 
     // 회원가입 인증번호 확인
-    @Transactional
+    @Transactional(noRollbackFor = CustomException.class)
     public void verifySignupCode(String email, String code) {
         log.info("이메일 인증번호 확인 요청: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
 
