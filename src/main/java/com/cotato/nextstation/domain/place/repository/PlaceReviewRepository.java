@@ -11,6 +11,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     // 장소 상세 조회 - 공개(삭제되지 않은 journal) 기준 리뷰 목록 조회
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
+            "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
             "ORDER BY pr.createdAt DESC")
     List<PlaceReview> findVisibleReviewsByPlaceId(@Param("placeId") Long placeId);

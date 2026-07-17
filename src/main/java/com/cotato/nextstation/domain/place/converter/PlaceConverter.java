@@ -49,7 +49,7 @@ public class PlaceConverter {
     private PlaceReviewPreviewResponse toReviewPreview(PlaceReview review) {
         return new PlaceReviewPreviewResponse(
                 review.getId(),
-                review.getJournal().getMemberId().toString(), // TODO: memberId → nickname 조회 필요
+                review.getJournal().getMember().getNickname(),
                 review.getReview()
         );
     }
