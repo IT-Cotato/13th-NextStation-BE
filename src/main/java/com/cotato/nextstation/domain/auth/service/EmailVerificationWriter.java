@@ -6,6 +6,7 @@ import com.cotato.nextstation.domain.auth.entity.VerificationType;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.repository.EmailVerificationRateLimitRepository;
 import com.cotato.nextstation.domain.auth.repository.EmailVerificationRepository;
+import com.cotato.nextstation.domain.auth.util.EmailMasker;
 import com.cotato.nextstation.domain.auth.util.VerificationCodeGenerator;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -53,20 +54,20 @@ public class EmailVerificationWriter {
     // 인증 한도 초과 여부 확인
     private void checkRateLimit(VerificationType type, String email) {
         if (rateLimitRepository.existsLock(type, email)) {
-            log.warn("잠금 상태에서 인증번호 재요청: type={}, email={}", type, email);
+            log.warn("잠금 상태에서 인증번호 재요청: type={}, email={}", type, EmailMasker.mask(email));
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED);
         }
 
         long hourlyCount = rateLimitRepository.incrementHourlyCount(type, email);
         if (hourlyCount > HOURLY_LIMIT) {
-            log.warn("시간당 인증번호 발송 한도 초과: type={}, email={}, count={}", type, email, hourlyCount);
+            log.warn("시간당 인증번호 발송 한도 초과: type={}, email={}, count={}", type, EmailMasker.mask(email), hourlyCount);
             rateLimitRepository.setLock(type, email, HOURLY_LOCK_DURATION);
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED);
         }
 
         long dailyCount = rateLimitRepository.incrementDailyCount(type, email);
         if (dailyCount > DAILY_LIMIT) {
-            log.warn("일일 인증번호 발송 한도 초과: type={}, email={}, count={}", type, email, dailyCount);
+            log.warn("일일 인증번호 발송 한도 초과: type={}, email={}, count={}", type, EmailMasker.mask(email), dailyCount);
             rateLimitRepository.setLock(type, email, DAILY_LOCK_DURATION);
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED);
         }
@@ -76,7 +77,7 @@ public class EmailVerificationWriter {
     private void invalidatePreviousPendingVerification(String email, VerificationType type) {
         emailVerificationRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(email, type, VerificationStatus.PENDING)
                 .ifPresent(previous -> {
-                    log.debug("기존 PENDING 인증번호 무효화: id={}, type={}, email={}", previous.getId(), type, email);
+                    log.debug("기존 PENDING 인증번호 무효화: id={}, type={}, email={}", previous.getId(), type, EmailMasker.mask(email));
                     previous.expire();
                 });
     }

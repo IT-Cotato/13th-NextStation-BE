@@ -38,8 +38,10 @@ com.cotato.nextstation
 │   ├── member
 │   │   ├── controller
 │   │   ├── service
-│   │   │   ├── MemberCommandService
-│   │   │   └── MemberQueryService
+│   │   │   ├── command
+│   │   │   │   └── MemberCommandService
+│   │   │   └── query
+│   │   │       └── MemberQueryService
 │   │   ├── repository
 │   │   ├── entity
 │   │   ├── dto
@@ -167,9 +169,11 @@ Entity와 DTO 간의 Service 코드를 **Command와 Query로 명확히 분리**�
 
 - Query 메서드는 `@Transactional(readOnly = true)`를 사용한다.
 - Command 메서드는 `@Transactional`을 사용한다.
-- `service` 디렉토리 내 `{domain}CommandService`, `{domain}QueryService`로 작성한다.
+- `service` 하위에 `command`, `query` 패키지를 두고, 그 안에 각각 `{domain}CommandService`, `{domain}QueryService`를 위치시킨다.
 
 ```java
+package com.cotato.nextstation.domain.member.service.command;
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -184,6 +188,8 @@ public class MemberCommandService {
         return memberConverter.toResponse(saved);
     }
 }
+
+package com.cotato.nextstation.domain.member.service.query;
 
 @Service
 @RequiredArgsConstructor

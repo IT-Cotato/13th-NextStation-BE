@@ -2,8 +2,8 @@ package com.cotato.nextstation.domain.departure.controller;
 
 import com.cotato.nextstation.domain.departure.dto.request.DepartureStationCreateRequest;
 import com.cotato.nextstation.domain.departure.dto.response.DepartureStationResponse;
-import com.cotato.nextstation.domain.departure.service.DepartureStationCommandService;
-import com.cotato.nextstation.domain.departure.service.DepartureStationQueryService;
+import com.cotato.nextstation.domain.departure.service.command.DepartureStationCommandService;
+import com.cotato.nextstation.domain.departure.service.query.DepartureStationQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

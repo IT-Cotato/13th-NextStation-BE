@@ -1,4 +1,4 @@
-package com.cotato.nextstation.domain.departure.service;
+package com.cotato.nextstation.domain.departure.service.query;
 
 import com.cotato.nextstation.domain.departure.converter.DepartureStationConverter;
 import com.cotato.nextstation.domain.departure.dto.response.DepartureStationResponse;
