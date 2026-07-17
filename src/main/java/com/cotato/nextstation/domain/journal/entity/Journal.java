@@ -1,9 +1,9 @@
 package com.cotato.nextstation.domain.journal.entity;
 
+import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.global.entity.BaseTimeEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;import lombok.AccessLevel;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,6 +11,10 @@ import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
+/**
+ *  탈퇴/정지된 회원(Member.status)이 작성한 리뷰/일지도 별도 필터링 없이 그대로 노출한다.
+ *
+ */
 @Entity
 @Table(name = "journal")
 @SQLRestriction("is_deleted = false")
@@ -18,8 +22,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Journal extends BaseTimeEntity {
 
-    @Column(name = "member_id", nullable = false)
-    private Long memberId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
 
     @Column(name = "is_public", nullable = false)
     private boolean isPublic;
@@ -31,8 +36,8 @@ public class Journal extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    public Journal(Long memberId, boolean isPublic) {
-        this.memberId = memberId;
+    public Journal(Member member, boolean isPublic) {
+        this.member = member;
         this.isPublic = isPublic;
         this.isDeleted = false;
     }

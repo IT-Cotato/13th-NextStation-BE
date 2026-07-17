@@ -36,6 +36,17 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // Place 관련 API (장소)
+    @Bean
+    public GroupedOpenApi placeApi() {
+        return GroupedOpenApi.builder()
+                .group("Place")
+                .displayName("Place API")
+                .packagesToScan("com.cotato.nextstation.domain.place.controller")
+                .pathsToMatch("/api/v1/places/**")
+                .build();
+    }
+
     // 코스 관련 API
     @Bean
     public GroupedOpenApi courseApi() {
