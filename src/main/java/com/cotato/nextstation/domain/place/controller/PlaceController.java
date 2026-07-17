@@ -1,7 +1,7 @@
 package com.cotato.nextstation.domain.place.controller;
 
 import com.cotato.nextstation.domain.place.dto.response.PlaceDetailResponse;
-import com.cotato.nextstation.domain.place.service.PlaceQueryService;
+import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

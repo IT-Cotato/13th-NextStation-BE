@@ -7,6 +7,7 @@ import com.cotato.nextstation.domain.place.exception.PlaceErrorCode;
 import com.cotato.nextstation.domain.place.repository.PlaceImageRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
+import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

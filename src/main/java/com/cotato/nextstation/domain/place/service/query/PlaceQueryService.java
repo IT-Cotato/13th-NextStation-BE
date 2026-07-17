@@ -1,4 +1,4 @@
-package com.cotato.nextstation.domain.place.service;
+package com.cotato.nextstation.domain.place.service.query;
 
 import com.cotato.nextstation.domain.place.converter.PlaceConverter;
 import com.cotato.nextstation.domain.place.dto.response.PlaceDetailResponse;
