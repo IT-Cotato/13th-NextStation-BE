@@ -12,10 +12,11 @@ import java.util.List;
 @Component
 public class PlaceConverter {
 
+    private static final int REVIEW_PREVIEW_SIZE = 3;
+
     public PlaceDetailResponse toDetailResponse(
             Place place,
             List<PlaceImage> placeImages,
-            List<PlaceTagMapping> tagMappings,
             List<PlaceReview> reviews
     ) {
         return new PlaceDetailResponse(
@@ -26,12 +27,7 @@ public class PlaceConverter {
                 place.getAddress(),
                 place.getContactNumber(),
                 toImageUrls(place, placeImages),
-                tagMappings.stream()
-                        .map(mapping -> mapping.getPlaceTag().getName().name())
-                        .toList(),
-                reviews.stream()
-                        .map(this::toReviewPreview)
-                        .toList()
+                toReviewPreviews(reviews)
         );
     }
 
@@ -43,6 +39,13 @@ public class PlaceConverter {
         }
         return placeImages.stream()
                 .map(PlaceImage::getImageUrl)
+                .toList();
+    }
+
+    private List<PlaceReviewPreviewResponse> toReviewPreviews(List<PlaceReview> reviews) {
+        return reviews.stream()
+                .limit(REVIEW_PREVIEW_SIZE)
+                .map(this::toReviewPreview)
                 .toList();
     }
 

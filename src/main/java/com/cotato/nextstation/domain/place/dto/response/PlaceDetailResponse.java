@@ -13,7 +13,6 @@ public record PlaceDetailResponse(
         String contactNumber,
 
         List<String> images,
-        List<String> tags,
         List<PlaceReviewPreviewResponse> reviews
 ) {
 }
