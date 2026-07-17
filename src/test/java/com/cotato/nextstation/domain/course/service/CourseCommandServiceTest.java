@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,6 +69,20 @@ class CourseCommandServiceTest {
         verify(courseRepository).save(saved);
         verify(coursePlaceRepository).saveAll(places);
         verify(courseConverter).toResponse(saved, places);
+    }
+
+    @Test
+    @DisplayName("같은 장소가 중복된 요청으로 코스를 생성하면 예외가 발생하고 저장하지 않는다")
+    void createCourse_duplicatePlaces() {
+        // given
+        CourseCreateRequest request = new CourseCreateRequest("성수 코스", 100L, null, List.of(10L, 10L, 20L));
+
+        // when & then
+        assertThatThrownBy(() -> courseCommandService.createCourse(1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.INVALID_COURSE_PLACES.getMessage());
+        verify(courseRepository, never()).save(any());
+        verify(coursePlaceRepository, never()).saveAll(any());
     }
 
     @Test

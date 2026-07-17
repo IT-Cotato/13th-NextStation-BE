@@ -31,6 +31,8 @@ public class CourseCommandService {
     private final CourseConverter courseConverter;
 
     public CourseResponse createCourse(Long memberId, CourseCreateRequest request) {
+        validateDistinctPlaces(request.placeIds());
+
         Course savedCourse = courseRepository.save(courseConverter.toCourse(memberId, request));
         List<CoursePlace> coursePlaces = coursePlaceRepository.saveAll(
                 courseConverter.toCoursePlaces(savedCourse.getId(), request.placeIds()));
@@ -48,6 +50,13 @@ public class CourseCommandService {
         List<CoursePlace> coursePlaces = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId);
         reorder(coursePlaces, request.placeIds());
         return courseConverter.toResponse(course, coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId));
+    }
+
+    // 같은 장소를 한 코스에 두 번 담을 수 없다.
+    private void validateDistinctPlaces(List<Long> placeIds) {
+        if (new HashSet<>(placeIds).size() != placeIds.size()) {
+            throw new CustomException(CourseErrorCode.INVALID_COURSE_PLACES);
+        }
     }
 
     private Course findOwnedCourse(Long memberId, Long courseId) {
