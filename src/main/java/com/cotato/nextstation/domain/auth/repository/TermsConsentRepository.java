@@ -14,7 +14,7 @@ public interface TermsConsentRepository extends JpaRepository<TermsConsent, Long
             WHERE t.id IN (
                 SELECT MAX(t2.id) FROM TermsConsent t2 GROUP BY t2.title
             )
-            ORDER BY t.required DESC, t.id ASC
+            ORDER BY t.isRequired DESC, t.id ASC
             """)
     List<TermsConsent> findAllLatestOrderByRequiredDescIdAsc();
 }
