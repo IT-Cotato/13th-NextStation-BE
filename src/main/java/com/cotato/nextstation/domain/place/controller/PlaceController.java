@@ -43,6 +43,7 @@ public class PlaceController {
                 장소에 달린 리뷰 목록을 조회한다.
                 - 정렬: 추천순(likeCount 내림차순, 기본) / 최신순
                 - cursor 기반 페이지네이션
+                - totalCount는 최초 조회(cursor 없음) 시에만 내려주며, 다음 페이지 요청 시 null이다
                 - 비로그인 사용자도 조회 가능 (X-Member-Id 헤더 생략 시 isLiked는 항상 false)
                 """
     )

@@ -32,6 +32,7 @@ public class PlaceReviewConverter {
     }
 
     public PlaceReviewListResponse toListResponse(
+            Long totalCount,
             List<PlaceReview> reviews,
             Map<Long, List<String>> imagesByReviewId,
             Set<Long> likedReviewIds,
@@ -41,7 +42,7 @@ public class PlaceReviewConverter {
         List<PlaceReviewResponse> reviewResponses = reviews.stream()
                 .map(review -> toReviewResponse(review, imagesByReviewId, likedReviewIds))
                 .toList();
-        return new PlaceReviewListResponse(reviewResponses, nextCursor, hasNext);
+        return new PlaceReviewListResponse(totalCount, reviewResponses, nextCursor, hasNext);
     }
 
     private PlaceReviewResponse toReviewResponse(

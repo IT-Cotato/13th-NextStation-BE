@@ -73,4 +73,8 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             @Param("reviewId") Long reviewId,
             Pageable pageable);
 
+    // 장소 리뷰 총 개수
+    @Query("SELECT COUNT(pr) FROM PlaceReview pr WHERE pr.place.id = :placeId")
+    long countByPlaceId(@Param("placeId") Long placeId);
+
 }

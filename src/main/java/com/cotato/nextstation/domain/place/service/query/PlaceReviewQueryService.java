@@ -42,12 +42,15 @@ public class PlaceReviewQueryService {
         boolean hasNext = reviews.size() > pageSize;
         List<PlaceReview> pageContent = hasNext ? reviews.subList(0, pageSize) : reviews;
 
+        // 최초 조회(cursor 없음)일 때만 totalCount 계산
+        Long totalCount = (cursor == null) ? placeReviewRepository.countByPlaceId(placeId) : null;
+
         Set<Long> likedReviewIds = resolveLikedReviewIds(memberId, pageContent);
         Map<Long, List<String>> imagesByReviewId = placeReviewConverter.resolveImagesByReviewId(pageContent);
 
         String nextCursor = hasNext ? buildNextCursor(sort, pageContent.get(pageContent.size() - 1)) : null;
 
-        return placeReviewConverter.toListResponse(pageContent, imagesByReviewId, likedReviewIds, nextCursor, hasNext);
+        return placeReviewConverter.toListResponse(totalCount, pageContent, imagesByReviewId, likedReviewIds, nextCursor, hasNext);
     }
 
     private List<PlaceReview> fetchReviews(Long placeId, PlaceReviewSortType sort, String cursor, Pageable pageable) {
