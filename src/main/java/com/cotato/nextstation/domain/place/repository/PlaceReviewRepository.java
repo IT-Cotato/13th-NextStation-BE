@@ -20,48 +20,6 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "ORDER BY pr.createdAt DESC")
     List<PlaceReview> findVisibleReviewsByPlaceId(@Param("placeId") Long placeId, Pageable pageable);
 
-    // 장소 리뷰 목록 - 최신순, 최초 페이지
-    @Query("SELECT pr FROM PlaceReview pr " +
-            "JOIN FETCH pr.journal j " +
-            "JOIN FETCH j.member m " +
-            "WHERE pr.place.id = :placeId " +
-            "ORDER BY pr.createdAt DESC, pr.id DESC")
-    List<PlaceReview> findByPlaceIdOrderByLatest(@Param("placeId") Long placeId, Pageable pageable);
-
-    // 장소 리뷰 목록 - 최신순, 커서 이후 페이지
-    @Query("SELECT pr FROM PlaceReview pr " +
-            "JOIN FETCH pr.journal j " +
-            "JOIN FETCH j.member m " +
-            "WHERE pr.place.id = :placeId " +
-            "AND (pr.createdAt < :createdAt OR (pr.createdAt = :createdAt AND pr.id < :reviewId)) " +
-            "ORDER BY pr.createdAt DESC, pr.id DESC")
-    List<PlaceReview> findByPlaceIdOrderByLatestAfterCursor(
-            @Param("placeId") Long placeId,
-            @Param("createdAt") LocalDateTime createdAt,
-            @Param("reviewId") Long reviewId,
-            Pageable pageable);
-
-    // 장소 리뷰 목록 - 추천순(likeCount 캐시 컬럼 기준), 최초 페이지
-    @Query("SELECT pr FROM PlaceReview pr " +
-            "JOIN FETCH pr.journal j " +
-            "JOIN FETCH j.member m " +
-            "WHERE pr.place.id = :placeId " +
-            "ORDER BY pr.likeCount DESC, pr.id DESC")
-    List<PlaceReview> findByPlaceIdOrderByRecommend(@Param("placeId") Long placeId, Pageable pageable);
-
-    // 장소 리뷰 목록 - 추천순, 커서 이후 페이지
-    @Query("SELECT pr FROM PlaceReview pr " +
-            "JOIN FETCH pr.journal j " +
-            "JOIN FETCH j.member m " +
-            "WHERE pr.place.id = :placeId " +
-            "AND (pr.likeCount < :likeCount OR (pr.likeCount = :likeCount AND pr.id < :reviewId)) " +
-            "ORDER BY pr.likeCount DESC, pr.id DESC")
-    List<PlaceReview> findByPlaceIdOrderByRecommendAfterCursor(
-            @Param("placeId") Long placeId,
-            @Param("likeCount") long likeCount,
-            @Param("reviewId") Long reviewId,
-            Pageable pageable);
-
     // 좋아요 추가 시 원자적 증가 (동시성 안전)
     @Modifying
     @Query("UPDATE PlaceReview pr SET pr.likeCount = pr.likeCount + 1 WHERE pr.id = :reviewId")
