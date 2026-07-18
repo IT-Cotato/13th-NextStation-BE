@@ -1,10 +1,16 @@
 package com.cotato.nextstation.domain.stamp.service.query;
 
+import com.cotato.nextstation.domain.course.entity.Course;
+import com.cotato.nextstation.domain.stamp.converter.StampCourseConverter;
 import com.cotato.nextstation.domain.stamp.dto.response.StationPopularCoursesResponse;
+import com.cotato.nextstation.domain.stamp.repository.StampCourseRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
+// TODO: Course 도메인 구현 완료 후 CourseQueryService 경유 방식으로 리팩터링 예정
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -12,11 +18,13 @@ public class StampCourseQueryService {
 
     private static final int POPULAR_COURSE_LIMIT = 3;
 
-    // TODO: CourseQueryService에 stationId 기준 인기 코스 조회 메서드 제공받으면 주입
-    // private final CourseQueryService courseQueryService;
+    private final StampCourseRepository stampCourseRepository;
+    private final StampCourseConverter stampCourseConverter;
 
     public StationPopularCoursesResponse getPopularCoursesByStation(Long stationId) {
-        // TODO: courseQueryService.getPopularCoursesByStation(stationId, POPULAR_COURSE_LIMIT) 호출로 교체
-        throw new UnsupportedOperationException("Course 도메인 연동 대기 중");
+        List<Course> courses = stampCourseRepository.findPopularCoursesByStationId(
+                stationId, PageRequest.of(0, POPULAR_COURSE_LIMIT)
+        );
+        return stampCourseConverter.toStationPopularCoursesResponse(courses);
     }
 }
