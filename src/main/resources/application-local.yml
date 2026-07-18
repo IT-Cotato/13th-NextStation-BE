@@ -8,9 +8,13 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+    defer-datasource-initialization: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
+  sql:
+    init:
+      mode: always
   data:
     redis:
       host: ${REDIS_HOST:localhost}
