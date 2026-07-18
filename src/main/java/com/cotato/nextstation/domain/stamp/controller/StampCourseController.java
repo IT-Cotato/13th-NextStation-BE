@@ -8,15 +8,16 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/stamps/stations")
 public class StampCourseController {
+
+    // TODO: Auth 적용 시 X-Member-Id 헤더를 @AuthenticationPrincipal 로 교체한다.
+    private static final String MEMBER_ID_HEADER = "X-Member-Id";
+    private static final String MEMBER_ID_DESCRIPTION = "회원 ID (Auth 적용 전까지 사용하는 임시 헤더)";
 
     private final StampCourseQueryService stampCourseQueryService;
 
@@ -29,9 +30,12 @@ public class StampCourseController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증이 필요함"),
     })
     @GetMapping("/{stationId}/courses")
     public CommonResponse<StationPopularCoursesResponse> getPopularCoursesByStation(
+            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
+            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @Parameter(description = "역 ID", example = "12")
             @PathVariable Long stationId) {
         return CommonResponse.success(stampCourseQueryService.getPopularCoursesByStation(stationId));
