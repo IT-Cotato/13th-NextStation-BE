@@ -10,6 +10,7 @@ import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,10 +31,15 @@ public class PlaceReviewLikeCommandService {
             throw new CustomException(PlaceReviewErrorCode.PLACE_REVIEW_LIKE_ALREADY_EXISTS);
         }
 
+        try {
         placeReviewLikeRepository.save(PlaceReviewLike.builder()
                 .memberId(memberId)
                 .placeReview(review)
                 .build());
+        } catch (DataIntegrityViolationException e) {
+            // 애플리케이션 레벨 중복 체크 사이의 레이스 컨디션을 DB UNIQUE 제약이 잡아낸 경우
+            throw new CustomException(PlaceReviewErrorCode.PLACE_REVIEW_LIKE_ALREADY_EXISTS);
+        }
         placeReviewRepository.incrementLikeCount(reviewId);
 
         long freshCount = refetchLikeCount(review);

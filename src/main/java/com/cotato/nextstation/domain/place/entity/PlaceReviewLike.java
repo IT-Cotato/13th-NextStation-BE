@@ -14,7 +14,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 // 장소 리뷰 좋아요. (member_id, place_review_id) 조합으로 중복 좋아요 방지.
-// likeCount는 별도 캐시 컬럼 없이 이 테이블을 COUNT 집계
 @Entity
 @Table(
         name = "place_review_like",
