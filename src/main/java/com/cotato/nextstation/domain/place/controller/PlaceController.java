@@ -1,16 +1,17 @@
 package com.cotato.nextstation.domain.place.controller;
 
 import com.cotato.nextstation.domain.place.dto.response.PlaceDetailResponse;
+import com.cotato.nextstation.domain.place.dto.response.PlaceReviewListResponse;
+import com.cotato.nextstation.domain.place.enums.PlaceReviewSortType;
 import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
+import com.cotato.nextstation.domain.place.service.query.PlaceReviewQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlaceController {
 
     private final PlaceQueryService placeQueryService;
+    private final PlaceReviewQueryService placeReviewQueryService;
 
     @Operation(
             summary = "장소 상세 조회",
@@ -34,4 +36,33 @@ public class PlaceController {
     public CommonResponse<PlaceDetailResponse> getPlaceDetail(@PathVariable Long placeId) {
         return CommonResponse.success(placeQueryService.getPlaceDetail(placeId));
     }
+
+    @Operation(
+            summary = "장소 리뷰 목록 조회",
+            description = """
+                장소에 달린 리뷰 목록을 조회한다.
+                - 정렬: 추천순(likeCount 내림차순, 기본) / 최신순
+                - cursor 기반 페이지네이션
+                - 비로그인 사용자도 조회 가능 (X-Member-Id 헤더 생략 시 isLiked는 항상 false)
+                """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 장소 (`PlaceErrorCode.PLACE_NOT_FOUND`)"),
+    })
+    @GetMapping("/{placeId}/reviews")
+    public CommonResponse<PlaceReviewListResponse> getReviews(
+            @Parameter(description = "장소 ID", example = "10")
+            @PathVariable Long placeId,
+            @Parameter(description = "정렬 기준", example = "RECOMMEND")
+            @RequestParam(defaultValue = "RECOMMEND") PlaceReviewSortType sort,
+            @Parameter(description = "다음 페이지 커서")
+            @RequestParam(required = false) String cursor,
+            @Parameter(description = "페이지 크기", example = "10")
+            @RequestParam(required = false) Integer size,
+            @Parameter(description = "회원 ID (비로그인 시 생략 가능)", example = "1")
+            @RequestHeader(value = "X-Member-Id", required = false) Long memberId) {
+        return CommonResponse.success(placeReviewQueryService.getReviews(placeId, sort, cursor, size, memberId));
+    }
+
 }

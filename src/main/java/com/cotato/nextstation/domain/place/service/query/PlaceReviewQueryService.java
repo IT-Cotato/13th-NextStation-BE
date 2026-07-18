@@ -1,9 +1,9 @@
 package com.cotato.nextstation.domain.place.service.query;
 
 import com.cotato.nextstation.domain.place.converter.PlaceReviewConverter;
-import com.cotato.nextstation.domain.place.dto.request.PlaceReviewSortType;
 import com.cotato.nextstation.domain.place.dto.response.PlaceReviewListResponse;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
+import com.cotato.nextstation.domain.place.enums.PlaceReviewSortType;
 import com.cotato.nextstation.domain.place.exception.PlaceErrorCode;
 import com.cotato.nextstation.domain.place.repository.PlaceRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewLikeRepository;
