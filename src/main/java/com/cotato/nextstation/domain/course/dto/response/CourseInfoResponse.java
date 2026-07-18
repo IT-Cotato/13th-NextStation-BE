@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 
-@Schema(description = "코스 조회 전용 응답 (도메인 간 조회 포트). 다른 파트가 코스 정보가 필요할 때 사용한다.")
+@Schema(description = "코스 조회 전용 응답으로, 코스 정보가 필요할 때 사용한다.")
 public record CourseInfoResponse(
 
         @Schema(description = "코스 ID", example = "1")

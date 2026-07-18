@@ -14,8 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-// 다른 도메인(Part3 등)이 코스를 조회할 때 사용하는 전용 포트.
-// CourseRepository/CourseErrorCode에 직접 의존하지 않고 이 서비스만 호출하도록 한다 (PR #23 원칙).
+// 다른 도메인이 코스를 조회할 때 사용하는 전용 포트
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
