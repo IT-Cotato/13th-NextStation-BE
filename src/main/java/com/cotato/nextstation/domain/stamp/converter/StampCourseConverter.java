@@ -9,11 +9,12 @@ import java.util.List;
 @Component
 public class StampCourseConverter {
 
+    // TODO: Station 도메인 구현 완료 후 stationName, line 값을 채워서 반환하도록 수정
     public StationPopularCoursesResponse toStationPopularCoursesResponse(List<Course> courses) {
         List<PopularCourseResponse> responses = courses.stream()
                 .map(this::toPopularCourseResponse)
                 .toList();
-        return new StationPopularCoursesResponse(responses);
+        return new StationPopularCoursesResponse(null, null, responses);
     }
 
     private PopularCourseResponse toPopularCourseResponse(Course course) {

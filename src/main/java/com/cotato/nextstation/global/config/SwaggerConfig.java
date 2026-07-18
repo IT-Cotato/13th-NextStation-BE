@@ -69,4 +69,15 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // Stamp 관련 API
+    @Bean
+    public GroupedOpenApi stampApi() {
+        return GroupedOpenApi.builder()
+                .group("Stamp")
+                .displayName("Stamp API")
+                .packagesToScan("com.cotato.nextstation.domain.stamp.controller")
+                .pathsToMatch("/api/v1/stamps/**")
+                .build();
+    }
+
 }
