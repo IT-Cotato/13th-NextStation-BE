@@ -14,9 +14,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -99,4 +99,7 @@ class PlaceReviewLikeControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_PLACE_REVIEW_LIKE_NOT_FOUND"));
     }
+
+
+
 }

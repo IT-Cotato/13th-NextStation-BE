@@ -3,6 +3,7 @@ package com.cotato.nextstation.domain.place.repository;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.place.entity.PlaceReviewLike;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
@@ -26,6 +27,12 @@ public interface PlaceReviewLikeRepository extends JpaRepository<PlaceReviewLike
             "FROM PlaceReviewLike prl " +
             "WHERE prl.memberId = :memberId AND prl.placeReview.id IN :reviewIds")
     List<Long> findLikedReviewIdsByMemberId(@Param("memberId") Long memberId, @Param("reviewIds") List<Long> reviewIds);
+
+
+    // 실제 삭제된 행 개수를 반환 -> 0이면 이미 다른 요청이 먼저 삭제한 것
+    @Modifying
+    @Query("DELETE FROM PlaceReviewLike prl WHERE prl.memberId = :memberId AND prl.placeReview = :placeReview")
+    int deleteByMemberIdAndPlaceReview(@Param("memberId") Long memberId, @Param("placeReview") PlaceReview placeReview);
 
     interface ReviewLikeCount {
         Long getReviewId();

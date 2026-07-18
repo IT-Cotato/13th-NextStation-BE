@@ -49,10 +49,12 @@ public class PlaceReviewLikeCommandService {
     public PlaceReviewLikeResponse unlike(Long memberId, Long reviewId) {
         PlaceReview review = findReview(reviewId);
 
-        PlaceReviewLike like = placeReviewLikeRepository.findByMemberIdAndPlaceReview(memberId, review)
-                .orElseThrow(() -> new CustomException(PlaceReviewErrorCode.PLACE_REVIEW_LIKE_NOT_FOUND));
+        int deletedCount = placeReviewLikeRepository.deleteByMemberIdAndPlaceReview(memberId, review);
 
-        placeReviewLikeRepository.delete(like);
+        if (deletedCount == 0) {
+            throw new CustomException(PlaceReviewErrorCode.PLACE_REVIEW_LIKE_NOT_FOUND);
+        }
+
         placeReviewRepository.decrementLikeCount(reviewId);
 
         long freshCount = refetchLikeCount(review);
