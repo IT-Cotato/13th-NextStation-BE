@@ -62,9 +62,10 @@ public class DrawableStationUpdater implements ApplicationRunner {
                     continue;
                 }
 
-                String[] columns = row.split(CSV_DELIMITER, 2);
+                String[] columns = row.split(CSV_DELIMITER, 3);
                 String stationName = columns[0].trim();
                 String lineName = columns[1].trim();
+                String todo = columns[2].trim();
 
                 Optional<Station> station = stationRepository.findByStationName(stationName);
                 if (station.isEmpty()) {
@@ -76,7 +77,7 @@ public class DrawableStationUpdater implements ApplicationRunner {
                 Line drawLine = lineRepository.findByName(lineName)
                         .orElseThrow(() -> new IllegalStateException("뽑기 대표 노선을 찾을 수 없습니다: lineName=" + lineName));
 
-                station.get().assignAsDrawable(drawLine);
+                station.get().assignAsDrawable(drawLine, todo);
                 updatedCount++;
             }
         }

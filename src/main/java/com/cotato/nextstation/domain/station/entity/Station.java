@@ -42,8 +42,9 @@ public class Station extends BaseEntity {
         this.todo = todo;
     }
 
-    public void assignAsDrawable(Line drawLine) {
+    public void assignAsDrawable(Line drawLine, String todo) {
         this.isDrawable = true;
         this.drawLine = drawLine;
+        this.todo = todo;
     }
 }
