@@ -6,6 +6,7 @@ import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.exception.PlaceErrorCode;
 import com.cotato.nextstation.domain.place.repository.PlaceImageRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceRepository;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +38,8 @@ class PlaceQueryServiceTest {
     private PlaceImageRepository placeImageRepository;
     @Mock
     private PlaceReviewRepository placeReviewRepository;
+    @Mock
+    private PlaceReviewImageRepository placeReviewImageRepository;
     @Mock
     private PlaceConverter placeConverter;
 
@@ -60,8 +64,8 @@ class PlaceQueryServiceTest {
         Place place = mock(Place.class);
         given(placeRepository.findById(placeId)).willReturn(Optional.of(place));
         given(placeImageRepository.findByPlaceOrderBySortOrderAsc(place)).willReturn(List.of());
-        given(placeReviewRepository.findVisibleReviewsByPlaceId(placeId)).willReturn(List.of());
-        given(placeConverter.toDetailResponse(place, List.of(), List.of()))
+        given(placeReviewRepository.findVisibleReviewsByPlaceId(placeId, PageRequest.of(0, 3))).willReturn(List.of());
+        given(placeConverter.toDetailResponse(place, List.of(), List.of(), List.of()))
                 .willReturn(new PlaceDetailResponse(placeId, "보문골한옥집", "설명", "식당", "주소", "02-1234-5678", List.of(), List.of()));
 
         // when
