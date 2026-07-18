@@ -32,13 +32,13 @@ public class TermsConsent extends BaseTimeEntity {
     private String version;
 
     @Column(name = "is_required", nullable = false)
-    private boolean required;
+    private boolean isRequired;
 
     @Builder
-    private TermsConsent(String title, String content, String version, boolean required) {
+    private TermsConsent(String title, String content, String version, boolean isRequired) {
         this.title = title;
         this.content = content;
         this.version = version;
-        this.required = required;
+        this.isRequired = isRequired;
     }
 }
