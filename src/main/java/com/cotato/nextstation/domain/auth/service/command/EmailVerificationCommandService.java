@@ -1,10 +1,13 @@
 package com.cotato.nextstation.domain.auth.service.command;
 
 import com.cotato.nextstation.domain.auth.entity.EmailVerification;
+import com.cotato.nextstation.domain.auth.entity.TermsConsent;
 import com.cotato.nextstation.domain.auth.entity.VerificationStatus;
 import com.cotato.nextstation.domain.auth.entity.VerificationType;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
+import com.cotato.nextstation.domain.auth.exception.TermsErrorCode;
 import com.cotato.nextstation.domain.auth.repository.EmailVerificationRepository;
+import com.cotato.nextstation.domain.auth.repository.TermsConsentRepository;
 import com.cotato.nextstation.domain.auth.service.EmailVerificationWriter;
 import com.cotato.nextstation.domain.auth.util.EmailMasker;
 import com.cotato.nextstation.domain.auth.util.VerificationMailSender;
@@ -15,6 +18,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Slf4j
 @Service
 public class EmailVerificationCommandService {
@@ -23,6 +30,7 @@ public class EmailVerificationCommandService {
 
     private final MemberRepository memberRepository;
     private final EmailVerificationRepository emailVerificationRepository;
+    private final TermsConsentRepository termsConsentRepository;
     private final EmailVerificationWriter emailVerificationWriter;
     private final VerificationMailSender verificationMailSender;
     private final long codeExpirationMillis;
@@ -30,22 +38,25 @@ public class EmailVerificationCommandService {
     public EmailVerificationCommandService(
             MemberRepository memberRepository,
             EmailVerificationRepository emailVerificationRepository,
+            TermsConsentRepository termsConsentRepository,
             EmailVerificationWriter emailVerificationWriter,
             VerificationMailSender verificationMailSender,
             @Value("${spring.mail.auth-code-expiration-millis}") long codeExpirationMillis
     ) {
         this.memberRepository = memberRepository;
         this.emailVerificationRepository = emailVerificationRepository;
+        this.termsConsentRepository = termsConsentRepository;
         this.emailVerificationWriter = emailVerificationWriter;
         this.verificationMailSender = verificationMailSender;
         this.codeExpirationMillis = codeExpirationMillis;
     }
 
     // 회원가입 인증번호 발송
-    public void sendSignupVerificationCode(String email) {
+    public void sendSignupVerificationCode(String email, List<Long> agreedTermsIds) {
         log.info("이메일 인증번호 발송 요청: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
 
         validateNotAlreadyRegistered(email);
+        validateAgreedTerms(agreedTermsIds);
 
         // DB/Redis 쓰기는 EmailVerificationWriter의 트랜잭션 안에서 커밋까지 완료된다.
         // 메일 발송(외부 API 호출)은 그 트랜잭션이 끝난 뒤 여기서 별도로 수행되므로
@@ -94,6 +105,28 @@ public class EmailVerificationCommandService {
     private void validateNotAlreadyRegistered(String email) {
         if (memberRepository.existsByEmail(email)) {
             throw new CustomException(AuthErrorCode.DUPLICATE_EMAIL);
+        }
+    }
+
+    // 필수 약관 동의 여부 확인 (비영속 검증)
+    private void validateAgreedTerms(List<Long> agreedTermsIds) {
+        List<TermsConsent> latestTerms = termsConsentRepository.findAllLatestOrderByRequiredDescIdAsc();
+
+        Set<Long> latestTermsIds = latestTerms.stream()
+                .map(TermsConsent::getId)
+                .collect(Collectors.toSet());
+        if (!latestTermsIds.containsAll(agreedTermsIds)) {
+            log.warn("존재하지 않는 약관 id 포함: agreedTermsIds={}", agreedTermsIds);
+            throw new CustomException(TermsErrorCode.TERMS_NOT_FOUND);
+        }
+
+        Set<Long> requiredTermsIds = latestTerms.stream()
+                .filter(TermsConsent::isRequired)
+                .map(TermsConsent::getId)
+                .collect(Collectors.toSet());
+        if (!agreedTermsIds.containsAll(requiredTermsIds)) {
+            log.warn("필수 약관 미동의: requiredTermsIds={}, agreedTermsIds={}", requiredTermsIds, agreedTermsIds);
+            throw new CustomException(TermsErrorCode.REQUIRED_TERMS_NOT_AGREED);
         }
     }
 }
