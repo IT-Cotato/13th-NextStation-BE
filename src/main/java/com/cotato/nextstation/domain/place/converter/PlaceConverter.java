@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.place.converter;
 
 import com.cotato.nextstation.domain.place.dto.response.PlaceDetailResponse;
+import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceReviewPreviewResponse;
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceImage;
@@ -69,6 +70,23 @@ public class PlaceConverter {
                 review.getReview(),
                 imagesByReviewId.getOrDefault(review.getId(), List.of()),
                 review.getCreatedAt()
+        );
+    }
+
+    public List<PlaceInfoResponse> toPlaceInfoResponses(List<Place> places) {
+        return places.stream()
+                .map(this::toPlaceInfoResponse)
+                .toList();
+    }
+
+    private PlaceInfoResponse toPlaceInfoResponse(Place place) {
+        return new PlaceInfoResponse(
+                place.getId(),
+                place.getPlaceName(),
+                place.getDescription(),
+                place.getCategory().getCode().name(),
+                place.getXCoordinate(),
+                place.getYCoordinate()
         );
     }
 }
