@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.departure.controller;
 
 import com.cotato.nextstation.domain.departure.dto.request.DepartureStationCreateRequest;
+import com.cotato.nextstation.domain.departure.dto.response.DepartureStationCreateResponse;
 import com.cotato.nextstation.domain.departure.dto.response.DepartureStationResponse;
 import com.cotato.nextstation.domain.departure.exception.DepartureStationErrorCode;
 import com.cotato.nextstation.domain.departure.service.command.DepartureStationCommandService;
@@ -55,7 +56,7 @@ class DepartureStationControllerTest {
     void addDepartureStation_created() throws Exception {
         DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L, "집");
         given(departureStationCommandService.addDepartureStation(eq(1L), any()))
-                .willReturn(new DepartureStationResponse(1L, 100L, "왕십리역", List.of("2호선", "5호선"), "집", 1, LocalDateTime.now()));
+                .willReturn(new DepartureStationCreateResponse(1L, 100L, "집", 1, LocalDateTime.now()));
 
         mockMvc.perform(post("/api/v1/departure-stations")
                         .header(MEMBER_ID_HEADER, 1L)
@@ -64,8 +65,6 @@ class DepartureStationControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.stationId").value(100))
-                .andExpect(jsonPath("$.data.stationName").value("왕십리역"))
-                .andExpect(jsonPath("$.data.lines[0]").value("2호선"))
                 .andExpect(jsonPath("$.data.orderNum").value(1));
     }
 

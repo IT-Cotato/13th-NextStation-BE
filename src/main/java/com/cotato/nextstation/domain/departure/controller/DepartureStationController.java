@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.departure.controller;
 
 import com.cotato.nextstation.domain.departure.dto.request.DepartureStationCreateRequest;
+import com.cotato.nextstation.domain.departure.dto.response.DepartureStationCreateResponse;
 import com.cotato.nextstation.domain.departure.dto.response.DepartureStationResponse;
 import com.cotato.nextstation.domain.departure.service.command.DepartureStationCommandService;
 import com.cotato.nextstation.domain.departure.service.query.DepartureStationQueryService;
@@ -42,7 +43,7 @@ public class DepartureStationController {
                     자주 쓰는 출발역을 즐겨찾기에 추가한다.
                     - `stationId`는 역 검색 API(`GET /api/v1/stations`)로 얻는다.
                     - 회원당 최대 10개까지 저장 가능하다.
-                    - 응답에는 역명/노선(`stationName`, `lines`)이 함께 내려간다.
+                    - 추가 응답에는 역명/노선이 포함되지 않는다. (역 정보는 목록 조회에서 제공)
                     """
     )
     @ApiResponses({
@@ -52,7 +53,7 @@ public class DepartureStationController {
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CommonResponse<DepartureStationResponse> addDepartureStation(
+    public CommonResponse<DepartureStationCreateResponse> addDepartureStation(
             @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @Valid @RequestBody DepartureStationCreateRequest request) {

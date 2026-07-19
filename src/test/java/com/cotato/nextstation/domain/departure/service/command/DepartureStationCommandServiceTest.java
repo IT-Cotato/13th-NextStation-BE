@@ -5,7 +5,6 @@ import com.cotato.nextstation.domain.departure.dto.request.DepartureStationCreat
 import com.cotato.nextstation.domain.departure.entity.MemberDepartureStation;
 import com.cotato.nextstation.domain.departure.exception.DepartureStationErrorCode;
 import com.cotato.nextstation.domain.departure.repository.MemberDepartureStationRepository;
-import com.cotato.nextstation.domain.station.service.query.StationQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,7 +13,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,9 +32,6 @@ class DepartureStationCommandServiceTest {
     private MemberDepartureStationRepository memberDepartureStationRepository;
 
     @Mock
-    private StationQueryService stationQueryService;
-
-    @Mock
     private DepartureStationConverter departureStationConverter;
 
     @Test
@@ -51,7 +46,6 @@ class DepartureStationCommandServiceTest {
         given(memberDepartureStationRepository.findMaxOrderNumByMemberId(memberId)).willReturn(3);
         given(departureStationConverter.toEntity(memberId, request, 4)).willReturn(entity);
         given(memberDepartureStationRepository.save(entity)).willReturn(entity);
-        given(stationQueryService.getSummariesByStationIds(any())).willReturn(Map.of());
 
         // when
         departureStationCommandService.addDepartureStation(memberId, request);
@@ -122,7 +116,6 @@ class DepartureStationCommandServiceTest {
         given(memberDepartureStationRepository.findMaxOrderNumByMemberId(memberId)).willReturn(0);
         given(departureStationConverter.toEntity(memberId, request, 1)).willReturn(entity);
         given(memberDepartureStationRepository.save(entity)).willReturn(entity);
-        given(stationQueryService.getSummariesByStationIds(any())).willReturn(Map.of());
 
         // when
         departureStationCommandService.addDepartureStation(memberId, request);

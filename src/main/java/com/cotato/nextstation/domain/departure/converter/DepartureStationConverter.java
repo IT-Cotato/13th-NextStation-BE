@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.departure.converter;
 
 import com.cotato.nextstation.domain.departure.dto.request.DepartureStationCreateRequest;
+import com.cotato.nextstation.domain.departure.dto.response.DepartureStationCreateResponse;
 import com.cotato.nextstation.domain.departure.dto.response.DepartureStationResponse;
 import com.cotato.nextstation.domain.departure.entity.MemberDepartureStation;
 import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
@@ -19,6 +20,16 @@ public class DepartureStationConverter {
                 .label(request.label())
                 .orderNum(orderNum)
                 .build();
+    }
+
+    public DepartureStationCreateResponse toCreateResponse(MemberDepartureStation departureStation) {
+        return new DepartureStationCreateResponse(
+                departureStation.getId(),
+                departureStation.getStationId(),
+                departureStation.getLabel(),
+                departureStation.getOrderNum(),
+                departureStation.getCreatedAt()
+        );
     }
 
     // 역 요약(이름/노선)을 합쳐 응답으로 변환한다. summary가 없으면(역 못 찾음) 이름 null, 노선 빈 목록.
