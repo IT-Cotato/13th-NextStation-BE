@@ -26,6 +26,9 @@ public class PlaceReviewQueryService {
 
     private static final int DEFAULT_SIZE = 10;
 
+    // TODO: 방어적으로 잡은 값. 추후 프론트 실제 요청 사이즈 확인 후 조정 필요.
+    private static final int MAX_SIZE = 50;
+
     private final PlaceRepository placeRepository;
     private final PlaceReviewRepository placeReviewRepository;
     private final PlaceReviewLikeRepository placeReviewLikeRepository;
@@ -34,7 +37,8 @@ public class PlaceReviewQueryService {
     public PlaceReviewListResponse getReviews(Long placeId, PlaceReviewSortType sort, String cursor, Integer size, Long memberId) {
         validatePlaceExists(placeId);
 
-        int pageSize = (size != null) ? size : DEFAULT_SIZE;
+        int pageSize = resolvePageSize(size);
+
         Pageable pageable = PageRequest.of(0, pageSize + 1); // hasNext 판단용 1개 더 조회
 
         List<PlaceReview> reviews = fetchReviews(placeId, sort, cursor, pageable);
@@ -90,5 +94,15 @@ public class PlaceReviewQueryService {
         if (!placeRepository.existsById(placeId)) {
             throw new CustomException(PlaceErrorCode.PLACE_NOT_FOUND);
         }
+    }
+
+    private int resolvePageSize(Integer size) {
+        if (size == null) {
+            return DEFAULT_SIZE;
+        }
+        if (size < 1 || size > MAX_SIZE) {
+            throw new CustomException(PlaceErrorCode.INVALID_PAGE_SIZE);  // 새 에러코드 필요
+        }
+        return size;
     }
 }
