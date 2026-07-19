@@ -115,8 +115,8 @@ class CourseQueryServiceTest {
     @Test
     @DisplayName("역별 인기 코스를 limit 개수만큼 조회해 변환 결과를 반환한다")
     void getPopularCoursesByStation_success() {
-        // given — 인기순 필터/정렬 자체는 리포지토리 쿼리(@DataJpaTest 부재로 미검증) 책임이고,
-        //         여기서는 서비스가 limit을 Pageable로 넘기고 변환 결과를 반환하는지 확인한다.
+        // 인기순 필터/정렬 자체는 리포지토리 쿼리 책임이고,
+        // 여기서는 서비스가 limit을 Pageable로 넘기고 변환 결과를 반환하는지 확인한다.
         List<Course> courses = List.of(course("보문역 코스"), course("성수 코스"));
         List<PopularCourseResponse> responses = List.of(
                 new PopularCourseResponse(1L, "보문역 코스", 300, 128),

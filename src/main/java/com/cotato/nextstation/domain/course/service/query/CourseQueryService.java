@@ -35,16 +35,16 @@ public class CourseQueryService {
         return courseConverter.toPlaceInfoResponses(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId));
     }
 
-    // 역별 인기 코스 상위 limit개 (인기순 = view_count + save_count*2, 동률 시 최신순).
-    // 공개된 여행일지가 있는 코스만 노출한다(비공개/삭제 일지 코스 제외 — CourseRepository 쿼리 주석 참고).
-    // 스탬프 페이지·둘러보기 등 다른 도메인이 CourseRepository/CourseErrorCode에 직접 의존하지 않고 이 메서드를 호출한다.
+    // 역별 인기 코스 상위 limit개
+    // 공개된 여행일지가 있는 코스만 노출한다
+    // 스탬프 페이지·둘러보기 등 다른 도메인이 Course에 직접 의존하지 않고 이 메서드를 호출한다
     public List<PopularCourseResponse> getPopularCoursesByStation(Long stationId, int limit) {
         List<Course> courses = courseRepository.findPopularPublicCoursesByStationId(stationId, PageRequest.of(0, limit));
         return courseConverter.toPopularResponses(courses);
     }
 
     private Course findCourse(Long courseId) {
-        // 삭제된 코스는 Course의 @SQLRestriction 으로 조회에서 자동 제외된다.
+        // 삭제된 코스는 Course의 @SQLRestriction 으로 조회에서 자동 제외된다
         return courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
     }
