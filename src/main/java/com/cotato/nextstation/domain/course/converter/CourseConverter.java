@@ -2,7 +2,9 @@ package com.cotato.nextstation.domain.course.converter;
 
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
+import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import org.springframework.stereotype.Component;
@@ -37,5 +39,24 @@ public class CourseConverter {
 
     public CourseNameResponse toNameResponse(Course course) {
         return new CourseNameResponse(course.getId(), course.getName());
+    }
+
+    public CourseInfoResponse toInfoResponse(Course course) {
+        return new CourseInfoResponse(
+                course.getId(),
+                course.getName(),
+                course.getMemberId(),
+                course.getStationId(),
+                course.getJournalId(),
+                course.getViewCount(),
+                course.getSaveCount(),
+                course.getCreatedAt()
+        );
+    }
+
+    public List<CoursePlaceInfoResponse> toPlaceInfoResponses(List<CoursePlace> coursePlaces) {
+        return coursePlaces.stream()
+                .map(coursePlace -> new CoursePlaceInfoResponse(coursePlace.getPlaceId(), coursePlace.getOrderNum()))
+                .toList();
     }
 }
