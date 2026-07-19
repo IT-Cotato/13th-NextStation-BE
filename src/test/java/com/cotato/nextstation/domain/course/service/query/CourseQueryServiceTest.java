@@ -3,6 +3,7 @@ package com.cotato.nextstation.domain.course.service.query;
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
@@ -12,16 +13,22 @@ import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class CourseQueryServiceTest {
@@ -103,5 +110,27 @@ class CourseQueryServiceTest {
         assertThatThrownBy(() -> courseQueryService.getCoursePlaces(1L))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("역별 인기 코스를 limit 개수만큼 조회해 변환 결과를 반환한다")
+    void getPopularCoursesByStation_success() {
+        // given — 인기순 필터/정렬 자체는 리포지토리 쿼리(@DataJpaTest 부재로 미검증) 책임이고,
+        //         여기서는 서비스가 limit을 Pageable로 넘기고 변환 결과를 반환하는지 확인한다.
+        List<Course> courses = List.of(course("보문역 코스"), course("성수 코스"));
+        List<PopularCourseResponse> responses = List.of(
+                new PopularCourseResponse(1L, "보문역 코스", 300, 128),
+                new PopularCourseResponse(2L, "성수 코스", 200, 50));
+        given(courseRepository.findPopularPublicCoursesByStationId(eq(6L), any(Pageable.class))).willReturn(courses);
+        given(courseConverter.toPopularResponses(courses)).willReturn(responses);
+
+        // when
+        List<PopularCourseResponse> result = courseQueryService.getPopularCoursesByStation(6L, 3);
+
+        // then
+        assertThat(result).isEqualTo(responses);
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(courseRepository).findPopularPublicCoursesByStationId(eq(6L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue()).isEqualTo(PageRequest.of(0, 3));
     }
 }
