@@ -8,6 +8,7 @@ import com.cotato.nextstation.domain.departure.exception.DepartureStationErrorCo
 import com.cotato.nextstation.domain.departure.repository.MemberDepartureStationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,11 +28,19 @@ public class DepartureStationCommandService {
         if (memberDepartureStationRepository.countByMemberId(memberId) >= MAX_DEPARTURE_STATIONS) {
             throw new CustomException(DepartureStationErrorCode.MAX_DEPARTURE_STATIONS_EXCEEDED);
         }
+        if (memberDepartureStationRepository.existsByMemberIdAndStationId(memberId, request.stationId())) {
+            throw new CustomException(DepartureStationErrorCode.DUPLICATE_DEPARTURE_STATION);
+        }
 
         int nextOrderNum = memberDepartureStationRepository.findMaxOrderNumByMemberId(memberId) + 1;
-        MemberDepartureStation saved = memberDepartureStationRepository.save(
-                departureStationConverter.toEntity(memberId, request, nextOrderNum));
-        return departureStationConverter.toCreateResponse(saved);
+        try {
+            MemberDepartureStation saved = memberDepartureStationRepository.save(
+                    departureStationConverter.toEntity(memberId, request, nextOrderNum));
+            return departureStationConverter.toCreateResponse(saved);
+        } catch (DataIntegrityViolationException e) {
+            // 앱 레벨 중복 체크와 저장 사이의 동시 요청을 DB UNIQUE 제약이 잡아낸 경우
+            throw new CustomException(DepartureStationErrorCode.DUPLICATE_DEPARTURE_STATION);
+        }
     }
 
     public void deleteDepartureStation(Long memberId, Long departureStationId) {

@@ -84,6 +84,21 @@ class DepartureStationControllerTest {
     }
 
     @Test
+    @DisplayName("이미 추가한 역이면 409를 반환한다")
+    void addDepartureStation_duplicate() throws Exception {
+        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L);
+        given(departureStationCommandService.addDepartureStation(eq(1L), any()))
+                .willThrow(new CustomException(DepartureStationErrorCode.DUPLICATE_DEPARTURE_STATION));
+
+        mockMvc.perform(post("/api/v1/departure-stations")
+                        .header(MEMBER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_409_DUPLICATE_DEPARTURE_STATION"));
+    }
+
+    @Test
     @DisplayName("역 ID가 없으면 검증 오류로 400을 반환한다")
     void addDepartureStation_validation() throws Exception {
         DepartureStationCreateRequest request = new DepartureStationCreateRequest(null);

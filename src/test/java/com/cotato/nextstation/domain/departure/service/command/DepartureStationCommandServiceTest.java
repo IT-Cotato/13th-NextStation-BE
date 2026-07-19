@@ -71,6 +71,22 @@ class DepartureStationCommandServiceTest {
     }
 
     @Test
+    @DisplayName("이미 추가한 역을 또 추가하면 중복 예외가 발생하고 저장하지 않는다")
+    void addDepartureStation_duplicate() {
+        // given
+        Long memberId = 1L;
+        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L);
+        given(memberDepartureStationRepository.countByMemberId(memberId)).willReturn(3L);
+        given(memberDepartureStationRepository.existsByMemberIdAndStationId(memberId, 100L)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> departureStationCommandService.addDepartureStation(memberId, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(DepartureStationErrorCode.DUPLICATE_DEPARTURE_STATION.getMessage());
+        verify(memberDepartureStationRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("본인 소유 출발역은 삭제된다")
     void deleteDepartureStation_success() {
         // given

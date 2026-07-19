@@ -19,10 +19,17 @@ import java.time.LocalDateTime;
 @Getter
 @Table(
         name = "member_departure_station",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_member_departure_station_member_order",
-                columnNames = {"member_id", "order_num"}
-        )
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_member_departure_station_member_order",
+                        columnNames = {"member_id", "order_num"}
+                ),
+                // 같은 회원이 같은 역을 중복으로 저장하지 못하도록 막는다.
+                @UniqueConstraint(
+                        name = "uk_member_departure_station_member_station",
+                        columnNames = {"member_id", "station_id"}
+                )
+        }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)

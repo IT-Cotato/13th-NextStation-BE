@@ -48,7 +48,9 @@ public class DepartureStationController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "추가 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 (`GlobalErrorCode.VALIDATION_ERROR`)"),
-            @ApiResponse(responseCode = "409", description = "최대 10개 초과 (`DepartureStationErrorCode.MAX_DEPARTURE_STATIONS_EXCEEDED`)"),
+            @ApiResponse(responseCode = "409", description = """
+                    최대 10개 초과 (`DepartureStationErrorCode.MAX_DEPARTURE_STATIONS_EXCEEDED`)
+                    또는 이미 추가한 역 (`DepartureStationErrorCode.DUPLICATE_DEPARTURE_STATION`)"""),
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

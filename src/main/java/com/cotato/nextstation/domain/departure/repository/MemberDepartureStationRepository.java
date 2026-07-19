@@ -14,6 +14,8 @@ public interface MemberDepartureStationRepository extends JpaRepository<MemberDe
 
     long countByMemberId(Long memberId);
 
+    boolean existsByMemberIdAndStationId(Long memberId, Long stationId);
+
     Optional<MemberDepartureStation> findByIdAndMemberId(Long id, Long memberId);
 
     @Query("SELECT COALESCE(MAX(d.orderNum), 0) FROM MemberDepartureStation d WHERE d.memberId = :memberId")
