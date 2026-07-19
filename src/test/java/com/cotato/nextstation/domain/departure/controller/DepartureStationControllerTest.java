@@ -54,9 +54,9 @@ class DepartureStationControllerTest {
     @Test
     @DisplayName("출발역 추가는 201과 저장된 데이터를 반환한다")
     void addDepartureStation_created() throws Exception {
-        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L, "집");
+        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L);
         given(departureStationCommandService.addDepartureStation(eq(1L), any()))
-                .willReturn(new DepartureStationCreateResponse(1L, 100L, "집", 1, LocalDateTime.now()));
+                .willReturn(new DepartureStationCreateResponse(1L, 100L, 1, LocalDateTime.now()));
 
         mockMvc.perform(post("/api/v1/departure-stations")
                         .header(MEMBER_ID_HEADER, 1L)
@@ -71,7 +71,7 @@ class DepartureStationControllerTest {
     @Test
     @DisplayName("출발역이 10개를 초과하면 409를 반환한다")
     void addDepartureStation_maxExceeded() throws Exception {
-        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L, "집");
+        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L);
         given(departureStationCommandService.addDepartureStation(eq(1L), any()))
                 .willThrow(new CustomException(DepartureStationErrorCode.MAX_DEPARTURE_STATIONS_EXCEEDED));
 
@@ -86,7 +86,7 @@ class DepartureStationControllerTest {
     @Test
     @DisplayName("역 ID가 없으면 검증 오류로 400을 반환한다")
     void addDepartureStation_validation() throws Exception {
-        DepartureStationCreateRequest request = new DepartureStationCreateRequest(null, "집");
+        DepartureStationCreateRequest request = new DepartureStationCreateRequest(null);
 
         mockMvc.perform(post("/api/v1/departure-stations")
                         .header(MEMBER_ID_HEADER, 1L)
@@ -102,8 +102,8 @@ class DepartureStationControllerTest {
     void getDepartureStations_success() throws Exception {
         given(departureStationQueryService.getDepartureStations(1L))
                 .willReturn(List.of(
-                        new DepartureStationResponse(1L, 100L, "왕십리역", List.of("2호선"), "집", 1, LocalDateTime.now()),
-                        new DepartureStationResponse(2L, 200L, "강남역", List.of("2호선", "신분당선"), "회사", 2, LocalDateTime.now())));
+                        new DepartureStationResponse(1L, 100L, "왕십리역", List.of("2호선"), 1, LocalDateTime.now()),
+                        new DepartureStationResponse(2L, 200L, "강남역", List.of("2호선", "신분당선"), 2, LocalDateTime.now())));
 
         mockMvc.perform(get("/api/v1/departure-stations")
                         .header(MEMBER_ID_HEADER, 1L))

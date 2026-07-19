@@ -47,7 +47,7 @@ class DepartureStationQueryServiceTest {
                 100L, new StationSummaryResponse(100L, "왕십리역", List.of("2호선")),
                 200L, new StationSummaryResponse(200L, "강남역", List.of("2호선", "신분당선")));
         List<DepartureStationResponse> expected = List.of(
-                new DepartureStationResponse(1L, 100L, "왕십리역", List.of("2호선"), null, 1, null));
+                new DepartureStationResponse(1L, 100L, "왕십리역", List.of("2호선"), 1, null));
         given(memberDepartureStationRepository.findByMemberIdOrderByOrderNumAsc(1L)).willReturn(stored);
         given(stationQueryService.getSummariesByStationIds(List.of(100L, 200L))).willReturn(summaries);
         given(departureStationConverter.toResponses(stored, summaries)).willReturn(expected);

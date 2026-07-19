@@ -15,9 +15,6 @@ public record DepartureStationCreateResponse(
         @Schema(description = "역 ID", example = "42")
         Long stationId,
 
-        @Schema(description = "표시 라벨", example = "집")
-        String label,
-
         @Schema(description = "표시 순서 (1부터)", example = "1")
         int orderNum,
 

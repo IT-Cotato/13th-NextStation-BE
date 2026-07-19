@@ -20,9 +20,6 @@ public record DepartureStationResponse(
         @Schema(description = "소속 노선 목록 (환승역이면 여러 개)", example = "[\"2호선\", \"5호선\"]")
         List<String> lines,
 
-        @Schema(description = "표시 라벨", example = "집")
-        String label,
-
         @Schema(description = "표시 순서 (1부터)", example = "1")
         int orderNum,
 

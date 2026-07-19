@@ -35,9 +35,6 @@ public class MemberDepartureStation extends BaseEntity {
     @Column(name = "station_id", nullable = false)
     private Long stationId;
 
-    @Column(length = 30)
-    private String label;
-
     @Column(name = "order_num", nullable = false)
     private int orderNum;
 
@@ -46,10 +43,9 @@ public class MemberDepartureStation extends BaseEntity {
     private LocalDateTime createdAt;
 
     @Builder
-    private MemberDepartureStation(Long memberId, Long stationId, String label, int orderNum) {
+    private MemberDepartureStation(Long memberId, Long stationId, int orderNum) {
         this.memberId = memberId;
         this.stationId = stationId;
-        this.label = label;
         this.orderNum = orderNum;
     }
 }

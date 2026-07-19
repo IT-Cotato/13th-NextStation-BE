@@ -17,7 +17,6 @@ public class DepartureStationConverter {
         return MemberDepartureStation.builder()
                 .memberId(memberId)
                 .stationId(request.stationId())
-                .label(request.label())
                 .orderNum(orderNum)
                 .build();
     }
@@ -26,7 +25,6 @@ public class DepartureStationConverter {
         return new DepartureStationCreateResponse(
                 departureStation.getId(),
                 departureStation.getStationId(),
-                departureStation.getLabel(),
                 departureStation.getOrderNum(),
                 departureStation.getCreatedAt()
         );
@@ -39,7 +37,6 @@ public class DepartureStationConverter {
                 departureStation.getStationId(),
                 summary != null ? summary.stationName() : null,
                 summary != null ? summary.lines() : List.of(),
-                departureStation.getLabel(),
                 departureStation.getOrderNum(),
                 departureStation.getCreatedAt()
         );
