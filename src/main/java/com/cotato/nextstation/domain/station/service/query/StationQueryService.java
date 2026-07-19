@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-// 역 조회 전용 서비스. 다른 도메인(출발역 등)이 역 정보가 필요할 때 이 서비스를 호출한다.
+// 역 조회 전용 서비스. 다른 도메인이 역 정보가 필요할 때 이 서비스를 호출한다
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -25,7 +25,7 @@ public class StationQueryService {
     private final StationLineRepository stationLineRepository;
     private final StationConverter stationConverter;
 
-    // 역 이름 검색 (현재 전체일치). 못 찾으면 빈 목록.
+    // 역 이름 검색 (현재 전체일치). 못 찾으면 빈 목록
     public List<StationSummaryResponse> searchByName(String keyword) {
         return stationRepository.findByStationName(keyword)
                 .map(station -> {
@@ -35,7 +35,7 @@ public class StationQueryService {
                 .orElseGet(List::of);
     }
 
-    // 출발역 목록 등에서 stationId들로 역 요약(이름/호선)을 일괄 조회할 때 사용.
+    // 출발역 목록 등에서 stationId들로 역 요약을 일괄 조회할 때 사용
     public Map<Long, StationSummaryResponse> getSummariesByStationIds(Collection<Long> stationIds) {
         if (stationIds.isEmpty()) {
             return Map.of();

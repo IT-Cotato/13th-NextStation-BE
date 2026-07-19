@@ -41,7 +41,6 @@ public class DepartureStationController {
             summary = "출발역 즐겨찾기 추가",
             description = """
                     자주 쓰는 출발역을 즐겨찾기에 추가한다.
-                    - `stationId`는 역 검색 API(`GET /api/v1/stations`)로 얻는다.
                     - 회원당 최대 10개까지 저장 가능하다.
                     - 추가 응답에는 역명/노선이 포함되지 않는다. (역 정보는 목록 조회에서 제공)
                     """
@@ -65,7 +64,7 @@ public class DepartureStationController {
             summary = "출발역 즐겨찾기 목록 조회",
             description = """
                     회원이 저장한 출발역 즐겨찾기를 표시 순서대로 조회한다.
-                    - 각 항목에 역명/노선(`stationName`, `lines`)이 포함된다.
+                    - 각 항목에 역명/노선이 포함된다.
                     """
     )
     @ApiResponses({
@@ -84,7 +83,7 @@ public class DepartureStationController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "삭제 성공 (data 없음)"),
-            @ApiResponse(responseCode = "404", description = "본인 소유가 아니거나 존재하지 않음 (`DepartureStationErrorCode.DEPARTURE_STATION_NOT_FOUND`)"),
+            @ApiResponse(responseCode = "404", description = "본인 소유가 아니거나 존재하지 않음 "),
     })
     @DeleteMapping("/{departureStationId}")
     public CommonResponse<Void> deleteDepartureStation(

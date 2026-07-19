@@ -32,7 +32,7 @@ public class DepartureStationConverter {
         );
     }
 
-    // 역 요약(이름/노선)을 합쳐 응답으로 변환한다. summary가 없으면(역 못 찾음) 이름 null, 노선 빈 목록.
+    // 역 이름과 노선을 합쳐 응답으로 변환한다. summary가 없으면 이름 null, 노선 빈 목록
     public DepartureStationResponse toResponse(MemberDepartureStation departureStation, StationSummaryResponse summary) {
         return new DepartureStationResponse(
                 departureStation.getId(),

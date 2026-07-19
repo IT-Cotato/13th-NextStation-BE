@@ -48,7 +48,6 @@ class StationQueryServiceTest {
     @Test
     @DisplayName("역명이 일치하면 소속 노선을 모두 묶어 요약을 반환한다")
     void searchByName_found() {
-        // given — 환승역: 2호선 + 5호선 (view 목은 스터빙 중첩을 피하려 먼저 생성)
         Station station = mock(Station.class);
         given(station.getId()).willReturn(42L);
         StationLineNameView view2 = lineView(42L, "2호선");
