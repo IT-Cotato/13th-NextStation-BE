@@ -1,5 +1,7 @@
 package com.cotato.nextstation.global.util;
 
+import com.cotato.nextstation.global.exception.CustomException;
+import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
@@ -17,7 +19,7 @@ public record CursorData(Long id, Long longValue, LocalDateTime dateTimeValue) {
             byte[] json = OBJECT_MAPPER.writeValueAsBytes(this);
             return Base64.getUrlEncoder().withoutPadding().encodeToString(json);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("커서 인코딩에 실패했습니다.", e);
+            throw new CustomException(GlobalErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -29,7 +31,7 @@ public record CursorData(Long id, Long longValue, LocalDateTime dateTimeValue) {
             byte[] json = Base64.getUrlDecoder().decode(cursor);
             return OBJECT_MAPPER.readValue(json, CursorData.class);
         } catch (Exception e) {
-            throw new IllegalArgumentException("유효하지 않은 커서입니다.");
+            throw new CustomException(GlobalErrorCode.INVALID_CURSOR);
         }
     }
 }

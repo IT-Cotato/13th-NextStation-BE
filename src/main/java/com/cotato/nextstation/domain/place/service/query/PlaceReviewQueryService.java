@@ -9,6 +9,7 @@ import com.cotato.nextstation.domain.place.repository.PlaceRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewLikeRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.global.exception.CustomException;
+import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -67,12 +68,25 @@ public class PlaceReviewQueryService {
             };
         }
 
+        validateCursorMatchesSort(sort, cursorData);
+
+
         return switch (sort) {
             case RECOMMEND -> placeReviewRepository.findByPlaceIdOrderByRecommendAfterCursor(
                     placeId, cursorData.longValue(), cursorData.id(), pageable);
             case LATEST -> placeReviewRepository.findByPlaceIdOrderByLatestAfterCursor(
                     placeId, cursorData.dateTimeValue(), cursorData.id(), pageable);
         };
+    }
+
+    private void validateCursorMatchesSort(PlaceReviewSortType sort, CursorData cursorData) {
+        boolean valid = switch (sort) {
+            case RECOMMEND -> cursorData.id() != null && cursorData.longValue() != null && cursorData.dateTimeValue() == null;
+            case LATEST -> cursorData.id() != null && cursorData.dateTimeValue() != null && cursorData.longValue() == null;
+        };
+        if (!valid) {
+            throw new CustomException(GlobalErrorCode.INVALID_CURSOR);
+        }
     }
 
     private String buildNextCursor(PlaceReviewSortType sort, PlaceReview lastReview) {
