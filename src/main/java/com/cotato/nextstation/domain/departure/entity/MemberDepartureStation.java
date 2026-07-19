@@ -19,17 +19,13 @@ import java.time.LocalDateTime;
 @Getter
 @Table(
         name = "member_departure_station",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_member_departure_station_member_order",
-                        columnNames = {"member_id", "order_num"}
-                ),
-                // 같은 회원이 같은 역을 중복으로 저장하지 못하도록 막는다.
-                @UniqueConstraint(
-                        name = "uk_member_departure_station_member_station",
-                        columnNames = {"member_id", "station_id"}
-                )
-        }
+        // 같은 회원이 같은 역을 중복으로 저장하지 못하도록 막는다.
+        // (member_id, order_num) 유니크는 제거함: order_num은 append 표시 순서일 뿐 엄격한 유니크가 불필요하고,
+        // 동시에 서로 다른 역을 추가할 때 order_num이 충돌해 "중복 역"으로 오인되는 문제를 유발했다.
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_member_departure_station_member_station",
+                columnNames = {"member_id", "station_id"}
+        )
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
