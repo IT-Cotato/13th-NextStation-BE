@@ -11,7 +11,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// Place와 PlaceTag의 N:M 관계를 풀어주는 매핑 테이블.
 @Entity
 @Table(
         name = "place_tag_mapping",
