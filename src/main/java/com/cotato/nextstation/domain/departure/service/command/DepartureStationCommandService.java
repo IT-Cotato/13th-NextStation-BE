@@ -6,10 +6,14 @@ import com.cotato.nextstation.domain.departure.dto.response.DepartureStationResp
 import com.cotato.nextstation.domain.departure.entity.MemberDepartureStation;
 import com.cotato.nextstation.domain.departure.exception.DepartureStationErrorCode;
 import com.cotato.nextstation.domain.departure.repository.MemberDepartureStationRepository;
+import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
+import com.cotato.nextstation.domain.station.service.query.StationQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +23,7 @@ public class DepartureStationCommandService {
     private static final int MAX_DEPARTURE_STATIONS = 10;
 
     private final MemberDepartureStationRepository memberDepartureStationRepository;
+    private final StationQueryService stationQueryService;
     private final DepartureStationConverter departureStationConverter;
 
     public DepartureStationResponse addDepartureStation(Long memberId, DepartureStationCreateRequest request) {
@@ -29,7 +34,11 @@ public class DepartureStationCommandService {
         int nextOrderNum = memberDepartureStationRepository.findMaxOrderNumByMemberId(memberId) + 1;
         MemberDepartureStation saved = memberDepartureStationRepository.save(
                 departureStationConverter.toEntity(memberId, request, nextOrderNum));
-        return departureStationConverter.toResponse(saved);
+
+        StationSummaryResponse summary = stationQueryService
+                .getSummariesByStationIds(List.of(saved.getStationId()))
+                .get(saved.getStationId());
+        return departureStationConverter.toResponse(saved, summary);
     }
 
     public void deleteDepartureStation(Long memberId, Long departureStationId) {

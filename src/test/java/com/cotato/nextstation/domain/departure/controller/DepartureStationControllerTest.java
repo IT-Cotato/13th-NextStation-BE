@@ -55,7 +55,7 @@ class DepartureStationControllerTest {
     void addDepartureStation_created() throws Exception {
         DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L, "집");
         given(departureStationCommandService.addDepartureStation(eq(1L), any()))
-                .willReturn(new DepartureStationResponse(1L, 100L, "집", 1, LocalDateTime.now()));
+                .willReturn(new DepartureStationResponse(1L, 100L, "왕십리역", List.of("2호선", "5호선"), "집", 1, LocalDateTime.now()));
 
         mockMvc.perform(post("/api/v1/departure-stations")
                         .header(MEMBER_ID_HEADER, 1L)
@@ -64,6 +64,8 @@ class DepartureStationControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.stationId").value(100))
+                .andExpect(jsonPath("$.data.stationName").value("왕십리역"))
+                .andExpect(jsonPath("$.data.lines[0]").value("2호선"))
                 .andExpect(jsonPath("$.data.orderNum").value(1));
     }
 
@@ -101,13 +103,15 @@ class DepartureStationControllerTest {
     void getDepartureStations_success() throws Exception {
         given(departureStationQueryService.getDepartureStations(1L))
                 .willReturn(List.of(
-                        new DepartureStationResponse(1L, 100L, "집", 1, LocalDateTime.now()),
-                        new DepartureStationResponse(2L, 200L, "회사", 2, LocalDateTime.now())));
+                        new DepartureStationResponse(1L, 100L, "왕십리역", List.of("2호선"), "집", 1, LocalDateTime.now()),
+                        new DepartureStationResponse(2L, 200L, "강남역", List.of("2호선", "신분당선"), "회사", 2, LocalDateTime.now())));
 
         mockMvc.perform(get("/api/v1/departure-stations")
                         .header(MEMBER_ID_HEADER, 1L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].stationName").value("왕십리역"))
+                .andExpect(jsonPath("$.data[1].lines[1]").value("신분당선"))
                 .andExpect(jsonPath("$.data[0].orderNum").value(1));
     }
 

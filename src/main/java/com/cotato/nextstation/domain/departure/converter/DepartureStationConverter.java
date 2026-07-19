@@ -3,9 +3,11 @@ package com.cotato.nextstation.domain.departure.converter;
 import com.cotato.nextstation.domain.departure.dto.request.DepartureStationCreateRequest;
 import com.cotato.nextstation.domain.departure.dto.response.DepartureStationResponse;
 import com.cotato.nextstation.domain.departure.entity.MemberDepartureStation;
+import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class DepartureStationConverter {
@@ -19,19 +21,25 @@ public class DepartureStationConverter {
                 .build();
     }
 
-    public DepartureStationResponse toResponse(MemberDepartureStation departureStation) {
+    // 역 요약(이름/노선)을 합쳐 응답으로 변환한다. summary가 없으면(역 못 찾음) 이름 null, 노선 빈 목록.
+    public DepartureStationResponse toResponse(MemberDepartureStation departureStation, StationSummaryResponse summary) {
         return new DepartureStationResponse(
                 departureStation.getId(),
                 departureStation.getStationId(),
+                summary != null ? summary.stationName() : null,
+                summary != null ? summary.lines() : List.of(),
                 departureStation.getLabel(),
                 departureStation.getOrderNum(),
                 departureStation.getCreatedAt()
         );
     }
 
-    public List<DepartureStationResponse> toResponses(List<MemberDepartureStation> departureStations) {
+    public List<DepartureStationResponse> toResponses(
+            List<MemberDepartureStation> departureStations,
+            Map<Long, StationSummaryResponse> summariesByStationId) {
         return departureStations.stream()
-                .map(this::toResponse)
+                .map(departureStation -> toResponse(
+                        departureStation, summariesByStationId.get(departureStation.getStationId())))
                 .toList();
     }
 }
