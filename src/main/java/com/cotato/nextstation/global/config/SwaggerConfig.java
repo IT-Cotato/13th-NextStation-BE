@@ -5,8 +5,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.info.License;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.servers.Server;
 
 @OpenAPIDefinition(
@@ -20,6 +22,14 @@ import io.swagger.v3.oas.annotations.servers.Server;
                 @Server(url = "http://localhost:8080", description = "Local Development"),
                 @Server(url = "https://3.37.77.188.nip.io", description = "Production Server"),
         }
+)
+// Authorization: Bearer {token} 헤더가 필요한 API용 인증 스킴
+// 우측 상단 자물쇠(Authorize) 버튼에 토큰 값만 넣으면 Swagger UI가 모든 요청에 자동으로 헤더를 실어 보낸다.
+@SecurityScheme(
+        name = "bearerAuth",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT"
 )
 @Configuration
 public class SwaggerConfig {
