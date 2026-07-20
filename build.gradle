@@ -51,6 +51,9 @@ dependencies {
     // S3 presigned URL 발급
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:4.0.0'
 
+    // 닉네임 금칙어(비속어) 필터링
+    implementation 'io.github.vaneproject:badwordfiltering:1.0.0'
+
 	compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
