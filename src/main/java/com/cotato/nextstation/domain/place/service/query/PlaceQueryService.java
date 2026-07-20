@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.place.service.query;
 
 import com.cotato.nextstation.domain.place.converter.PlaceConverter;
 import com.cotato.nextstation.domain.place.dto.response.PlaceDetailResponse;
+import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceImage;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
@@ -45,4 +46,15 @@ public class PlaceQueryService {
         List<PlaceReviewImage> reviewImages = placeReviewImageRepository.findByPlaceReviewIdIn(reviewIds);
         return placeConverter.toDetailResponse(place, placeImages, reviews, reviewImages);
     }
+
+    public List<PlaceInfoResponse> getPlaceInfos(List<Long> placeIds) {
+        List<Place> places = placeRepository.findAllById(placeIds);
+        return placeConverter.toPlaceInfoResponses(places);
+    }
+
+    public List<PlaceInfoResponse> getPlacesByStation(Long stationId) {
+        List<Place> places = placeRepository.findByStationId(stationId);
+        return placeConverter.toPlaceInfoResponses(places);  // 같은 변환 메서드 재사용
+    }
+
 }
