@@ -22,6 +22,10 @@ spring:
   mail:
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:ap-northeast-2}
 
 logging:
   level:
@@ -33,3 +37,7 @@ jwt:
 
 kakao:
   rest-api-key: ${KAKAO_REST_API_KEY:}
+
+aws:
+  s3:
+    bucket-name: ${AWS_S3_BUCKET_NAME:}
