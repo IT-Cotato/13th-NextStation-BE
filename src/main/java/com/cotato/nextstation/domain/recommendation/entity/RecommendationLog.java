@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
 @EntityListeners(AuditingEntityListener.class)
 public class RecommendationLog extends BaseEntity {
 
-    // 연관관계 매핑 대신 FK 식별자(Long)만 보관한다.
+    // 연관관계 매핑 대신 FK 식별자만 보관한다.
     // 비로그인 랜덤뽑기를 대비해 memberId는 nullable.
     @Column(name = "member_id")
     private Long memberId;

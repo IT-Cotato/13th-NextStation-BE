@@ -32,9 +32,7 @@ public class RecommendationCommandService {
     private final StationPlaceReader stationPlaceReader;
     private final RecommendationConverter recommendationConverter;
 
-    /**
-     * 랜덤뽑기(RANDOM-01). memberId가 있으면(로그인) 직전 추천 1건을 제외한다.
-     */
+    // 랜덤뽑기. memberId가 있으면 직전 추천 1건을 제외한다.
     public RandomRecommendationResponse drawRandom(Long memberId) {
         Station picked = pickDrawableStation(memberId);
         recommendationLogRepository.save(
@@ -60,7 +58,7 @@ public class RecommendationCommandService {
         return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
     }
 
-    // 로그인 사용자의 직전 추천 1건을 후보에서 제외한다. 제외 후 비면(뽑기 역이 1개뿐) 전체에서 다시 뽑는다.
+    // 로그인 사용자의 직전 추천 1건을 후보에서 제외한다.
     private List<Station> excludeLastRecommended(List<Station> drawables, Long memberId) {
         if (memberId == null) {
             return drawables;
@@ -79,7 +77,7 @@ public class RecommendationCommandService {
         return filtered.isEmpty() ? drawables : filtered;
     }
 
-    // 카테고리 노출 순서대로 카테고리당 첫 장소 1개씩 선택한다. 장소가 없는 카테고리는 건너뛴다(COURSE-01).
+    // 카테고리 노출 순서대로 카테고리당 첫 장소 1개씩 선택한다. 장소가 없는 카테고리는 건너뛴다.
     private List<StationPlaceView> selectOnePerCategory(List<StationPlaceView> places) {
         List<StationPlaceView> selected = new ArrayList<>();
         for (String categoryCode : CATEGORY_DISPLAY_ORDER) {
