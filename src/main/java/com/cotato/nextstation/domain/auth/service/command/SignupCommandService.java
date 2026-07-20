@@ -59,16 +59,16 @@ public class SignupCommandService {
                         .build()
         );
 
-        agreedTermsIds.forEach(termsConsentId ->
-                memberTermsAgreementRepository.save(
-                        MemberTermsAgreement.builder()
-                                .memberId(member.getId())
-                                .termsConsentsId(termsConsentId)
-                                .agreed(true)
-                                .ipAddress(ipAddress)
-                                .build()
-                )
-        );
+        List<MemberTermsAgreement> agreements = agreedTermsIds.stream()
+                .distinct()
+                .map(termsConsentId -> MemberTermsAgreement.builder()
+                        .memberId(member.getId())
+                        .termsConsentsId(termsConsentId)
+                        .agreed(true)
+                        .ipAddress(ipAddress)
+                        .build())
+                .toList();
+        memberTermsAgreementRepository.saveAll(agreements);
 
         String signupToken = jwtProvider.generateToken(
                 member.getId().toString(),
