@@ -27,7 +27,7 @@ class PlaceInfoQueryServiceTest {
     @InjectMocks
     private PlaceInfoQueryService placeInfoQueryService;
 
-
+    @Mock
     private PlaceRepository placeRepository;
 
     @Mock
