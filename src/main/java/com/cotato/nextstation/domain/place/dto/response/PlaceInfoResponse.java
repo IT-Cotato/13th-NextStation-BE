@@ -14,7 +14,13 @@ public record PlaceInfoResponse(
         String description,
 
         @Schema(description = "카테고리", example = "CULTURE")
-        String category,
+        String categoryCode,
+
+        @Schema(description = "카테고리명", example = "문화공간")
+        String categoryName,
+
+        @Schema(description = "대표 이미지 URL (장소 이미지 없으면 카테고리 기본 이미지로 대체)")
+        String imageUrl,
 
         @Schema(description = "x좌표", example = "127.123")
         Double xCoordinate,
