@@ -11,6 +11,7 @@ import com.cotato.nextstation.domain.auth.repository.EmailVerificationRepository
 import com.cotato.nextstation.domain.auth.repository.MemberTermsAgreementRepository;
 import com.cotato.nextstation.domain.auth.repository.TermsConsentRepository;
 import com.cotato.nextstation.domain.auth.util.EmailMasker;
+import com.cotato.nextstation.domain.auth.util.SignupTokenClaims;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
@@ -18,6 +19,7 @@ import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +36,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SignupCommandService {
 
-    private static final String SIGNUP_TOKEN_PURPOSE = "SIGNUP";
     private static final Duration SIGNUP_TOKEN_EXPIRATION = Duration.ofMinutes(30);
 
     private final MemberRepository memberRepository;
@@ -60,12 +61,19 @@ public class SignupCommandService {
         validateEmailVerified(email);
         validateAgreedTerms(agreedTermsIds);
 
-        Member member = memberRepository.save(
-                Member.builder()
-                        .email(email)
-                        .password(passwordEncoder.encode(password))
-                        .build()
-        );
+        Member member;
+        try {
+            member = memberRepository.save(
+                    Member.builder()
+                            .email(email)
+                            .password(passwordEncoder.encode(password))
+                            .build()
+            );
+        } catch (DataIntegrityViolationException e) {
+            // 위 findByEmail 조회 이후 동시에 같은 이메일로 들어온 요청이 먼저 저장된 경우 (레이스 컨디션)
+            log.warn("이메일 중복 저장 시도(레이스 컨디션): email={}", EmailMasker.mask(email));
+            throw new CustomException(AuthErrorCode.DUPLICATE_EMAIL);
+        }
 
         List<MemberTermsAgreement> agreements = agreedTermsIds.stream()
                 .distinct()
@@ -112,7 +120,7 @@ public class SignupCommandService {
     private String issueSignupToken(Long memberId) {
         return jwtProvider.generateToken(
                 memberId.toString(),
-                Map.of("purpose", SIGNUP_TOKEN_PURPOSE),
+                Map.of(SignupTokenClaims.PURPOSE_KEY, SignupTokenClaims.SIGNUP_PURPOSE),
                 SIGNUP_TOKEN_EXPIRATION
         );
     }
