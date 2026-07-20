@@ -9,6 +9,7 @@ import com.cotato.nextstation.domain.auth.exception.TermsErrorCode;
 import com.cotato.nextstation.domain.auth.repository.EmailVerificationRepository;
 import com.cotato.nextstation.domain.auth.repository.MemberTermsAgreementRepository;
 import com.cotato.nextstation.domain.auth.repository.TermsConsentRepository;
+import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
@@ -23,8 +24,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -84,14 +87,27 @@ class SignupCommandServiceTest {
         return member;
     }
 
+    private Member pendingMember() {
+        Member member = Member.builder().email(EMAIL).password("encoded").build();
+        ReflectionTestUtils.setField(member, "id", 1L);
+        return member;
+    }
+
+    private Member activeMember() {
+        Member member = Member.builder().email(EMAIL).password("encoded").build();
+        ReflectionTestUtils.setField(member, "id", 1L);
+        member.completeProfile("기존닉네임", null, Gender.UNSPECIFIED, LocalDate.of(2000, 1, 1));
+        return member;
+    }
+
     @Test
     @DisplayName("정상 요청이면 회원이 생성되고 약관 동의가 저장되고 signupToken이 발급된다")
     void signup_success() {
         // given
-        given(memberRepository.existsByEmail(EMAIL)).willReturn(false);
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
         given(emailVerificationRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(
                 EMAIL, VerificationType.SIGNUP, VerificationStatus.VERIFIED))
-                .willReturn(java.util.Optional.of(verifiedEmailVerification()));
+                .willReturn(Optional.of(verifiedEmailVerification()));
         given(termsConsentRepository.findAllLatestOrderByRequiredDescIdAsc())
                 .willReturn(List.of(requiredTerms(1L)));
         given(passwordEncoder.encode(PASSWORD)).willReturn("encoded");
@@ -115,14 +131,14 @@ class SignupCommandServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.PASSWORD_CONFIRMATION_MISMATCH.getMessage());
         verify(memberRepository, never()).save(any());
-        verify(memberRepository, never()).existsByEmail(anyString());
+        verify(memberRepository, never()).findByEmail(anyString());
     }
 
     @Test
-    @DisplayName("이미 가입된 이메일이면 예외가 발생한다")
+    @DisplayName("이미 프로필 설정까지 완료된(ACTIVE) 이메일이면 예외가 발생한다")
     void signup_duplicateEmail() {
         // given
-        given(memberRepository.existsByEmail(EMAIL)).willReturn(true);
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(activeMember()));
 
         // when & then
         assertThatThrownBy(() -> signupCommandService.signup(EMAIL, PASSWORD, PASSWORD, List.of(1L), "127.0.0.1"))
@@ -135,10 +151,10 @@ class SignupCommandServiceTest {
     @DisplayName("이메일 인증이 완료되지 않았으면 예외가 발생한다")
     void signup_emailNotVerified() {
         // given
-        given(memberRepository.existsByEmail(EMAIL)).willReturn(false);
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
         given(emailVerificationRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(
                 EMAIL, VerificationType.SIGNUP, VerificationStatus.VERIFIED))
-                .willReturn(java.util.Optional.empty());
+                .willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> signupCommandService.signup(EMAIL, PASSWORD, PASSWORD, List.of(1L), "127.0.0.1"))
@@ -151,10 +167,10 @@ class SignupCommandServiceTest {
     @DisplayName("필수 약관을 동의하지 않으면 예외가 발생한다")
     void signup_requiredTermsNotAgreed() {
         // given
-        given(memberRepository.existsByEmail(EMAIL)).willReturn(false);
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
         given(emailVerificationRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(
                 EMAIL, VerificationType.SIGNUP, VerificationStatus.VERIFIED))
-                .willReturn(java.util.Optional.of(verifiedEmailVerification()));
+                .willReturn(Optional.of(verifiedEmailVerification()));
         given(termsConsentRepository.findAllLatestOrderByRequiredDescIdAsc())
                 .willReturn(List.of(requiredTerms(1L)));
 
@@ -169,10 +185,10 @@ class SignupCommandServiceTest {
     @DisplayName("존재하지 않는 약관 id가 포함되면 예외가 발생한다")
     void signup_termsNotFound() {
         // given
-        given(memberRepository.existsByEmail(EMAIL)).willReturn(false);
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
         given(emailVerificationRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(
                 EMAIL, VerificationType.SIGNUP, VerificationStatus.VERIFIED))
-                .willReturn(java.util.Optional.of(verifiedEmailVerification()));
+                .willReturn(Optional.of(verifiedEmailVerification()));
         given(termsConsentRepository.findAllLatestOrderByRequiredDescIdAsc())
                 .willReturn(List.of(requiredTerms(1L)));
 
@@ -180,6 +196,40 @@ class SignupCommandServiceTest {
         assertThatThrownBy(() -> signupCommandService.signup(EMAIL, PASSWORD, PASSWORD, List.of(1L, 999L), "127.0.0.1"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(TermsErrorCode.TERMS_NOT_FOUND.getMessage());
+        verify(memberRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("signupToken 만료 후 돌아온 PENDING 회원이 비밀번호를 맞게 입력하면 새 회원을 만들지 않고 signupToken만 재발급한다")
+    void signup_reissueForPendingMember() {
+        // given
+        Member member = pendingMember();
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(PASSWORD, "encoded")).willReturn(true);
+        given(jwtProvider.generateToken(eq("1"), any(Map.class), any(Duration.class))).willReturn("reissued-token");
+
+        // when
+        var response = signupCommandService.signup(EMAIL, PASSWORD, PASSWORD, List.of(1L), "127.0.0.1");
+
+        // then
+        assertThat(response.memberId()).isEqualTo(1L);
+        assertThat(response.signupToken()).isEqualTo("reissued-token");
+        verify(memberRepository, never()).save(any());
+        verify(memberTermsAgreementRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("PENDING 회원인데 비밀번호가 다르면 예외가 발생한다")
+    void signup_reissuePasswordMismatch() {
+        // given
+        Member member = pendingMember();
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(PASSWORD, "encoded")).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> signupCommandService.signup(EMAIL, PASSWORD, PASSWORD, List.of(1L), "127.0.0.1"))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(AuthErrorCode.PASSWORD_MISMATCH.getMessage());
         verify(memberRepository, never()).save(any());
     }
 }
