@@ -104,7 +104,7 @@ class SignupCommandServiceTest {
         // then
         assertThat(response.memberId()).isEqualTo(1L);
         assertThat(response.signupToken()).isEqualTo("signup-token");
-        verify(memberTermsAgreementRepository, times(1)).save(any());
+        verify(memberTermsAgreementRepository, times(1)).saveAll(any());
     }
 
     @Test
