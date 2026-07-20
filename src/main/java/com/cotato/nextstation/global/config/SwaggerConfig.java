@@ -69,4 +69,15 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // S3 이미지 업로드 관련 API
+    @Bean
+    public GroupedOpenApi imageApi() {
+        return GroupedOpenApi.builder()
+                .group("Image")
+                .displayName("Image API")
+                .packagesToScan("com.cotato.nextstation.domain.image.controller")
+                .pathsToMatch("/api/v1/images/**")
+                .build();
+    }
+
 }
