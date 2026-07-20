@@ -1,15 +1,22 @@
 package com.cotato.nextstation.domain.auth.controller;
 
+import com.cotato.nextstation.domain.auth.dto.request.ProfileSetupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupVerificationSendRequest;
+import com.cotato.nextstation.domain.auth.dto.response.ProfileSetupResponse;
 import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.exception.TermsErrorCode;
 import com.cotato.nextstation.domain.auth.service.command.EmailVerificationCommandService;
+import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
+import com.cotato.nextstation.domain.member.entity.Gender;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
+import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -39,13 +47,16 @@ class AuthControllerTest {
     @Autowired
     MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @MockitoBean
     EmailVerificationCommandService emailVerificationCommandService;
 
     @MockitoBean
     SignupCommandService signupCommandService;
+
+    @MockitoBean
+    ProfileSetupCommandService profileSetupCommandService;
 
     @Test
     @DisplayName("동의한 약관 목록이 비어있으면 400을 반환한다")
@@ -130,6 +141,20 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("PENDING 회원의 비밀번호가 다르면 401을 반환한다")
+    void signup_passwordMismatchForPendingMember() throws Exception {
+        SignupRequest request = new SignupRequest("user@example.com", "abc12345!", "abc12345!", List.of(1L));
+        willThrow(new CustomException(AuthErrorCode.PASSWORD_MISMATCH))
+                .given(signupCommandService).signup(anyString(), anyString(), anyString(), any(), anyString());
+
+        mockMvc.perform(post("/api/v1/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.PASSWORD_MISMATCH.getCode()));
+    }
+
+    @Test
     @DisplayName("비밀번호 형식이 올바르지 않으면 400을 반환한다")
     void signup_invalidPasswordFormat() throws Exception {
         SignupRequest request = new SignupRequest("user@example.com", "short1!", "short1!", List.of(1L));
@@ -156,5 +181,163 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.memberId").value(1L))
                 .andExpect(jsonPath("$.data.signupToken").value("signup-token"));
+    }
+
+    private static final String SIGNUP_TOKEN_HEADER = "Bearer signup-token";
+
+    private ProfileSetupRequest profileSetupRequest(String nickname) {
+        return new ProfileSetupRequest(nickname, null, Gender.MALE, LocalDate.of(2001, 1, 1));
+    }
+
+    @Test
+    @DisplayName("정상 요청이면 200과 프로필 설정 결과를 반환한다")
+    void setupProfile_success() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("환승러");
+        ProfileSetupResponse response = new ProfileSetupResponse(1L, "환승러", MemberStatus.ACTIVE);
+        given(profileSetupCommandService.setupProfile(SIGNUP_TOKEN_HEADER, "환승러", null, Gender.MALE, LocalDate.of(2001, 1, 1)))
+                .willReturn(response);
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .header("Authorization", SIGNUP_TOKEN_HEADER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.memberId").value(1L))
+                .andExpect(jsonPath("$.data.nickname").value("환승러"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("닉네임이 비어있으면 400을 반환한다")
+    void setupProfile_nicknameBlank() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("");
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .header("Authorization", SIGNUP_TOKEN_HEADER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.reasons.nickname").exists());
+    }
+
+    @Test
+    @DisplayName("Authorization 헤더가 없으면 401을 반환한다")
+    void setupProfile_missingAuthorizationHeader() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("환승러");
+        willThrow(new CustomException(AuthErrorCode.INVALID_SIGNUP_TOKEN))
+                .given(profileSetupCommandService).setupProfile(anyString(), anyString(), any(), any(), any());
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_SIGNUP_TOKEN.getCode()));
+    }
+
+    @Test
+    @DisplayName("토큰이 만료됐으면 401을 반환한다")
+    void setupProfile_expiredToken() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("환승러");
+        willThrow(new CustomException(AuthErrorCode.SIGNUP_TOKEN_EXPIRED))
+                .given(profileSetupCommandService).setupProfile(anyString(), anyString(), any(), any(), any());
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .header("Authorization", SIGNUP_TOKEN_HEADER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.SIGNUP_TOKEN_EXPIRED.getCode()));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원이면 404를 반환한다")
+    void setupProfile_memberNotFound() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("환승러");
+        willThrow(new CustomException(AuthErrorCode.MEMBER_NOT_FOUND))
+                .given(profileSetupCommandService).setupProfile(anyString(), anyString(), any(), any(), any());
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .header("Authorization", SIGNUP_TOKEN_HEADER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.MEMBER_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("이미 프로필 설정이 완료된 회원이면 409를 반환한다")
+    void setupProfile_alreadyCompleted() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("환승러");
+        willThrow(new CustomException(AuthErrorCode.PROFILE_ALREADY_COMPLETED))
+                .given(profileSetupCommandService).setupProfile(anyString(), anyString(), any(), any(), any());
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .header("Authorization", SIGNUP_TOKEN_HEADER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.PROFILE_ALREADY_COMPLETED.getCode()));
+    }
+
+    @Test
+    @DisplayName("닉네임이 중복되면 409를 반환한다")
+    void setupProfile_duplicateNickname() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("환승러");
+        willThrow(new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME))
+                .given(profileSetupCommandService).setupProfile(anyString(), anyString(), any(), any(), any());
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .header("Authorization", SIGNUP_TOKEN_HEADER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(NicknameErrorCode.DUPLICATE_NICKNAME.getCode()));
+    }
+
+    @Test
+    @DisplayName("닉네임이 2자 미만이면 400을 반환한다")
+    void setupProfile_nicknameTooShort() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("환");
+        willThrow(new CustomException(NicknameErrorCode.NICKNAME_TOO_SHORT))
+                .given(profileSetupCommandService).setupProfile(anyString(), anyString(), any(), any(), any());
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .header("Authorization", SIGNUP_TOKEN_HEADER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(NicknameErrorCode.NICKNAME_TOO_SHORT.getCode()));
+    }
+
+    @Test
+    @DisplayName("닉네임이 10자를 초과하면 400을 반환한다")
+    void setupProfile_nicknameTooLong() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("환승러환승러환승러환승러");
+        willThrow(new CustomException(NicknameErrorCode.NICKNAME_TOO_LONG))
+                .given(profileSetupCommandService).setupProfile(anyString(), anyString(), any(), any(), any());
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .header("Authorization", SIGNUP_TOKEN_HEADER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(NicknameErrorCode.NICKNAME_TOO_LONG.getCode()));
+    }
+
+    @Test
+    @DisplayName("닉네임에 허용되지 않은 문자가 포함되면 400을 반환한다")
+    void setupProfile_nicknameInvalidCharacter() throws Exception {
+        ProfileSetupRequest request = profileSetupRequest("환승러!!");
+        willThrow(new CustomException(NicknameErrorCode.NICKNAME_INVALID_CHARACTER))
+                .given(profileSetupCommandService).setupProfile(anyString(), anyString(), any(), any(), any());
+
+        mockMvc.perform(post("/api/v1/auth/profile")
+                        .header("Authorization", SIGNUP_TOKEN_HEADER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(NicknameErrorCode.NICKNAME_INVALID_CHARACTER.getCode()));
     }
 }
