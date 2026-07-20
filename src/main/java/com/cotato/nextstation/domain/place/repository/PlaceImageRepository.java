@@ -9,4 +9,7 @@ public interface PlaceImageRepository extends JpaRepository<PlaceImage, Long> {
 
     // 장소 상세 조회 - 대표 이미지 노출 순서대로
     List<PlaceImage> findByPlaceOrderBySortOrderAsc(Place place);
+
+    List<PlaceImage> findByPlaceIdIn(List<Long> placeIds);
+
 }

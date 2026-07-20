@@ -4,8 +4,13 @@ import com.cotato.nextstation.domain.place.dto.response.PlaceDetailResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.*;
 import com.cotato.nextstation.domain.place.enums.CategoryCode;
+import com.cotato.nextstation.domain.place.repository.PlaceImageRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
@@ -13,9 +18,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.BDDMockito.given;
 
+@ExtendWith(MockitoExtension.class)
 class PlaceConverterTest {
 
-    private final PlaceConverter placeConverter = new PlaceConverter();
+
+    @InjectMocks
+    private PlaceConverter placeConverter;
+
+    @Mock
+    private PlaceImageRepository placeImageRepository;
 
     @Test
     @DisplayName("등록된 이미지가 없으면 카테고리 기본 이미지로 대체된다")
@@ -56,7 +67,7 @@ class PlaceConverterTest {
         // then
         assertThat(result).hasSize(1);
         assertThat(result.get(0).placeId()).isEqualTo(1L);
-        assertThat(result.get(0).category()).isEqualTo("CULTURE");
+        assertThat(result.get(0).categoryCode()).isEqualTo("CULTURE");
     }
 
 

@@ -27,10 +27,12 @@ class PlaceInfoQueryServiceTest {
     @InjectMocks
     private PlaceInfoQueryService placeInfoQueryService;
 
-    @Mock
+
     private PlaceRepository placeRepository;
+
     @Mock
     private PlaceTagMappingRepository placeTagMappingRepository;
+
     @Mock
     private PlaceConverter placeConverter;
 
@@ -41,8 +43,7 @@ class PlaceInfoQueryServiceTest {
         List<Long> placeIds = List.of(1L, 2L);
         List<Place> places = List.of(mock(Place.class), mock(Place.class));
         List<PlaceInfoResponse> expected = List.of(
-                new PlaceInfoResponse(1L, "보문숲길도서관", "설명", "CULTURE", 127.1, 37.5),
-                new PlaceInfoResponse(2L, "보문골한옥집", "설명2", "FOOD", 127.2, 37.6)
+                new PlaceInfoResponse(1L, "보문숲길도서관", "설명", "CULTURE", "문화공간", "https://image.jpg", 127.1, 37.5)
         );
 
         given(placeRepository.findAllById(placeIds)).willReturn(places);

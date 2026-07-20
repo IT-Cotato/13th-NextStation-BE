@@ -2,8 +2,10 @@ package com.cotato.nextstation.domain.place.service.query;
 
 import com.cotato.nextstation.domain.place.converter.PlaceConverter;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
+import com.cotato.nextstation.domain.place.dto.response.StationTagCountResponse;
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceTagMapping;
+import com.cotato.nextstation.domain.place.enums.PlaceTagName;
 import com.cotato.nextstation.domain.place.repository.PlaceRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceTagMappingRepository;
 import lombok.RequiredArgsConstructor;
@@ -44,4 +46,24 @@ public class PlaceInfoQueryService {
                 .map(Map.Entry::getKey)
                 .toList();
     }
+
+    public StationTagCountResponse getPlaceCountsByStationForTags(List<String> tags) {
+        List<PlaceTagName> tagNames = tags.stream()
+                .map(PlaceTagName::valueOf)
+                .toList();
+
+        List<PlaceTagMapping> mappings = placeTagMappingRepository.findByPlaceTagNameIn(tagNames);
+
+        Map<Long, Map<String, Long>> result = mappings.stream()
+                .collect(Collectors.groupingBy(
+                        mapping -> mapping.getPlace().getStationId(),
+                        Collectors.groupingBy(
+                                mapping -> mapping.getPlaceTag().getName().name(),
+                                Collectors.counting()
+                        )
+                ));
+
+        return new StationTagCountResponse(result);
+    }
+
 }
