@@ -1,17 +1,24 @@
 package com.cotato.nextstation.domain.auth.controller;
 
 import com.cotato.nextstation.domain.auth.dto.request.EmailVerificationConfirmRequest;
+import com.cotato.nextstation.domain.auth.dto.request.SignupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupVerificationSendRequest;
+import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
 import com.cotato.nextstation.domain.auth.service.command.EmailVerificationCommandService;
+import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.util.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -20,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final EmailVerificationCommandService emailVerificationCommandService;
+    private final SignupCommandService signupCommandService;
 
     @Operation(
             summary = "회원가입 이메일 인증번호 발송",
@@ -63,5 +71,35 @@ public class AuthController {
     public CommonResponse<Void> confirmEmailVerificationCode(@Valid @RequestBody EmailVerificationConfirmRequest request) {
         emailVerificationCommandService.verifySignupCode(request.email(), request.code());
         return CommonResponse.success(null);
+    }
+
+    @Operation(
+            summary = "회원가입 비밀번호 설정",
+            description = """
+                    이메일 인증이 완료된 이메일로 회원(Member)을 생성하고 비밀번호를 설정한다.
+                    - Member 생성과 약관 동의(`member_terms_agreement`) 저장이 한 트랜잭션으로 처리된다.
+                    - 응답으로 받는 `signupToken`은 **다음 단계인 "프로필 설정" API를 호출할 때만 쓰는 전용 토큰**이다.
+                      로그인 상태를 유지하는 access token이 아니므로 다른 API 호출에는 쓸 수 없고, 발급 후 30분이 지나면 만료된다.
+                    - 프로필 설정 화면으로 넘어갈 때 이 값을 프론트에서 잠깐 들고 있다가, 프로필 설정 API 요청의 `Authorization: Bearer {signupToken}` 헤더에 그대로 실어서 보내면 된다.
+                    - access token(로그인 유지용)과 refresh token은 이 API가 아니라 프로필 설정 완료 API에서 발급된다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "회원가입 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 비밀번호 확인 불일치, 이메일 인증 미완료, 또는 필수 약관 미동의 (`GlobalErrorCode.VALIDATION_ERROR`, `AuthErrorCode.PASSWORD_CONFIRMATION_MISMATCH`, `AuthErrorCode.EMAIL_NOT_VERIFIED`, `TermsErrorCode.REQUIRED_TERMS_NOT_AGREED`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 약관 id (`TermsErrorCode.TERMS_NOT_FOUND`)"),
+            @ApiResponse(responseCode = "409", description = "이미 가입된 이메일 (`AuthErrorCode.DUPLICATE_EMAIL`)"),
+    })
+    @ResponseStatus(HttpStatus.CREATED)
+    @PostMapping("/signup")
+    public CommonResponse<SignupResponse> signup(@Valid @RequestBody SignupRequest request, HttpServletRequest httpRequest) {
+        SignupResponse response = signupCommandService.signup(
+                request.email(),
+                request.password(),
+                request.passwordConfirm(),
+                request.agreedTermsIds(),
+                ClientIpResolver.resolve(httpRequest)
+        );
+        return CommonResponse.success(HttpStatus.CREATED, response);
     }
 }
