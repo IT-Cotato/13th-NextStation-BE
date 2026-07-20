@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 public class PlaceTag extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private PlaceTagName name;
 
     @Column(name = "is_active", nullable = false)
