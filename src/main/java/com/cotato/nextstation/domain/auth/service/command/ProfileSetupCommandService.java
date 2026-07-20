@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.auth.service.command;
 
 import com.cotato.nextstation.domain.auth.dto.response.ProfileSetupResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
+import com.cotato.nextstation.domain.auth.util.SignupTokenClaims;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
@@ -15,6 +16,7 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +28,6 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class ProfileSetupCommandService {
 
-    private static final String SIGNUP_TOKEN_PURPOSE = "SIGNUP";
     private static final String BEARER_PREFIX = "Bearer ";
 
     private static final int NICKNAME_MIN_LENGTH = 2;
@@ -50,6 +51,13 @@ public class ProfileSetupCommandService {
         validateNickname(nickname);
 
         member.completeProfile(nickname, profileImageUrl, gender, birthDate);
+        try {
+            memberRepository.saveAndFlush(member);
+        } catch (DataIntegrityViolationException e) {
+            // 위 existsByNickname 조회 이후 동시에 같은 닉네임으로 들어온 요청이 먼저 커밋된 경우 (레이스 컨디션)
+            log.warn("닉네임 중복 저장 시도(레이스 컨디션): nickname={}", nickname);
+            throw new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME);
+        }
 
         log.info("프로필 설정 완료: memberId={}, nickname={}", memberId, nickname);
         return new ProfileSetupResponse(member.getId(), member.getNickname(), member.getStatus());
@@ -70,7 +78,7 @@ public class ProfileSetupCommandService {
             throw new CustomException(AuthErrorCode.INVALID_SIGNUP_TOKEN);
         }
 
-        if (!SIGNUP_TOKEN_PURPOSE.equals(claims.get("purpose", String.class))) {
+        if (!SignupTokenClaims.SIGNUP_PURPOSE.equals(claims.get(SignupTokenClaims.PURPOSE_KEY, String.class))) {
             log.warn("purpose가 SIGNUP이 아닌 토큰으로 프로필 설정 시도");
             throw new CustomException(AuthErrorCode.INVALID_SIGNUP_TOKEN);
         }
