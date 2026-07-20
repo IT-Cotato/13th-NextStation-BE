@@ -12,6 +12,7 @@ import com.cotato.nextstation.domain.auth.repository.MemberTermsAgreementReposit
 import com.cotato.nextstation.domain.auth.repository.TermsConsentRepository;
 import com.cotato.nextstation.domain.auth.util.EmailMasker;
 import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -48,7 +50,13 @@ public class SignupCommandService {
         log.info("회원가입 요청: email={}", EmailMasker.mask(email));
 
         validatePasswordConfirmation(password, passwordConfirm);
-        validateNotAlreadyRegistered(email);
+
+        // PENDING 회원은 재가입이 아니라 signupToken 재발급으로 처리 (만료된 토큰 구제)
+        Optional<Member> existingMember = memberRepository.findByEmail(email);
+        if (existingMember.isPresent()) {
+            return reissueForPendingMember(existingMember.get(), password);
+        }
+
         validateEmailVerified(email);
         validateAgreedTerms(agreedTermsIds);
 
@@ -70,11 +78,7 @@ public class SignupCommandService {
                 .toList();
         memberTermsAgreementRepository.saveAll(agreements);
 
-        String signupToken = jwtProvider.generateToken(
-                member.getId().toString(),
-                Map.of("purpose", SIGNUP_TOKEN_PURPOSE),
-                SIGNUP_TOKEN_EXPIRATION
-        );
+        String signupToken = issueSignupToken(member.getId());
 
         log.info("회원가입 완료: memberId={}, email={}", member.getId(), EmailMasker.mask(email));
         return new SignupResponse(member.getId(), signupToken);
@@ -87,11 +91,30 @@ public class SignupCommandService {
         }
     }
 
-    // 이미 가입한 이메일인지 확인
-    private void validateNotAlreadyRegistered(String email) {
-        if (memberRepository.existsByEmail(email)) {
+    // PENDING 회원은 비밀번호로 재인증 후 signupToken만 새로 발급, 그 외 상태(ACTIVE 등)는 이미 가입 완료된 이메일이라 거부
+    private SignupResponse reissueForPendingMember(Member member, String password) {
+        if (member.getStatus() != MemberStatus.PENDING) {
+            log.warn("이미 가입 완료된 이메일로 재요청: memberId={}", member.getId());
             throw new CustomException(AuthErrorCode.DUPLICATE_EMAIL);
         }
+        // 비밀번호 재확인 (본인 인증, 없으면 이메일만 알아도 토큰 탈취 가능)
+        if (!passwordEncoder.matches(password, member.getPassword())) {
+            log.warn("PENDING 회원 signupToken 재발급 시 비밀번호 불일치: memberId={}", member.getId());
+            throw new CustomException(AuthErrorCode.PASSWORD_MISMATCH);
+        }
+
+        // Member/약관 동의는 최초 가입 시 이미 저장됨
+        String signupToken = issueSignupToken(member.getId());
+        log.info("signupToken 재발급: memberId={}", member.getId());
+        return new SignupResponse(member.getId(), signupToken);
+    }
+
+    private String issueSignupToken(Long memberId) {
+        return jwtProvider.generateToken(
+                memberId.toString(),
+                Map.of("purpose", SIGNUP_TOKEN_PURPOSE),
+                SIGNUP_TOKEN_EXPIRATION
+        );
     }
 
     // 이메일 인증이 완료된 상태인지 확인
