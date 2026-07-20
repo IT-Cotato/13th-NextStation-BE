@@ -33,7 +33,7 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false)
     private MemberRole role;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true)
     private String nickname;
 
     @Column(name = "profile_image_url")
@@ -46,14 +46,18 @@ public class Member extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    private Member(String email, String password, String nickname, String profileImageUrl, String profileBio) {
+    private Member(String email, String password) {
         this.email = email;
         this.password = password;
+        this.status = MemberStatus.PENDING;
+        this.role = MemberRole.USER;
+    }
+
+    public void completeProfile(String nickname, String profileImageUrl, String profileBio) {
         this.nickname = nickname;
         this.profileImageUrl = profileImageUrl;
         this.profileBio = profileBio;
-        this.status = MemberStatus.PENDING;
-        this.role = MemberRole.USER;
+        this.status = MemberStatus.ACTIVE;
     }
 
     public void withdraw() {
