@@ -4,6 +4,7 @@ import com.cotato.nextstation.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -16,7 +17,11 @@ import java.time.LocalDateTime;
 
 @Entity
 @Getter
-@Table(name = "recommendation_log")
+@Table(
+        name = "recommendation_log",
+        // 직전 추천 1건 조회(member_id 필터 + 최신순)를 위한 복합 인덱스
+        indexes = @Index(name = "idx_recommendation_log_member_created", columnList = "member_id, created_at")
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 public class RecommendationLog extends BaseEntity {

@@ -66,7 +66,7 @@ public class RecommendationCommandService {
             return drawables;
         }
 
-        Long lastStationId = recommendationLogRepository.findTopByMemberIdOrderByCreatedAtDesc(memberId)
+        Long lastStationId = recommendationLogRepository.findTopByMemberIdOrderByCreatedAtDescIdDesc(memberId)
                 .map(RecommendationLog::getResultStationId)
                 .orElse(null);
         if (lastStationId == null) {

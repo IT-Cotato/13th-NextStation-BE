@@ -69,7 +69,7 @@ class RecommendationCommandServiceTest {
         // given
         Long memberId = 1L;
         given(stationRepository.findByIsDrawableTrue()).willReturn(List.of(station(1L, "A역"), station(2L, "B역")));
-        given(recommendationLogRepository.findTopByMemberIdOrderByCreatedAtDesc(memberId))
+        given(recommendationLogRepository.findTopByMemberIdOrderByCreatedAtDescIdDesc(memberId))
                 .willReturn(Optional.of(RecommendationLog.builder().memberId(memberId).resultStationId(1L).isRandom(true).build()));
         given(stationPlaceReader.getPlacesByStation(anyLong())).willReturn(List.of());
 
@@ -91,7 +91,7 @@ class RecommendationCommandServiceTest {
         // given
         Long memberId = 1L;
         given(stationRepository.findByIsDrawableTrue()).willReturn(List.of(station(1L, "A역")));
-        given(recommendationLogRepository.findTopByMemberIdOrderByCreatedAtDesc(memberId))
+        given(recommendationLogRepository.findTopByMemberIdOrderByCreatedAtDescIdDesc(memberId))
                 .willReturn(Optional.of(RecommendationLog.builder().memberId(memberId).resultStationId(1L).isRandom(true).build()));
         given(stationPlaceReader.getPlacesByStation(anyLong())).willReturn(List.of());
 
@@ -114,7 +114,7 @@ class RecommendationCommandServiceTest {
 
         // then
         assertThat(response.station().stationId()).isEqualTo(1L);
-        verify(recommendationLogRepository, never()).findTopByMemberIdOrderByCreatedAtDesc(any());
+        verify(recommendationLogRepository, never()).findTopByMemberIdOrderByCreatedAtDescIdDesc(any());
         ArgumentCaptor<RecommendationLog> captor = ArgumentCaptor.forClass(RecommendationLog.class);
         verify(recommendationLogRepository).save(captor.capture());
         assertThat(captor.getValue().getMemberId()).isNull();
