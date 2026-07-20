@@ -11,6 +11,7 @@ public enum GlobalErrorCode implements ErrorCode {
     // 400 Bad Request
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_INVALID_REQUEST", "유효하지 않은 요청입니다."),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_VALIDATION_ERROR", "요청 값이 유효하지 않습니다."),
+    INVALID_CURSOR(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_INVALID_CURSOR", "유효하지 않은 커서입니다."),
 
     // 401 Unauthorized
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "CLIENT_ERROR_401_UNAUTHORIZED", "인증이 필요합니다."),

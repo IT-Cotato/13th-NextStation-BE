@@ -17,7 +17,11 @@ import java.time.LocalDateTime;
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_place_review_journal_place",
                 columnNames = {"journal_id", "place_id"}
-        )
+        ),
+        indexes = {
+                @Index(name = "idx_place_review_place_like", columnList = "place_id, like_count DESC, id DESC"),
+                @Index(name = "idx_place_review_place_created", columnList = "place_id, created_at DESC, id DESC")
+        }
 )
 @SQLRestriction("is_deleted = false")
 @Getter
