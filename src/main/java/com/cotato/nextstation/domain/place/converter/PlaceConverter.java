@@ -44,6 +44,7 @@ public class PlaceConverter {
                 place.getCategory().getName(),
                 place.getAddress(),
                 place.getContactNumber(),
+                place.getKakaoPlaceUrl(),
                 toImageUrls(place, placeImages),
                 toReviewPreviews(reviews, reviewImages)
         );
