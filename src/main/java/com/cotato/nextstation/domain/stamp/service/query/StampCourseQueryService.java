@@ -5,7 +5,9 @@ import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.stamp.converter.StampCourseConverter;
 import com.cotato.nextstation.domain.stamp.dto.response.StationPopularCoursesResponse;
+import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
 import com.cotato.nextstation.domain.station.entity.Station;
+import com.cotato.nextstation.domain.station.repository.StationLineRepository;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
-// TODO: Course 도메인 구현 완료 후 CourseQueryService 경유 방식으로 리팩터링 예정
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -25,13 +26,18 @@ public class StampCourseQueryService {
     private final StampCourseConverter stampCourseConverter;
     private final CourseQueryService courseQueryService;
     private final StationRepository stationRepository;
+    private final StationLineRepository stationLineRepository;
 
     public StationPopularCoursesResponse getPopularCoursesByStation(Long stationId) {
         Station station = stationRepository.findById(stationId)
                 .orElseThrow(() -> new CustomException(StampErrorCode.STATION_NOT_FOUND));
 
+        String lineName = stationLineRepository.findFirstByStation(station)
+                .map(stationLine -> stationLine.getLine().getName())
+                .orElse(null);
+
         List<PopularCourseResponse> courses = courseQueryService.getPopularCoursesByStation(stationId, POPULAR_COURSE_LIMIT);
 
-        return stampCourseConverter.toStationPopularCoursesResponse(station, courses);
+        return stampCourseConverter.toStationPopularCoursesResponse(station, lineName, courses);
     }
 }

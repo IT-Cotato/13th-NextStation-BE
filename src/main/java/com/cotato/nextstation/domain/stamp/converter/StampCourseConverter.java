@@ -12,11 +12,9 @@ public class StampCourseConverter {
 
     public StationPopularCoursesResponse toStationPopularCoursesResponse(
             Station station,
+            String lineName,
             List<PopularCourseResponse> courses) {
-        return new StationPopularCoursesResponse(station.getStationName(), resolveLine(station), courses);
+        return new StationPopularCoursesResponse(station.getStationName(), lineName, courses);
     }
 
-    private String resolveLine(Station station) {
-        return station.getDrawLine() != null ? station.getDrawLine().getName() : null;
-    }
 }
