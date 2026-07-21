@@ -91,4 +91,14 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // 추천 관련 API (랜덤뽑기/맞춤추천)
+    @Bean
+    public GroupedOpenApi recommendationApi() {
+        return GroupedOpenApi.builder()
+                .group("Recommendation")
+                .displayName("Recommendation API")
+                .packagesToScan("com.cotato.nextstation.domain.recommendation.controller")
+                .build();
+    }
+
 }
