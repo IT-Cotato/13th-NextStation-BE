@@ -1,28 +1,22 @@
 package com.cotato.nextstation.domain.stamp.converter;
 
+import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
-import com.cotato.nextstation.domain.stamp.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.StationPopularCoursesResponse;
+import com.cotato.nextstation.domain.station.entity.Station;
 import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
 public class StampCourseConverter {
 
-    // TODO: Station 도메인 구현 완료 후 stationName, line 값을 채워서 반환하도록 수정
-    public StationPopularCoursesResponse toStationPopularCoursesResponse(List<Course> courses) {
-        List<PopularCourseResponse> responses = courses.stream()
-                .map(this::toPopularCourseResponse)
-                .toList();
-        return new StationPopularCoursesResponse(null, null, responses);
+    public StationPopularCoursesResponse toStationPopularCoursesResponse(
+            Station station,
+            List<PopularCourseResponse> courses) {
+        return new StationPopularCoursesResponse(station.getStationName(), resolveLine(station), courses);
     }
 
-    private PopularCourseResponse toPopularCourseResponse(Course course) {
-        return new PopularCourseResponse(
-                course.getId(),
-                course.getName(),
-                course.getViewCount(),
-                course.getSaveCount()
-        );
+    private String resolveLine(Station station) {
+        return station.getDrawLine() != null ? station.getDrawLine().getName() : null;
     }
 }

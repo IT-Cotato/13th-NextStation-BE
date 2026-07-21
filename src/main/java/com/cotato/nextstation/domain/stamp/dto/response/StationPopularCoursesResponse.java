@@ -1,4 +1,5 @@
 package com.cotato.nextstation.domain.stamp.dto.response;
+import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
