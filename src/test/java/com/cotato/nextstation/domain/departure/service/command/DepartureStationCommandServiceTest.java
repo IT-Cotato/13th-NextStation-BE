@@ -39,9 +39,9 @@ class DepartureStationCommandServiceTest {
     void addDepartureStation_success() {
         // given
         Long memberId = 1L;
-        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L, "집");
+        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L);
         MemberDepartureStation entity = MemberDepartureStation.builder()
-                .memberId(memberId).stationId(100L).label("집").orderNum(4).build();
+                .memberId(memberId).stationId(100L).orderNum(4).build();
         given(memberDepartureStationRepository.countByMemberId(memberId)).willReturn(3L);
         given(memberDepartureStationRepository.findMaxOrderNumByMemberId(memberId)).willReturn(3);
         given(departureStationConverter.toEntity(memberId, request, 4)).willReturn(entity);
@@ -60,7 +60,7 @@ class DepartureStationCommandServiceTest {
     void addDepartureStation_maxExceeded() {
         // given
         Long memberId = 1L;
-        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L, "집");
+        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L);
         given(memberDepartureStationRepository.countByMemberId(memberId)).willReturn(10L);
 
         // when & then
@@ -71,13 +71,29 @@ class DepartureStationCommandServiceTest {
     }
 
     @Test
+    @DisplayName("이미 추가한 역을 또 추가하면 중복 예외가 발생하고 저장하지 않는다")
+    void addDepartureStation_duplicate() {
+        // given
+        Long memberId = 1L;
+        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L);
+        given(memberDepartureStationRepository.countByMemberId(memberId)).willReturn(3L);
+        given(memberDepartureStationRepository.existsByMemberIdAndStationId(memberId, 100L)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> departureStationCommandService.addDepartureStation(memberId, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(DepartureStationErrorCode.DUPLICATE_DEPARTURE_STATION.getMessage());
+        verify(memberDepartureStationRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("본인 소유 출발역은 삭제된다")
     void deleteDepartureStation_success() {
         // given
         Long memberId = 1L;
         Long departureStationId = 5L;
         MemberDepartureStation entity = MemberDepartureStation.builder()
-                .memberId(memberId).stationId(100L).label("집").orderNum(1).build();
+                .memberId(memberId).stationId(100L).orderNum(1).build();
         given(memberDepartureStationRepository.findByIdAndMemberId(departureStationId, memberId))
                 .willReturn(Optional.of(entity));
 
@@ -109,7 +125,7 @@ class DepartureStationCommandServiceTest {
     void addDepartureStation_firstOrderNum() {
         // given
         Long memberId = 1L;
-        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L, null);
+        DepartureStationCreateRequest request = new DepartureStationCreateRequest(100L);
         MemberDepartureStation entity = MemberDepartureStation.builder()
                 .memberId(memberId).stationId(100L).orderNum(1).build();
         given(memberDepartureStationRepository.countByMemberId(memberId)).willReturn(0L);

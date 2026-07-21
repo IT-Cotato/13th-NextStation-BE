@@ -69,6 +69,28 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // 역 관련 API (역 검색 등)
+    @Bean
+    public GroupedOpenApi stationApi() {
+        return GroupedOpenApi.builder()
+                .group("Station")
+                .displayName("Station API")
+                .packagesToScan("com.cotato.nextstation.domain.station.controller")
+                .pathsToMatch("/api/v1/stations/**")
+                .build();
+    }
+
+    // Stamp 관련 API
+    @Bean
+    public GroupedOpenApi stampApi() {
+        return GroupedOpenApi.builder()
+                .group("Stamp")
+                .displayName("Stamp API")
+                .packagesToScan("com.cotato.nextstation.domain.stamp.controller")
+                .pathsToMatch("/api/v1/stamps/**")
+                .build();
+    }
+
     // 추천 관련 API (랜덤뽑기/맞춤추천)
     @Bean
     public GroupedOpenApi recommendationApi() {
