@@ -87,6 +87,9 @@ public class SwaggerConfig {
                 .displayName("Image API")
                 .packagesToScan("com.cotato.nextstation.domain.image.controller")
                 .pathsToMatch("/api/v1/images/**")
+                .build();
+    }
+
     // 역 관련 API (역 검색 등)
     @Bean
     public GroupedOpenApi stationApi() {
