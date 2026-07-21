@@ -19,9 +19,12 @@ import java.time.LocalDateTime;
 @Getter
 @Table(
         name = "member_departure_station",
+        // 같은 회원이 같은 역을 중복으로 저장하지 못하도록 막는다.
+        // (member_id, order_num) 유니크는 제거함: order_num은 append 표시 순서일 뿐 엄격한 유니크가 불필요하고,
+        // 동시에 서로 다른 역을 추가할 때 order_num이 충돌해 "중복 역"으로 오인되는 문제를 유발했다.
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_member_departure_station_member_order",
-                columnNames = {"member_id", "order_num"}
+                name = "uk_member_departure_station_member_station",
+                columnNames = {"member_id", "station_id"}
         )
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -35,9 +38,6 @@ public class MemberDepartureStation extends BaseEntity {
     @Column(name = "station_id", nullable = false)
     private Long stationId;
 
-    @Column(length = 30)
-    private String label;
-
     @Column(name = "order_num", nullable = false)
     private int orderNum;
 
@@ -46,10 +46,9 @@ public class MemberDepartureStation extends BaseEntity {
     private LocalDateTime createdAt;
 
     @Builder
-    private MemberDepartureStation(Long memberId, Long stationId, String label, int orderNum) {
+    private MemberDepartureStation(Long memberId, Long stationId, int orderNum) {
         this.memberId = memberId;
         this.stationId = stationId;
-        this.label = label;
         this.orderNum = orderNum;
     }
 }

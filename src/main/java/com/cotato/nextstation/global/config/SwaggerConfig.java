@@ -87,6 +87,25 @@ public class SwaggerConfig {
                 .displayName("Image API")
                 .packagesToScan("com.cotato.nextstation.domain.image.controller")
                 .pathsToMatch("/api/v1/images/**")
+    // 역 관련 API (역 검색 등)
+    @Bean
+    public GroupedOpenApi stationApi() {
+        return GroupedOpenApi.builder()
+                .group("Station")
+                .displayName("Station API")
+                .packagesToScan("com.cotato.nextstation.domain.station.controller")
+                .pathsToMatch("/api/v1/stations/**")
+                .build();
+    }
+
+    // Stamp 관련 API
+    @Bean
+    public GroupedOpenApi stampApi() {
+        return GroupedOpenApi.builder()
+                .group("Stamp")
+                .displayName("Stamp API")
+                .packagesToScan("com.cotato.nextstation.domain.stamp.controller")
+                .pathsToMatch("/api/v1/stamps/**")
                 .build();
     }
 
