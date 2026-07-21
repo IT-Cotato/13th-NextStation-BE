@@ -52,6 +52,7 @@ public class LoginQueryService {
         String accessToken = issueToken(member.getId(), AuthTokenClaims.ACCESS_PURPOSE, ACCESS_TOKEN_EXPIRATION);
         String refreshToken = issueToken(member.getId(), AuthTokenClaims.REFRESH_PURPOSE, REFRESH_TOKEN_EXPIRATION);
 
+        log.info("로그인 성공: memberId={}", member.getId());
         return new LoginResult(member.getId(), accessToken, refreshToken);
     }
 
