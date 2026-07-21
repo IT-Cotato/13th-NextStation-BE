@@ -1,12 +1,14 @@
 package com.cotato.nextstation.global.exception;
 
 import com.cotato.nextstation.global.exception.support.ExceptionTestController;
+import com.cotato.nextstation.global.jwt.JwtProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -22,6 +24,10 @@ class GlobalExceptionHandlerTest {
 
     @Autowired
     MockMvc mockMvc;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
 
     @Test
     void customException_는_에러코드에_매핑된_상태코드를_반환한다() throws Exception {

@@ -7,6 +7,7 @@ import com.cotato.nextstation.domain.departure.service.command.DepartureStationC
 import com.cotato.nextstation.domain.departure.service.query.DepartureStationQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
+import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,10 @@ class DepartureStationControllerTest {
 
     @MockitoBean
     DepartureStationQueryService departureStationQueryService;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
 
     @Test
     @DisplayName("출발역 추가는 201과 저장된 데이터를 반환한다")
