@@ -19,7 +19,7 @@ import java.util.UUID;
 @Service
 public class ImageCommandService {
 
-    private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(10); //TODO: 10분으로 수정 -> 테스트 위해서 수정해둠
+    private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(10);
 
     private final S3Presigner s3Presigner;
     private final String bucketName;
