@@ -37,12 +37,16 @@ dependencies {
 
     // security
 	// implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.security:spring-security-crypto'
 
     // validation
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     //webmvc
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+    // place 데이터 파이프라인 1회성 배치 스크립트용 CSV 파서
+    implementation 'org.apache.commons:commons-csv:1.11.0'
 
 	compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
@@ -60,3 +64,4 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+

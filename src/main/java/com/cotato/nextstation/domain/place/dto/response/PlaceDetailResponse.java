@@ -11,6 +11,7 @@ public record PlaceDetailResponse(
         String category,
         String address,
         String contactNumber,
+        String kakaoPlaceUrl,
 
         List<String> images,
         List<PlaceReviewPreviewResponse> reviews

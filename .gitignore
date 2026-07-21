@@ -58,3 +58,8 @@ pom.xml.releaseBackup
 
 # Raw external data (station pipeline source files)
 src/main/resources/data/raw/
+
+# Place geocoding batch script output
+place-geocoding-output/
+
+src/main/resources/data/places.csv
