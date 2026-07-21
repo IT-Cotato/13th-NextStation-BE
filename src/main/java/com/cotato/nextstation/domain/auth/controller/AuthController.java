@@ -1,14 +1,18 @@
 package com.cotato.nextstation.domain.auth.controller;
 
 import com.cotato.nextstation.domain.auth.dto.request.EmailVerificationConfirmRequest;
+import com.cotato.nextstation.domain.auth.dto.request.LoginRequest;
 import com.cotato.nextstation.domain.auth.dto.request.ProfileSetupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupVerificationSendRequest;
+import com.cotato.nextstation.domain.auth.dto.response.LoginResponse;
 import com.cotato.nextstation.domain.auth.dto.response.ProfileSetupResponse;
 import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
 import com.cotato.nextstation.domain.auth.service.command.EmailVerificationCommandService;
 import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
+import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
+import com.cotato.nextstation.domain.auth.service.query.LoginResult;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import com.cotato.nextstation.global.util.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,9 +21,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -32,9 +39,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
+    private static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+
     private final EmailVerificationCommandService emailVerificationCommandService;
     private final SignupCommandService signupCommandService;
     private final ProfileSetupCommandService profileSetupCommandService;
+    private final LoginQueryService loginQueryService;
 
     @Operation(
             summary = "회원가입 이메일 인증번호 발송",
@@ -88,7 +98,7 @@ public class AuthController {
                     - 응답으로 받는 `signupToken`은 **다음 단계인 "프로필 설정" API를 호출할 때만 쓰는 전용 토큰**이다.
                       로그인 상태를 유지하는 access token이 아니므로 다른 API 호출에는 쓸 수 없고, 발급 후 30분이 지나면 만료된다.
                     - 프로필 설정 화면으로 넘어갈 때 이 값을 프론트에서 잠깐 들고 있다가, 프로필 설정 API 요청의 `Authorization: Bearer {signupToken}` 헤더에 그대로 실어서 보내면 된다.
-                    - access token(로그인 유지용)과 refresh token은 이 API가 아니라 프로필 설정 완료 API에서 발급된다.
+                    - access token(로그인 유지용)과 refresh token은 이 API가 아니라 로그인 API에서 발급된다.
                     - signupToken이 만료된 뒤 돌아온 **PENDING 회원**이 같은 이메일/비밀번호로 다시 요청하면, 새로 가입시키지 않고 **signupToken만 재발급**한다(비밀번호가 재인증 역할). 이미 프로필 설정까지 끝난 회원은 그대로 `DUPLICATE_EMAIL`로 거부된다.
                     """
     )
@@ -142,5 +152,35 @@ public class AuthController {
                 request.birthDate()
         );
         return CommonResponse.success(response);
+    }
+
+    @Operation(
+            summary = "로그인",
+            description = """
+                    이메일/비밀번호로 로그인하고 access token을 발급한다.
+                    - access token은 응답 body로 내려가며, 다른 API 호출 시 `Authorization: Bearer {accessToken}` 헤더에 실어서 보낸다. 발급 후 1시간이 지나면 만료된다.
+                    - refresh token은 httpOnly 쿠키(`refreshToken`)로 내려가며, 프론트에서 직접 다루지 않는다. 발급 후 14일이 지나면 만료된다.
+                    - 존재하지 않는 이메일, 비밀번호 불일치, 프로필 설정이 끝나지 않은 회원(PENDING) 모두 동일하게 `INVALID_CREDENTIALS`로 응답한다(계정 존재 여부 노출 방지).
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그인 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 (`GlobalErrorCode.VALIDATION_ERROR`)"),
+            @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치 (`AuthErrorCode.INVALID_CREDENTIALS`)"),
+    })
+    @PostMapping("/login")
+    public CommonResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse httpResponse) {
+        LoginResult result = loginQueryService.login(request.email(), request.password());
+
+        ResponseCookie refreshTokenCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, result.refreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("None")
+                .path("/")
+                .maxAge(LoginQueryService.REFRESH_TOKEN_EXPIRATION)
+                .build();
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+
+        return CommonResponse.success(new LoginResponse(result.memberId(), result.accessToken()));
     }
 }
