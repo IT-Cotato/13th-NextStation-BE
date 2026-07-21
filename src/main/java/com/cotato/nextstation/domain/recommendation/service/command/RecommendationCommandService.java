@@ -77,14 +77,17 @@ public class RecommendationCommandService {
         return filtered.isEmpty() ? drawables : filtered;
     }
 
-    // 카테고리 노출 순서대로 카테고리당 첫 장소 1개씩 선택한다. 장소가 없는 카테고리는 건너뛴다.
+    // 카테고리 노출 순서대로 카테고리당 1개씩 선택한다. 장소가 없는 카테고리는 건너뛴다.
+    // 같은 역이 다시 뽑혀도 코스가 고정되지 않도록 카테고리 안에서는 무작위로 고른다.
     private List<StationPlaceView> selectOnePerCategory(List<StationPlaceView> places) {
         List<StationPlaceView> selected = new ArrayList<>();
         for (String categoryCode : CATEGORY_DISPLAY_ORDER) {
-            places.stream()
+            List<StationPlaceView> candidates = places.stream()
                     .filter(place -> categoryCode.equals(place.categoryCode()))
-                    .findFirst()
-                    .ifPresent(selected::add);
+                    .toList();
+            if (!candidates.isEmpty()) {
+                selected.add(candidates.get(ThreadLocalRandom.current().nextInt(candidates.size())));
+            }
         }
         return selected;
     }

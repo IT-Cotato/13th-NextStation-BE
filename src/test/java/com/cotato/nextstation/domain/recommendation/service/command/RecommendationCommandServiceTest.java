@@ -135,7 +135,7 @@ class RecommendationCommandServiceTest {
     }
 
     @Test
-    @DisplayName("코스 미리보기는 카테고리 순서(문화/식당/카페/산책)대로 카테고리당 첫 장소 1개씩 구성되고 없는 카테고리는 제외된다")
+    @DisplayName("코스 미리보기는 카테고리 순서(문화/식당/카페/산책)대로 카테고리당 1개씩 구성되고 없는 카테고리는 제외된다")
     void drawRandom_coursePreviewSelectsOnePerCategory() {
         // given
         Station station = station(10L, "제기동역");
@@ -160,7 +160,29 @@ class RecommendationCommandServiceTest {
         assertThat(response.course().places())
                 .extracting(p -> p.categoryCode())
                 .containsExactly("CULTURE", "FOOD", "CAFE");
-        // FOOD는 첫 번째(placeId=100)가 선택된다
-        assertThat(response.course().places().get(1).placeId()).isEqualTo(100L);
+        // FOOD가 2개면 그중 하나가 무작위로 선택된다
+        assertThat(response.course().places().get(1).placeId()).isIn(100L, 300L);
+    }
+
+    @Test
+    @DisplayName("같은 역이라도 카테고리 안에서는 무작위로 골라 매번 같은 코스만 나오지는 않는다")
+    void drawRandom_coursePreviewPicksRandomlyWithinCategory() {
+        // given: FOOD 후보가 20개인 역을 반복해서 뽑는다
+        Station station = station(10L, "제기동역");
+        given(stationRepository.findByIsDrawableTrue()).willReturn(List.of(station));
+        List<StationPlaceView> foodPlaces = java.util.stream.LongStream.rangeClosed(1, 20)
+                .mapToObj(id -> place(id, "FOOD"))
+                .toList();
+        given(stationPlaceReader.getPlacesByStation(10L)).willReturn(foodPlaces);
+
+        // when: 30번 뽑아 선택된 장소 id를 모은다
+        java.util.Set<Long> pickedIds = new java.util.HashSet<>();
+        for (int i = 0; i < 30; i++) {
+            pickedIds.add(recommendationCommandService.drawRandom(null)
+                    .course().places().get(0).placeId());
+        }
+
+        // then: 항상 같은 장소만 나오지는 않는다 (후보 20개 중 30회 시도)
+        assertThat(pickedIds).hasSizeGreaterThan(1);
     }
 }
