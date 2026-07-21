@@ -132,7 +132,7 @@ public class AuthController {
                     - 이미 프로필 설정이 완료된 회원(status != PENDING)이 같은 토큰으로 다시 요청하면 거부된다(재사용 방지).
                     """
     )
-    @SecurityRequirement(name = "bearerAuth")
+    @SecurityRequirement(name = "signupTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "프로필 설정 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 닉네임 길이/문자/금칙어 위반 (`GlobalErrorCode.VALIDATION_ERROR`, `NicknameErrorCode.NICKNAME_TOO_SHORT`, `NicknameErrorCode.NICKNAME_TOO_LONG`, `NicknameErrorCode.NICKNAME_INVALID_CHARACTER`, `NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD`)"),
