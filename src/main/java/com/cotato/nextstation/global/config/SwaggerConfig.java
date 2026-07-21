@@ -69,6 +69,17 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // 역 관련 API (역 검색 등)
+    @Bean
+    public GroupedOpenApi stationApi() {
+        return GroupedOpenApi.builder()
+                .group("Station")
+                .displayName("Station API")
+                .packagesToScan("com.cotato.nextstation.domain.station.controller")
+                .pathsToMatch("/api/v1/stations/**")
+                .build();
+    }
+
     // Stamp 관련 API
     @Bean
     public GroupedOpenApi stampApi() {
