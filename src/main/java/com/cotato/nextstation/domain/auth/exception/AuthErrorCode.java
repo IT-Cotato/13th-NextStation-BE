@@ -15,6 +15,8 @@ public enum AuthErrorCode implements ErrorCode {
     EMAIL_VERIFICATION_EXPIRED(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_EMAIL_VERIFICATION_EXPIRED", "인증번호가 만료되었습니다. 인증번호를 다시 요청해주세요."),
     EMAIL_VERIFICATION_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_EMAIL_VERIFICATION_CODE_MISMATCH", "인증번호가 일치하지 않습니다."),
     EMAIL_VERIFICATION_ATTEMPT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "CLIENT_ERROR_429_EMAIL_VERIFICATION_ATTEMPT_EXCEEDED", "인증번호 확인 시도 횟수를 초과했습니다. 인증번호를 다시 요청해주세요."),
+    EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_EMAIL_NOT_VERIFIED", "이메일 인증이 완료되지 않았습니다."),
+    PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_PASSWORD_CONFIRMATION_MISMATCH", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
     ;
 
     private final HttpStatus httpStatus;

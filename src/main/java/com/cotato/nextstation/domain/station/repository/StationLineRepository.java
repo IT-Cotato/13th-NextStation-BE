@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.station.repository;
 
+import com.cotato.nextstation.domain.station.entity.Station;
 import com.cotato.nextstation.domain.station.entity.StationLine;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -7,8 +8,11 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface StationLineRepository extends JpaRepository<StationLine, Long> {
+
+    Optional<StationLine> findFirstByStation(Station station);
 
     // 여러 역의 소속 노선명을 한 번에 조회 (N+1 방지)
     // line.id 순으로 정렬해 노선 표시 순서를 일정하게 유지한다.
