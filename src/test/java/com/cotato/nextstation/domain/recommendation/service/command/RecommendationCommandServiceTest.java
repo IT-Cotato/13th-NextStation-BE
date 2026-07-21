@@ -54,7 +54,8 @@ class RecommendationCommandServiceTest {
     }
 
     private Station station(Long id, String name) {
-        Station station = Station.builder().stationName(name).description(name + " 소개").isDrawable(true).build();
+        Station station = Station.builder()
+                .stationName(name).description(name + " 소개").todo(name + " 할일").isDrawable(true).build();
         ReflectionTestUtils.setField(station, "id", id);
         return station;
     }
@@ -153,6 +154,8 @@ class RecommendationCommandServiceTest {
 
         // then
         assertThat(response.station().lineName()).isEqualTo("1호선");
+        assertThat(response.station().description()).isEqualTo("제기동역 소개");
+        assertThat(response.station().todo()).isEqualTo("제기동역 할일");
         assertThat(response.course().name()).isEqualTo("제기동역 환승여행 코스");
         assertThat(response.course().places())
                 .extracting(p -> p.categoryCode())

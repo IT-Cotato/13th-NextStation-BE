@@ -42,7 +42,7 @@ class RandomControllerTest {
 
     private RandomRecommendationResponse sampleResponse() {
         return new RandomRecommendationResponse(
-                new RecommendedStationResponse(10L, "제기동역", "제기동역 소개", "1호선"),
+                new RecommendedStationResponse(10L, "제기동역", "제기동역 소개", "경동시장 구경하기", "1호선"),
                 new CoursePreviewResponse("제기동역 환승여행 코스", List.of(
                         new CoursePreviewPlaceResponse(100L, "경동시장", "설명", "CULTURE", "문화공간", "img", 127.0, 37.5)
                 ))
@@ -58,6 +58,7 @@ class RandomControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data.station.stationName").value("제기동역"))
+                .andExpect(jsonPath("$.data.station.todo").value("경동시장 구경하기"))
                 .andExpect(jsonPath("$.data.station.lineName").value("1호선"))
                 .andExpect(jsonPath("$.data.course.name").value("제기동역 환승여행 코스"))
                 .andExpect(jsonPath("$.data.course.places[0].categoryCode").value("CULTURE"));

@@ -27,6 +27,7 @@ public class RecommendationConverter {
                 station.getId(),
                 station.getStationName(),
                 station.getDescription(),
+                station.getTodo(),
                 drawLine != null ? drawLine.getName() : null
         );
     }
