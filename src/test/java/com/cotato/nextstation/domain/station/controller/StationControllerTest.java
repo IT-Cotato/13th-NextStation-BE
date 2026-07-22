@@ -64,7 +64,9 @@ class StationControllerTest {
     @DisplayName("역별 장소 목록은 200과 카테고리별 장소를 반환한다")
     void getStationPlaces_success() throws Exception {
         given(stationQueryService.getStationPlaces(6L)).willReturn(
-                new StationPlacesResponse(6L, "보문역", "보문역 환승여행 코스", List.of(
+                new StationPlacesResponse(6L, "보문역", "성북천을 따라 걷기 좋은 역", "6호선",
+                        List.of("6호선", "우이신설선"), List.of("LOCAL_EXPLORE", "NATURE"),
+                        "보문역 환승여행 코스", List.of(
                         new StationPlaceCategoryResponse("CULTURE", "문화공간", List.of(
                                 new StationPlaceResponse(11L, "보문숲길도서관", "동네 도서관", "img", 127.0, 37.5)))
                 )));
@@ -72,6 +74,10 @@ class StationControllerTest {
         mockMvc.perform(get("/api/v1/stations/{stationId}/places", 6L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.stationName").value("보문역"))
+                .andExpect(jsonPath("$.data.description").value("성북천을 따라 걷기 좋은 역"))
+                .andExpect(jsonPath("$.data.lineName").value("6호선"))
+                .andExpect(jsonPath("$.data.lines[1]").value("우이신설선"))
+                .andExpect(jsonPath("$.data.tags[0]").value("LOCAL_EXPLORE"))
                 .andExpect(jsonPath("$.data.defaultCourseName").value("보문역 환승여행 코스"))
                 .andExpect(jsonPath("$.data.categories[0].categoryCode").value("CULTURE"))
                 .andExpect(jsonPath("$.data.categories[0].places[0].placeName").value("보문숲길도서관"));
@@ -81,7 +87,8 @@ class StationControllerTest {
     @DisplayName("장소가 없는 역은 200과 빈 카테고리 목록을 반환한다")
     void getStationPlaces_noPlaces() throws Exception {
         given(stationQueryService.getStationPlaces(300L))
-                .willReturn(new StationPlacesResponse(300L, "서울역", "서울역 환승여행 코스", List.of()));
+                .willReturn(new StationPlacesResponse(300L, "서울역", null, null,
+                        List.of("1호선", "4호선"), List.of(), "서울역 환승여행 코스", List.of()));
 
         mockMvc.perform(get("/api/v1/stations/{stationId}/places", 300L))
                 .andExpect(status().isOk())

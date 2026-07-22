@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.station.service.query;
 
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
+import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
 import com.cotato.nextstation.domain.station.converter.StationConverter;
 import com.cotato.nextstation.domain.station.dto.response.StationPlaceCategoryResponse;
@@ -45,6 +46,8 @@ class StationQueryServiceTest {
     private StationLineRepository stationLineRepository;
     @Mock
     private PlaceQueryService placeQueryService;
+    @Mock
+    private PlaceInfoQueryService placeInfoQueryService;
     @Mock
     private StationConverter stationConverter;
 
@@ -123,10 +126,13 @@ class StationQueryServiceTest {
 
         // then: 카테고리가 정해진 순서로, 없는 WALK는 빠진 채 전달된다
         ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<List<PlaceInfoResponse>> placesCaptor = ArgumentCaptor.forClass(List.class);
         verify(stationConverter, times(3))
-                .toPlaceCategoryResponse(codeCaptor.capture(), any(), placesCaptor.capture());
+                .toPlaceCategoryResponse(codeCaptor.capture(), nameCaptor.capture(), placesCaptor.capture());
         assertThat(codeCaptor.getAllValues()).containsExactly("CULTURE", "FOOD", "CAFE");
+        // 카테고리 표시명이 코드와 짝이 맞는지까지 확인한다 (엉뚱한 이름이 들어가면 잡히도록)
+        assertThat(nameCaptor.getAllValues()).containsExactly("문화공간", "식당", "카페");
 
         // CULTURE는 4개 중 id 작은 3개만, id 순으로
         assertThat(placesCaptor.getAllValues().get(0))
@@ -147,7 +153,7 @@ class StationQueryServiceTest {
 
         // then
         ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
-        verify(stationConverter).toPlacesResponse(eq(station), nameCaptor.capture(), any());
+        verify(stationConverter).toPlacesResponse(eq(station), any(), any(), nameCaptor.capture(), any());
         assertThat(nameCaptor.getValue()).isEqualTo("보문역 환승여행 코스");
     }
 
@@ -164,8 +170,51 @@ class StationQueryServiceTest {
         // then: 카테고리 변환은 한 번도 일어나지 않고, 빈 목록으로 응답이 만들어진다
         verify(stationConverter, never()).toPlaceCategoryResponse(any(), any(), any());
         ArgumentCaptor<List<StationPlaceCategoryResponse>> categoriesCaptor = ArgumentCaptor.forClass(List.class);
-        verify(stationConverter).toPlacesResponse(any(), any(), categoriesCaptor.capture());
+        verify(stationConverter).toPlacesResponse(any(), any(), any(), any(), categoriesCaptor.capture());
         assertThat(categoriesCaptor.getValue()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("소속 노선과 역 대표 태그를 함께 내려준다")
+    void getStationPlaces_includesLinesAndTags() {
+        // given: 코스 만들기 화면 상단에 노선(6호선·우이신설선)과 태그가 표시된다
+        // lineView가 내부에서 스터빙하므로 given(...) 안에서 호출하면 중첩 스터빙이 된다. 미리 만들어 둔다.
+        StationLineNameView line6 = lineView(6L, "6호선");
+        StationLineNameView lineUi = lineView(6L, "우이신설선");
+        given(stationRepository.findById(6L)).willReturn(Optional.of(station(6L, "보문역")));
+        List<PlaceInfoResponse> places = List.of(place(11L, "CULTURE", "문화공간"), place(30L, "FOOD", "식당"));
+        given(placeQueryService.getPlacesByStation(6L)).willReturn(places);
+        given(stationLineRepository.findLineNamesByStationIdIn(List.of(6L)))
+                .willReturn(List.of(line6, lineUi));
+        given(placeInfoQueryService.getTopTagNames(List.of(11L, 30L)))
+                .willReturn(List.of("LOCAL_EXPLORE", "NATURE", "BUDGET"));
+
+        // when
+        stationQueryService.getStationPlaces(6L);
+
+        // then
+        ArgumentCaptor<List<String>> linesCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<String>> tagsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(stationConverter).toPlacesResponse(any(), linesCaptor.capture(), tagsCaptor.capture(), any(), any());
+        assertThat(linesCaptor.getValue()).containsExactly("6호선", "우이신설선");
+        assertThat(tagsCaptor.getValue()).containsExactly("LOCAL_EXPLORE", "NATURE", "BUDGET");
+    }
+
+    @Test
+    @DisplayName("장소가 없으면 태그 조회를 호출하지 않고 빈 태그를 내려준다")
+    void getStationPlaces_noPlacesSkipsTagLookup() {
+        // given
+        given(stationRepository.findById(300L)).willReturn(Optional.of(station(300L, "서울역")));
+        given(placeQueryService.getPlacesByStation(300L)).willReturn(List.of());
+
+        // when
+        stationQueryService.getStationPlaces(300L);
+
+        // then: 빈 id 목록으로 태그를 조회하는 낭비를 막는다
+        verify(placeInfoQueryService, never()).getTopTagNames(any());
+        ArgumentCaptor<List<String>> tagsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(stationConverter).toPlacesResponse(any(), any(), tagsCaptor.capture(), any(), any());
+        assertThat(tagsCaptor.getValue()).isEmpty();
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.cotato.nextstation.domain.station.dto.response.StationPlaceCategoryRe
 import com.cotato.nextstation.domain.station.dto.response.StationPlaceResponse;
 import com.cotato.nextstation.domain.station.dto.response.StationPlacesResponse;
 import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.Line;
 import com.cotato.nextstation.domain.station.entity.Station;
 import org.springframework.stereotype.Component;
 
@@ -17,9 +18,20 @@ public class StationConverter {
         return new StationSummaryResponse(station.getId(), station.getStationName(), lines);
     }
 
-    public StationPlacesResponse toPlacesResponse(Station station, String defaultCourseName,
+    public StationPlacesResponse toPlacesResponse(Station station, List<String> lines, List<String> tags,
+                                                  String defaultCourseName,
                                                   List<StationPlaceCategoryResponse> categories) {
-        return new StationPlacesResponse(station.getId(), station.getStationName(), defaultCourseName, categories);
+        Line drawLine = station.getDrawLine();
+        return new StationPlacesResponse(
+                station.getId(),
+                station.getStationName(),
+                station.getDescription(),
+                drawLine != null ? drawLine.getName() : null,
+                lines,
+                tags,
+                defaultCourseName,
+                categories
+        );
     }
 
     public StationPlaceCategoryResponse toPlaceCategoryResponse(String categoryCode, String categoryName,

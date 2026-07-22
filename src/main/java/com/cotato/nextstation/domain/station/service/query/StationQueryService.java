@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.station.service.query;
 
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
+import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
 import com.cotato.nextstation.domain.station.converter.StationConverter;
 import com.cotato.nextstation.domain.station.dto.response.StationPlaceCategoryResponse;
@@ -38,6 +39,7 @@ public class StationQueryService {
     private final StationRepository stationRepository;
     private final StationLineRepository stationLineRepository;
     private final PlaceQueryService placeQueryService;
+    private final PlaceInfoQueryService placeInfoQueryService;
     private final StationConverter stationConverter;
 
     /**
@@ -49,7 +51,8 @@ public class StationQueryService {
         Station station = stationRepository.findById(stationId)
                 .orElseThrow(() -> new CustomException(StationErrorCode.STATION_NOT_FOUND));
 
-        Map<String, List<PlaceInfoResponse>> placesByCategory = placeQueryService.getPlacesByStation(stationId).stream()
+        List<PlaceInfoResponse> allPlaces = placeQueryService.getPlacesByStation(stationId);
+        Map<String, List<PlaceInfoResponse>> placesByCategory = allPlaces.stream()
                 .collect(Collectors.groupingBy(PlaceInfoResponse::categoryCode));
 
         List<StationPlaceCategoryResponse> categories = new ArrayList<>();
@@ -62,12 +65,25 @@ public class StationQueryService {
                     .sorted(Comparator.comparing(PlaceInfoResponse::placeId))
                     .limit(PLACES_PER_CATEGORY)
                     .toList();
+            // 카테고리 표시명은 카테고리의 속성이지만 별도 조회 창구가 없어 같은 그룹의 장소에서 가져온다.
+            // 한 그룹의 장소는 모두 같은 카테고리이므로 어느 것을 써도 값은 같다.
             categories.add(stationConverter.toPlaceCategoryResponse(
                     categoryCode, selected.get(0).categoryName(), selected));
         }
 
+        List<String> lines = groupLineNames(List.of(stationId)).getOrDefault(stationId, List.of());
+        List<String> tags = resolveTopTags(allPlaces);
         String defaultCourseName = station.getStationName() + COURSE_NAME_SUFFIX;
-        return stationConverter.toPlacesResponse(station, defaultCourseName, categories);
+        return stationConverter.toPlacesResponse(station, lines, tags, defaultCourseName, categories);
+    }
+
+    // 역 대표 태그 = 그 역 장소들의 태그를 집계한 상위 3개
+    private List<String> resolveTopTags(List<PlaceInfoResponse> places) {
+        if (places.isEmpty()) {
+            return List.of();
+        }
+        List<Long> placeIds = places.stream().map(PlaceInfoResponse::placeId).toList();
+        return placeInfoQueryService.getTopTagNames(placeIds);
     }
 
     // 역 이름 검색 (현재 전체일치). 못 찾으면 빈 목록
