@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+// 저장 탭 API는 경로가 /members/me 하위라 컨트롤러가 나뉘는데,
+// 같은 태그를 달아 Swagger에서는 한 섹션으로 묶는다.
+@Tag(name = "Course")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/courses")
