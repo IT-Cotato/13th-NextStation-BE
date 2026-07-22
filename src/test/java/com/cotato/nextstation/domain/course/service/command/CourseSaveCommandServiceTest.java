@@ -47,7 +47,8 @@ class CourseSaveCommandServiceTest {
     @DisplayName("코스를 스크랩하면 저장되고 저장 수가 증가한다")
     void saveCourse_success() {
         // given
-        given(courseRepository.existsById(1L)).willReturn(true);
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course(1L, 2L)));
+        given(courseRepository.existsPublicById(1L)).willReturn(true);
         given(courseSaveRepository.existsByMemberIdAndCourseId(1L, 1L)).willReturn(false);
 
         // when
@@ -62,7 +63,8 @@ class CourseSaveCommandServiceTest {
     @DisplayName("이미 저장한 코스를 다시 스크랩하면 예외가 발생하고 저장 수가 늘지 않는다")
     void saveCourse_duplicate() {
         // given
-        given(courseRepository.existsById(1L)).willReturn(true);
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course(1L, 2L)));
+        given(courseRepository.existsPublicById(1L)).willReturn(true);
         given(courseSaveRepository.existsByMemberIdAndCourseId(1L, 1L)).willReturn(true);
 
         // when & then
@@ -77,7 +79,8 @@ class CourseSaveCommandServiceTest {
     @DisplayName("동시 요청으로 유니크 제약에 걸리면 중복 저장 예외로 응답한다")
     void saveCourse_raceCondition() {
         // given: 중복 확인은 통과했지만 저장 시점에 다른 요청이 먼저 커밋된 상황
-        given(courseRepository.existsById(1L)).willReturn(true);
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course(1L, 2L)));
+        given(courseRepository.existsPublicById(1L)).willReturn(true);
         given(courseSaveRepository.existsByMemberIdAndCourseId(1L, 1L)).willReturn(false);
         willThrow(new DataIntegrityViolationException("unique"))
                 .given(courseSaveRepository).saveAndFlush(any(CourseSave.class));
@@ -93,13 +96,42 @@ class CourseSaveCommandServiceTest {
     @DisplayName("존재하지 않는 코스는 스크랩할 수 없다")
     void saveCourse_courseNotFound() {
         // given
-        given(courseRepository.existsById(1L)).willReturn(false);
+        given(courseRepository.findById(1L)).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> courseSaveCommandService.saveCourse(1L, 1L))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
         verify(courseSaveRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("본인이 만든 코스는 스크랩할 수 없다")
+    void saveCourse_ownCourse() {
+        // given: 1번 회원이 자기 코스(memberId=1)를 스크랩 시도
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course(1L, 1L)));
+
+        // when & then
+        assertThatThrownBy(() -> courseSaveCommandService.saveCourse(1L, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.CANNOT_SAVE_OWN_COURSE.getMessage());
+        verify(courseSaveRepository, never()).saveAndFlush(any());
+        verify(courseRepository, never()).increaseSaveCount(any());
+    }
+
+    @Test
+    @DisplayName("공개되지 않은 코스는 스크랩할 수 없다")
+    void saveCourse_notPublic() {
+        // given: 타인 코스지만 일지가 없거나 비공개인 경우
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course(1L, 2L)));
+        given(courseRepository.existsPublicById(1L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> courseSaveCommandService.saveCourse(1L, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
+        verify(courseSaveRepository, never()).saveAndFlush(any());
+        verify(courseRepository, never()).increaseSaveCount(any());
     }
 
     @Test

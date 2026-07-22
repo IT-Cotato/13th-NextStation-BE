@@ -11,6 +11,14 @@ import java.util.List;
 
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
+    // 스크랩 가능한(= 둘러보기에 노출되는) 코스인지 확인한다.
+    // Journal을 INNER JOIN 하므로 journalId가 NULL인 코스는 자동 제외되고,
+    // 삭제된 코스/일지는 각 엔티티의 @SQLRestriction으로 걸러진다.
+    @Query("SELECT COUNT(c) > 0 FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "WHERE c.id = :courseId AND j.isPublic = true")
+    boolean existsPublicById(@Param("courseId") Long courseId);
+
     // save_count는 DB에서 직접 증감시킨다.
     // 엔티티를 읽어 +1 하면 동시 스크랩 시 한쪽 증가분이 유실된다(lost update).
     @Modifying(clearAutomatically = true, flushAutomatically = true)

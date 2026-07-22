@@ -21,9 +21,9 @@ public class CourseSaveCommandService {
     private final CourseRepository courseRepository;
     private final CourseSaveRepository courseSaveRepository;
 
-    // 코스 스크랩. 이미 저장한 코스면 409.
+    // 코스 스크랩. 스크랩은 "타인의 공개 코스"만 대상으로 한다.
     public void saveCourse(Long memberId, Long courseId) {
-        validateCourseExists(courseId);
+        validateSavable(memberId, courseId);
 
         if (courseSaveRepository.existsByMemberIdAndCourseId(memberId, courseId)) {
             throw new CustomException(CourseErrorCode.DUPLICATE_COURSE_SAVE);
@@ -64,9 +64,19 @@ public class CourseSaveCommandService {
         course.delete();
     }
 
-    private void validateCourseExists(Long courseId) {
+    private void validateSavable(Long memberId, Long courseId) {
         // 삭제된 코스는 Course의 @SQLRestriction으로 조회에서 자동 제외된다.
-        if (!courseRepository.existsById(courseId)) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        if (course.getMemberId().equals(memberId)) {
+            throw new CustomException(CourseErrorCode.CANNOT_SAVE_OWN_COURSE);
+        }
+
+        // 공개되지 않은 코스는 스크랩해도 목록에 뜨지 않으므로 애초에 막는다.
+        // 남의 비공개 코스가 존재한다는 사실이 드러나지 않도록 404로 응답한다.
+        if (!courseRepository.existsPublicById(courseId)) {
+            log.warn("공개되지 않은 코스 저장 시도: memberId={}, courseId={}", memberId, courseId);
             throw new CustomException(CourseErrorCode.COURSE_NOT_FOUND);
         }
     }
