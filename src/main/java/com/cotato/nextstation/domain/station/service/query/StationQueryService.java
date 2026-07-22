@@ -45,13 +45,17 @@ public class StationQueryService {
     /**
      * 코스 만들기 후보 장소를 카테고리별로 묶어 반환한다.
      * 랜덤뽑기와 달리 후보가 매번 바뀌면 사용자가 혼란스러우므로 id 순으로 고정 선택한다.
-     * 뽑기 대상이 아닌 역은 장소가 없어 빈 목록이 나가며, 역 자체가 없으면 404다.
+     * 뽑기 대상이 아닌 역은 빈 목록이 나가며, 역 자체가 없으면 404다.
      */
     public StationPlacesResponse getStationPlaces(Long stationId) {
         Station station = stationRepository.findById(stationId)
                 .orElseThrow(() -> new CustomException(StationErrorCode.STATION_NOT_FOUND));
 
-        List<PlaceInfoResponse> allPlaces = placeQueryService.getPlacesByStation(stationId);
+        // 코스 만들기는 뽑기 결과 역에서만 진입하므로 뽑기 대상이 아닌 역은 후보를 내리지 않는다.
+        // 현재 데이터도 장소가 뽑기 역에만 붙어 있지만, 그 전제에 기대지 않고 조건을 명시한다.
+        List<PlaceInfoResponse> allPlaces = station.isDrawable()
+                ? placeQueryService.getPlacesByStation(stationId)
+                : List.of();
         Map<String, List<PlaceInfoResponse>> placesByCategory = allPlaces.stream()
                 .collect(Collectors.groupingBy(PlaceInfoResponse::categoryCode));
 

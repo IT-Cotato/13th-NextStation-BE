@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -98,7 +99,11 @@ class StationQueryServiceTest {
     // ---------- 역별 장소 목록 ----------
 
     private Station station(Long id, String name) {
-        Station station = Station.builder().stationName(name).isDrawable(true).build();
+        return station(id, name, true);
+    }
+
+    private Station station(Long id, String name, boolean isDrawable) {
+        Station station = Station.builder().stationName(name).isDrawable(isDrawable).build();
         ReflectionTestUtils.setField(station, "id", id);
         return station;
     }
@@ -158,7 +163,7 @@ class StationQueryServiceTest {
     }
 
     @Test
-    @DisplayName("뽑기 대상이 아니라 장소가 없는 역은 빈 목록으로 응답한다")
+    @DisplayName("장소가 아직 없는 역은 빈 목록으로 응답한다")
     void getStationPlaces_noPlaces() {
         // given
         given(stationRepository.findById(300L)).willReturn(Optional.of(station(300L, "서울역")));
@@ -214,6 +219,28 @@ class StationQueryServiceTest {
         verify(placeInfoQueryService, never()).getTopTagNames(any());
         ArgumentCaptor<List<String>> tagsCaptor = ArgumentCaptor.forClass(List.class);
         verify(stationConverter).toPlacesResponse(any(), any(), tagsCaptor.capture(), any(), any());
+        assertThat(tagsCaptor.getValue()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("뽑기 대상이 아닌 역은 장소가 있어도 후보로 내보내지 않는다")
+    void getStationPlaces_notDrawable() {
+        // given: 출발역 전용 역에 장소 데이터가 붙어 있는 상황
+        // (현재 데이터에는 없지만, 데이터 전제에 기대지 않고 조건이 지켜지는지 확인한다)
+        given(stationRepository.findById(300L)).willReturn(Optional.of(station(300L, "서울역", false)));
+        lenient().when(placeQueryService.getPlacesByStation(300L))
+                .thenReturn(List.of(place(11L, "CULTURE", "문화공간")));
+
+        // when
+        stationQueryService.getStationPlaces(300L);
+
+        // then: 장소 조회 자체를 하지 않고 카테고리·태그가 빈 채로 나간다
+        verify(placeQueryService, never()).getPlacesByStation(any());
+        verify(placeInfoQueryService, never()).getTopTagNames(any());
+        ArgumentCaptor<List<StationPlaceCategoryResponse>> categoriesCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<String>> tagsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(stationConverter).toPlacesResponse(any(), any(), tagsCaptor.capture(), any(), categoriesCaptor.capture());
+        assertThat(categoriesCaptor.getValue()).isEmpty();
         assertThat(tagsCaptor.getValue()).isEmpty();
     }
 
