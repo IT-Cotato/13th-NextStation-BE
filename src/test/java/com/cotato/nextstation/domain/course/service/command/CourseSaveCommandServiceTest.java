@@ -9,6 +9,7 @@ import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -44,19 +45,24 @@ class CourseSaveCommandServiceTest {
     }
 
     @Test
-    @DisplayName("코스를 스크랩하면 저장되고 저장 수가 증가한다")
+    @DisplayName("코스를 스크랩하면 회원/코스가 정확히 저장되고 저장 수가 증가한다")
     void saveCourse_success() {
-        // given
-        given(courseRepository.findById(1L)).willReturn(Optional.of(course(1L, 2L)));
-        given(courseRepository.existsPublicById(1L)).willReturn(true);
-        given(courseSaveRepository.existsByMemberIdAndCourseId(1L, 1L)).willReturn(false);
+        // given: memberId와 courseId를 다른 값으로 둬야 둘이 뒤바뀌는 실수를 잡을 수 있다
+        Long memberId = 1L;
+        Long courseId = 7L;
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course(courseId, 2L)));
+        given(courseRepository.existsPublicById(courseId)).willReturn(true);
+        given(courseSaveRepository.existsByMemberIdAndCourseId(memberId, courseId)).willReturn(false);
 
         // when
-        courseSaveCommandService.saveCourse(1L, 1L);
+        courseSaveCommandService.saveCourse(memberId, courseId);
 
         // then
-        verify(courseSaveRepository).saveAndFlush(any(CourseSave.class));
-        verify(courseRepository).increaseSaveCount(1L);
+        ArgumentCaptor<CourseSave> captor = ArgumentCaptor.forClass(CourseSave.class);
+        verify(courseSaveRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getMemberId()).isEqualTo(memberId);
+        assertThat(captor.getValue().getCourseId()).isEqualTo(courseId);
+        verify(courseRepository).increaseSaveCount(courseId);
     }
 
     @Test
