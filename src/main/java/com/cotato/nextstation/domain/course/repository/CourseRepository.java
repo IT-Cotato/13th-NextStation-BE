@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface CourseRepository extends JpaRepository<Course, Long> {
@@ -29,6 +30,12 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Course c SET c.saveCount = c.saveCount - 1 WHERE c.id = :courseId AND c.saveCount > 0")
     void decreaseSaveCount(@Param("courseId") Long courseId);
+
+    // 다중 취소용. 코스마다 UPDATE를 날리지 않고 한 번에 처리한다.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Course c SET c.saveCount = c.saveCount - 1 " +
+            "WHERE c.id IN :courseIds AND c.saveCount > 0")
+    void decreaseSaveCountAll(@Param("courseIds") Collection<Long> courseIds);
 
     // 역별 인기 공개 코스 조회
     // 인기순 = view_count + save_count*2, 동률이면 최신순으로 2차 정렬

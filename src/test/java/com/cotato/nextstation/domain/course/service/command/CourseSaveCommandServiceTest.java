@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -166,6 +167,37 @@ class CourseSaveCommandServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.COURSE_SAVE_NOT_FOUND.getMessage());
         verify(courseRepository, never()).decreaseSaveCount(any());
+    }
+
+    @Test
+    @DisplayName("여러 스크랩을 한 번에 취소하면 저장된 것만 삭제되고 저장 수도 함께 줄어든다")
+    void cancelSaves_success() {
+        // given: 1,2,3을 요청했지만 실제로 저장된 건 1,3뿐 (2는 다른 기기에서 이미 취소된 상황)
+        List<Long> requested = List.of(1L, 2L, 3L);
+        List<Long> saved = List.of(1L, 3L);
+        given(courseSaveRepository.findSavedCourseIds(1L, requested)).willReturn(saved);
+
+        // when
+        courseSaveCommandService.cancelSaves(1L, requested);
+
+        // then: 요청한 3건이 아니라 실제 저장된 2건만 처리된다
+        verify(courseSaveRepository).deleteByMemberIdAndCourseIdIn(1L, saved);
+        verify(courseRepository).decreaseSaveCountAll(saved);
+    }
+
+    @Test
+    @DisplayName("선택한 코스가 하나도 저장돼 있지 않으면 예외가 발생한다")
+    void cancelSaves_noneSaved() {
+        // given
+        List<Long> requested = List.of(1L, 2L);
+        given(courseSaveRepository.findSavedCourseIds(1L, requested)).willReturn(List.of());
+
+        // when & then
+        assertThatThrownBy(() -> courseSaveCommandService.cancelSaves(1L, requested))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_SAVE_NOT_FOUND.getMessage());
+        verify(courseSaveRepository, never()).deleteByMemberIdAndCourseIdIn(any(), any());
+        verify(courseRepository, never()).decreaseSaveCountAll(any());
     }
 
     @Test

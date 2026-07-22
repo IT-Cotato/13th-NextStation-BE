@@ -12,6 +12,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -49,6 +51,21 @@ public class CourseSaveCommandService {
 
         courseSaveRepository.delete(courseSave);
         courseRepository.decreaseSaveCount(courseId);
+    }
+
+    /**
+     * 스크랩 다중 취소(저장 탭의 선택 모드). 요청한 코스 중 실제로 저장돼 있는 것만 취소한다.
+     * 다른 기기에서 이미 취소된 코스가 섞여 있어도 나머지는 정상 처리되도록 부분 성공을 허용하고,
+     * 하나도 저장돼 있지 않을 때만 예외로 알린다.
+     */
+    public void cancelSaves(Long memberId, List<Long> courseIds) {
+        List<Long> savedCourseIds = courseSaveRepository.findSavedCourseIds(memberId, courseIds);
+        if (savedCourseIds.isEmpty()) {
+            throw new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND);
+        }
+
+        courseSaveRepository.deleteByMemberIdAndCourseIdIn(memberId, savedCourseIds);
+        courseRepository.decreaseSaveCountAll(savedCourseIds);
     }
 
     // 코스 삭제(soft delete). 본인 코스만 삭제할 수 있다.

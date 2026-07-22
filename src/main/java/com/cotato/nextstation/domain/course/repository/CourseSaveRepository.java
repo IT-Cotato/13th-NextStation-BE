@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.course.repository;
 
 import com.cotato.nextstation.domain.course.entity.CourseSave;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,9 +16,16 @@ public interface CourseSaveRepository extends JpaRepository<CourseSave, Long> {
 
     Optional<CourseSave> findByMemberIdAndCourseId(Long memberId, Long courseId);
 
-    // 여러 코스의 스크랩 여부를 한 번에 조회 
+    // 여러 코스의 스크랩 여부를 한 번에 조회
     @Query("SELECT cs.courseId FROM CourseSave cs " +
             "WHERE cs.memberId = :memberId AND cs.courseId IN :courseIds")
     List<Long> findSavedCourseIds(@Param("memberId") Long memberId,
                                   @Param("courseIds") Collection<Long> courseIds);
+
+    // 선택한 스크랩을 한 번에 삭제한다.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM CourseSave cs " +
+            "WHERE cs.memberId = :memberId AND cs.courseId IN :courseIds")
+    void deleteByMemberIdAndCourseIdIn(@Param("memberId") Long memberId,
+                                       @Param("courseIds") Collection<Long> courseIds);
 }
