@@ -11,6 +11,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -42,6 +43,13 @@ public class Member extends BaseTimeEntity {
     @Column(name = "profile_bio", length = 30)
     private String profileBio;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Gender gender;
+
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -51,12 +59,14 @@ public class Member extends BaseTimeEntity {
         this.password = password;
         this.status = MemberStatus.PENDING;
         this.role = MemberRole.USER;
+        this.gender = Gender.UNSPECIFIED;
     }
 
-    public void completeProfile(String nickname, String profileImageUrl, String profileBio) {
+    public void completeProfile(String nickname, String profileImageUrl, Gender gender, LocalDate birthDate) {
         this.nickname = nickname;
         this.profileImageUrl = profileImageUrl;
-        this.profileBio = profileBio;
+        this.gender = gender;
+        this.birthDate = birthDate;
         this.status = MemberStatus.ACTIVE;
     }
 

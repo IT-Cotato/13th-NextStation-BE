@@ -787,8 +787,8 @@ class MemberQueryServiceTest {
 ### 브랜치 전략
 
 - `develop`: 배포 브랜치
-- `feature/{이슈번호}-{기능}`: 기능 개발 브랜치
-- 예: `feature/12-member-signup`
+- `feat/{이슈번호}-{기능}`: 기능 개발 브랜치
+- 예: `feat/12-member-signup`
 
 ### PR 규칙
 

@@ -1,22 +1,28 @@
 package com.cotato.nextstation.domain.auth.controller;
 
 import com.cotato.nextstation.domain.auth.dto.request.EmailVerificationConfirmRequest;
+import com.cotato.nextstation.domain.auth.dto.request.ProfileSetupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupVerificationSendRequest;
+import com.cotato.nextstation.domain.auth.dto.response.ProfileSetupResponse;
 import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
 import com.cotato.nextstation.domain.auth.service.command.EmailVerificationCommandService;
+import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import com.cotato.nextstation.global.util.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,6 +34,7 @@ public class AuthController {
 
     private final EmailVerificationCommandService emailVerificationCommandService;
     private final SignupCommandService signupCommandService;
+    private final ProfileSetupCommandService profileSetupCommandService;
 
     @Operation(
             summary = "회원가입 이메일 인증번호 발송",
@@ -82,13 +89,15 @@ public class AuthController {
                       로그인 상태를 유지하는 access token이 아니므로 다른 API 호출에는 쓸 수 없고, 발급 후 30분이 지나면 만료된다.
                     - 프로필 설정 화면으로 넘어갈 때 이 값을 프론트에서 잠깐 들고 있다가, 프로필 설정 API 요청의 `Authorization: Bearer {signupToken}` 헤더에 그대로 실어서 보내면 된다.
                     - access token(로그인 유지용)과 refresh token은 이 API가 아니라 프로필 설정 완료 API에서 발급된다.
+                    - signupToken이 만료된 뒤 돌아온 **PENDING 회원**이 같은 이메일/비밀번호로 다시 요청하면, 새로 가입시키지 않고 **signupToken만 재발급**한다(비밀번호가 재인증 역할). 이미 프로필 설정까지 끝난 회원은 그대로 `DUPLICATE_EMAIL`로 거부된다.
                     """
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "회원가입 성공"),
+            @ApiResponse(responseCode = "201", description = "회원가입 성공 또는 PENDING 회원 signupToken 재발급 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 비밀번호 확인 불일치, 이메일 인증 미완료, 또는 필수 약관 미동의 (`GlobalErrorCode.VALIDATION_ERROR`, `AuthErrorCode.PASSWORD_CONFIRMATION_MISMATCH`, `AuthErrorCode.EMAIL_NOT_VERIFIED`, `TermsErrorCode.REQUIRED_TERMS_NOT_AGREED`)"),
+            @ApiResponse(responseCode = "401", description = "PENDING 회원의 비밀번호 불일치 (`AuthErrorCode.PASSWORD_MISMATCH`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 약관 id (`TermsErrorCode.TERMS_NOT_FOUND`)"),
-            @ApiResponse(responseCode = "409", description = "이미 가입된 이메일 (`AuthErrorCode.DUPLICATE_EMAIL`)"),
+            @ApiResponse(responseCode = "409", description = "이미 프로필 설정까지 완료된 이메일 (`AuthErrorCode.DUPLICATE_EMAIL`)"),
     })
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/signup")
@@ -101,5 +110,37 @@ public class AuthController {
                 ClientIpResolver.resolve(httpRequest)
         );
         return CommonResponse.success(HttpStatus.CREATED, response);
+    }
+
+    @Operation(
+            summary = "프로필 설정",
+            description = """
+                    닉네임/프로필 사진/성별/생년월일을 설정하고 회원가입을 완료한다(status: PENDING -> ACTIVE).
+                    - signupToken 인증 필요. 우측 상단 자물쇠(Authorize) 버튼을 눌러 회원가입 비밀번호 설정 API 응답의 signupToken 값을 그대로(Bearer 접두사 없이) 넣으면 된다.
+                    - 프로필 사진은 선택 입력이며, presigned URL로 S3에 업로드 완료 후 받은 imageUrl을 그대로 넣으면 된다.
+                    - 성별의 "선택 안함"도 `UNSPECIFIED`로 명시적으로 보내야 한다.
+                    - 이미 프로필 설정이 완료된 회원(status != PENDING)이 같은 토큰으로 다시 요청하면 거부된다(재사용 방지).
+                    """
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "프로필 설정 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 닉네임 길이/문자/금칙어 위반 (`GlobalErrorCode.VALIDATION_ERROR`, `NicknameErrorCode.NICKNAME_TOO_SHORT`, `NicknameErrorCode.NICKNAME_TOO_LONG`, `NicknameErrorCode.NICKNAME_INVALID_CHARACTER`, `NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD`)"),
+            @ApiResponse(responseCode = "401", description = "signupToken 누락, 위변조, 또는 만료 (`AuthErrorCode.INVALID_SIGNUP_TOKEN`, `AuthErrorCode.SIGNUP_TOKEN_EXPIRED`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`AuthErrorCode.MEMBER_NOT_FOUND`)"),
+            @ApiResponse(responseCode = "409", description = "이미 프로필 설정 완료됨 또는 닉네임 중복 (`AuthErrorCode.PROFILE_ALREADY_COMPLETED`, `NicknameErrorCode.DUPLICATE_NICKNAME`)"),
+    })
+    @PostMapping("/profile")
+    public CommonResponse<ProfileSetupResponse> setupProfile(
+            @Parameter(hidden = true) @RequestHeader(value = "Authorization", required = false, defaultValue = "") String authorizationHeader,
+            @Valid @RequestBody ProfileSetupRequest request) {
+        ProfileSetupResponse response = profileSetupCommandService.setupProfile(
+                authorizationHeader,
+                request.nickname(),
+                request.profileImageUrl(),
+                request.gender(),
+                request.birthDate()
+        );
+        return CommonResponse.success(response);
     }
 }

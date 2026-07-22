@@ -63,3 +63,6 @@ src/main/resources/data/raw/
 place-geocoding-output/
 
 src/main/resources/data/places.csv
+
+# 로컬 테스트용 signupToken 발급 스크립트
+scripts/GenerateSignupToken.java
