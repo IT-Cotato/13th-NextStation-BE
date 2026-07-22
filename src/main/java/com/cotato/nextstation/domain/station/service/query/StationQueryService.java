@@ -1,16 +1,24 @@
 package com.cotato.nextstation.domain.station.service.query;
 
+import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
+import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
 import com.cotato.nextstation.domain.station.converter.StationConverter;
+import com.cotato.nextstation.domain.station.dto.response.StationPlaceCategoryResponse;
+import com.cotato.nextstation.domain.station.dto.response.StationPlacesResponse;
 import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.Station;
+import com.cotato.nextstation.domain.station.exception.StationErrorCode;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineNameView;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
+import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -21,9 +29,46 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class StationQueryService {
 
+    // 코스 만들기 화면의 카테고리 노출 순서(문화공간 → 식당 → 카페 → 산책포인트).
+    // 랜덤뽑기 코스 미리보기와 같은 순서를 쓴다.
+    private static final List<String> CATEGORY_DISPLAY_ORDER = List.of("CULTURE", "FOOD", "CAFE", "WALK");
+    private static final int PLACES_PER_CATEGORY = 3;
+    private static final String COURSE_NAME_SUFFIX = " 환승여행 코스";
+
     private final StationRepository stationRepository;
     private final StationLineRepository stationLineRepository;
+    private final PlaceQueryService placeQueryService;
     private final StationConverter stationConverter;
+
+    /**
+     * 코스 만들기 후보 장소를 카테고리별로 묶어 반환한다.
+     * 랜덤뽑기와 달리 후보가 매번 바뀌면 사용자가 혼란스러우므로 id 순으로 고정 선택한다.
+     * 뽑기 대상이 아닌 역은 장소가 없어 빈 목록이 나가며, 역 자체가 없으면 404다.
+     */
+    public StationPlacesResponse getStationPlaces(Long stationId) {
+        Station station = stationRepository.findById(stationId)
+                .orElseThrow(() -> new CustomException(StationErrorCode.STATION_NOT_FOUND));
+
+        Map<String, List<PlaceInfoResponse>> placesByCategory = placeQueryService.getPlacesByStation(stationId).stream()
+                .collect(Collectors.groupingBy(PlaceInfoResponse::categoryCode));
+
+        List<StationPlaceCategoryResponse> categories = new ArrayList<>();
+        for (String categoryCode : CATEGORY_DISPLAY_ORDER) {
+            List<PlaceInfoResponse> places = placesByCategory.getOrDefault(categoryCode, List.of());
+            if (places.isEmpty()) {
+                continue;
+            }
+            List<PlaceInfoResponse> selected = places.stream()
+                    .sorted(Comparator.comparing(PlaceInfoResponse::placeId))
+                    .limit(PLACES_PER_CATEGORY)
+                    .toList();
+            categories.add(stationConverter.toPlaceCategoryResponse(
+                    categoryCode, selected.get(0).categoryName(), selected));
+        }
+
+        String defaultCourseName = station.getStationName() + COURSE_NAME_SUFFIX;
+        return stationConverter.toPlacesResponse(station, defaultCourseName, categories);
+    }
 
     // 역 이름 검색 (현재 전체일치). 못 찾으면 빈 목록
     public List<StationSummaryResponse> searchByName(String keyword) {
