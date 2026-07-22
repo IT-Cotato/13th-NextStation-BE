@@ -45,11 +45,13 @@ public class CourseSaveCommandService {
     }
 
     // 코스 스크랩 취소. 저장하지 않은 코스면 404.
+    // 조회 없이 바로 삭제하고 지워진 행 수로 판단한다. 조회 후 삭제하면 동시 취소 시
+    // 두 요청이 모두 삭제에 성공했다고 보고 저장 수를 각각 줄인다.
     public void cancelSave(Long memberId, Long courseId) {
-        CourseSave courseSave = courseSaveRepository.findByMemberIdAndCourseId(memberId, courseId)
-                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND));
+        if (courseSaveRepository.deleteByMemberIdAndCourseId(memberId, courseId) == 0) {
+            throw new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND);
+        }
 
-        courseSaveRepository.delete(courseSave);
         courseRepository.decreaseSaveCount(courseId);
     }
 
@@ -59,13 +61,17 @@ public class CourseSaveCommandService {
      * 하나도 저장돼 있지 않을 때만 예외로 알린다.
      */
     public void cancelSaves(Long memberId, List<Long> courseIds) {
-        List<Long> savedCourseIds = courseSaveRepository.findSavedCourseIds(memberId, courseIds);
-        if (savedCourseIds.isEmpty()) {
+        // 단건과 같은 이유로, 미리 조회한 목록이 아니라 실제로 지워진 코스만 저장 수를 줄인다.
+        List<Long> deletedCourseIds = courseIds.stream()
+                .distinct()
+                .filter(courseId -> courseSaveRepository.deleteByMemberIdAndCourseId(memberId, courseId) > 0)
+                .toList();
+
+        if (deletedCourseIds.isEmpty()) {
             throw new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND);
         }
 
-        courseSaveRepository.deleteByMemberIdAndCourseIdIn(memberId, savedCourseIds);
-        courseRepository.decreaseSaveCountAll(savedCourseIds);
+        courseRepository.decreaseSaveCountAll(deletedCourseIds);
     }
 
     // 코스 삭제(soft delete). 본인 코스만 삭제할 수 있다.

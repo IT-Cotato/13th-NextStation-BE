@@ -144,23 +144,21 @@ class CourseSaveCommandServiceTest {
     @Test
     @DisplayName("스크랩을 취소하면 삭제되고 저장 수가 감소한다")
     void cancelSave_success() {
-        // given
-        CourseSave courseSave = CourseSave.builder().memberId(1L).courseId(1L).build();
-        given(courseSaveRepository.findByMemberIdAndCourseId(1L, 1L)).willReturn(Optional.of(courseSave));
+        // given: 삭제 쿼리가 1행을 지웠다 = 실제로 스크랩돼 있었다
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(1L, 1L)).willReturn(1);
 
         // when
         courseSaveCommandService.cancelSave(1L, 1L);
 
         // then
-        verify(courseSaveRepository).delete(courseSave);
         verify(courseRepository).decreaseSaveCount(1L);
     }
 
     @Test
     @DisplayName("저장하지 않은 코스를 취소하면 예외가 발생하고 저장 수가 줄지 않는다")
     void cancelSave_notSaved() {
-        // given
-        given(courseSaveRepository.findByMemberIdAndCourseId(1L, 1L)).willReturn(Optional.empty());
+        // given: 지워진 행이 없다 = 저장돼 있지 않았다
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(1L, 1L)).willReturn(0);
 
         // when & then
         assertThatThrownBy(() -> courseSaveCommandService.cancelSave(1L, 1L))
@@ -170,33 +168,56 @@ class CourseSaveCommandServiceTest {
     }
 
     @Test
-    @DisplayName("여러 스크랩을 한 번에 취소하면 저장된 것만 삭제되고 저장 수도 함께 줄어든다")
+    @DisplayName("동시 취소로 이미 지워진 뒤라면 저장 수를 줄이지 않는다")
+    void cancelSave_alreadyDeletedByConcurrentRequest() {
+        // given: 조회 시점엔 있었더라도 삭제 시점에 다른 요청이 먼저 지웠다면 0행이 반환된다
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(1L, 1L)).willReturn(0);
+
+        // when & then: 저장 수가 중복으로 깎이지 않는다
+        assertThatThrownBy(() -> courseSaveCommandService.cancelSave(1L, 1L))
+                .isInstanceOf(CustomException.class);
+        verify(courseRepository, never()).decreaseSaveCount(any());
+    }
+
+    @Test
+    @DisplayName("여러 스크랩을 한 번에 취소하면 실제로 지워진 것만 저장 수가 줄어든다")
     void cancelSaves_success() {
-        // given: 1,2,3을 요청했지만 실제로 저장된 건 1,3뿐 (2는 다른 기기에서 이미 취소된 상황)
-        List<Long> requested = List.of(1L, 2L, 3L);
-        List<Long> saved = List.of(1L, 3L);
-        given(courseSaveRepository.findSavedCourseIds(1L, requested)).willReturn(saved);
+        // given: 1,2,3을 요청했지만 2는 이미 취소돼 있어 0행이 지워진다
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(1L, 1L)).willReturn(1);
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(1L, 2L)).willReturn(0);
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(1L, 3L)).willReturn(1);
 
         // when
-        courseSaveCommandService.cancelSaves(1L, requested);
+        courseSaveCommandService.cancelSaves(1L, List.of(1L, 2L, 3L));
 
-        // then: 요청한 3건이 아니라 실제 저장된 2건만 처리된다
-        verify(courseSaveRepository).deleteByMemberIdAndCourseIdIn(1L, saved);
-        verify(courseRepository).decreaseSaveCountAll(saved);
+        // then: 저장돼 있지 않던 2번은 빠지고 1,3번만 감소한다
+        verify(courseRepository).decreaseSaveCountAll(List.of(1L, 3L));
+    }
+
+    @Test
+    @DisplayName("같은 코스를 중복으로 보내도 한 번만 처리한다")
+    void cancelSaves_duplicateIds() {
+        // given
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(1L, 1L)).willReturn(1);
+
+        // when
+        courseSaveCommandService.cancelSaves(1L, List.of(1L, 1L, 1L));
+
+        // then: 삭제도 감소도 한 번씩만
+        verify(courseSaveRepository).deleteByMemberIdAndCourseId(1L, 1L);
+        verify(courseRepository).decreaseSaveCountAll(List.of(1L));
     }
 
     @Test
     @DisplayName("선택한 코스가 하나도 저장돼 있지 않으면 예외가 발생한다")
     void cancelSaves_noneSaved() {
         // given
-        List<Long> requested = List.of(1L, 2L);
-        given(courseSaveRepository.findSavedCourseIds(1L, requested)).willReturn(List.of());
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(any(), any())).willReturn(0);
 
         // when & then
-        assertThatThrownBy(() -> courseSaveCommandService.cancelSaves(1L, requested))
+        assertThatThrownBy(() -> courseSaveCommandService.cancelSaves(1L, List.of(1L, 2L)))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.COURSE_SAVE_NOT_FOUND.getMessage());
-        verify(courseSaveRepository, never()).deleteByMemberIdAndCourseIdIn(any(), any());
         verify(courseRepository, never()).decreaseSaveCountAll(any());
     }
 
