@@ -3,12 +3,24 @@ package com.cotato.nextstation.domain.course.repository;
 import com.cotato.nextstation.domain.course.entity.Course;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
 public interface CourseRepository extends JpaRepository<Course, Long> {
+
+    // save_count는 DB에서 직접 증감시킨다.
+    // 엔티티를 읽어 +1 하면 동시 스크랩 시 한쪽 증가분이 유실된다(lost update).
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Course c SET c.saveCount = c.saveCount + 1 WHERE c.id = :courseId")
+    void increaseSaveCount(@Param("courseId") Long courseId);
+
+    // 동시 취소로 음수가 되지 않도록 0보다 클 때만 감소시킨다.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Course c SET c.saveCount = c.saveCount - 1 WHERE c.id = :courseId AND c.saveCount > 0")
+    void decreaseSaveCount(@Param("courseId") Long courseId);
 
     // 역별 인기 공개 코스 조회
     // 인기순 = view_count + save_count*2, 동률이면 최신순으로 2차 정렬
