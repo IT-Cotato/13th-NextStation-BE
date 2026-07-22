@@ -35,6 +35,12 @@ logging:
 jwt:
   secret: ${JWT_SECRET}
 
+auth:
+  refresh-cookie:
+    # localhost는 HTTPS가 아니라서 secure 쿠키는 브라우저가 저장을 거부한다 -> 로컬에서만 완화
+    secure: false
+    same-site: Lax
+
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
