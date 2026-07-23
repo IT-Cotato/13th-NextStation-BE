@@ -16,31 +16,31 @@ VALUES ('마케팅 정보 수신 동의', '제1조 (수신 목적) ...', 'v1.0',
 -- Category/PlaceTag 마스터 데이터.
 -- 둘 다 place가 자연키(code/name)로 참조하므로 PlaceSeeder보다 먼저 시딩돼야 한다.
 -- default_image_url은 사진 업로드(S3) 단계 전이라 아직 비워둔다.
--- TODO: PlaceSeeder가 생겨 place.category_id/place_tag_mapping이 이 테이블들을 FK로 참조하기 시작하면 재시작마다 DELETE하는 지금 방식은 제약 위반으로 실패한다. 그 시점엔 StationDataSeeder처럼
--- TODO: 데이터 있으면 skip" 방식으로 전환하거나 이 DELETE를 제거할 것
-
-DELETE FROM category;
+-- place.category_id/place_tag_mapping이 이 테이블들을 FK로 참조하므로 재시작마다 DELETE하면 제약 위반으로 실패한다.
+-- 그래서 DELETE 없이 자연키(code/name) 기준 upsert로 멱등하게 반영한다.
 
 INSERT INTO category (code, name, default_image_url)
-VALUES ('CAFE', '카페', NULL);
+VALUES ('CAFE', '카페', NULL)
+ON DUPLICATE KEY UPDATE name = VALUES(name), default_image_url = VALUES(default_image_url);
 
 INSERT INTO category (code, name, default_image_url)
-VALUES ('FOOD', '식당', NULL);
+VALUES ('FOOD', '식당', NULL)
+ON DUPLICATE KEY UPDATE name = VALUES(name), default_image_url = VALUES(default_image_url);
 
 INSERT INTO category (code, name, default_image_url)
-VALUES ('CULTURE', '문화공간', NULL);
+VALUES ('CULTURE', '문화공간', NULL)
+ON DUPLICATE KEY UPDATE name = VALUES(name), default_image_url = VALUES(default_image_url);
 
 INSERT INTO category (code, name, default_image_url)
-VALUES ('WALK', '산책포인트', NULL);
+VALUES ('WALK', '산책포인트', NULL)
+ON DUPLICATE KEY UPDATE name = VALUES(name), default_image_url = VALUES(default_image_url);
 
-DELETE FROM place_tag;
-
-INSERT INTO place_tag (name, is_active) VALUES ('NATURE', true);
-INSERT INTO place_tag (name, is_active) VALUES ('ALLEY_TRIP', true);
-INSERT INTO place_tag (name, is_active) VALUES ('MARKET', true);
-INSERT INTO place_tag (name, is_active) VALUES ('HOTPLACE', true);
-INSERT INTO place_tag (name, is_active) VALUES ('PHOTO_SPOT', true);
-INSERT INTO place_tag (name, is_active) VALUES ('SHOPPING', true);
-INSERT INTO place_tag (name, is_active) VALUES ('EXPERIENCE', true);
-INSERT INTO place_tag (name, is_active) VALUES ('BUDGET', true);
-INSERT INTO place_tag (name, is_active) VALUES ('INDOOR', true);
+INSERT INTO place_tag (name, is_active) VALUES ('NATURE', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
+INSERT INTO place_tag (name, is_active) VALUES ('ALLEY_TRIP', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
+INSERT INTO place_tag (name, is_active) VALUES ('MARKET', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
+INSERT INTO place_tag (name, is_active) VALUES ('HOTPLACE', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
+INSERT INTO place_tag (name, is_active) VALUES ('PHOTO_SPOT', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
+INSERT INTO place_tag (name, is_active) VALUES ('SHOPPING', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
+INSERT INTO place_tag (name, is_active) VALUES ('EXPERIENCE', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
+INSERT INTO place_tag (name, is_active) VALUES ('BUDGET', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
+INSERT INTO place_tag (name, is_active) VALUES ('INDOOR', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
