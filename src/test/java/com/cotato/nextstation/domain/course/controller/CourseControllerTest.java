@@ -10,6 +10,7 @@ import com.cotato.nextstation.domain.course.service.command.CourseCommandService
 import com.cotato.nextstation.domain.course.service.command.CourseSaveCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
+import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,10 @@ class CourseControllerTest {
 
     @MockitoBean
     CourseSaveCommandService courseSaveCommandService;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
 
     @Test
     @DisplayName("코스 생성은 201과 courseId/name/createdAt을 반환한다")
