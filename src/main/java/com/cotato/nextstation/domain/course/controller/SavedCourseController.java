@@ -1,7 +1,9 @@
 package com.cotato.nextstation.domain.course.controller;
 
 import com.cotato.nextstation.domain.course.dto.request.CourseSaveCancelRequest;
+import com.cotato.nextstation.domain.course.dto.response.SavedCourseListResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseSaveCommandService;
+import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -11,9 +13,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 // CourseController와 같은 태그를 써서 Swagger에서 한 섹션으로 보이게 한다.
@@ -28,6 +32,31 @@ public class SavedCourseController {
     private static final String MEMBER_ID_DESCRIPTION = "회원 ID (Auth 적용 전까지 사용하는 임시 헤더)";
 
     private final CourseSaveCommandService courseSaveCommandService;
+    private final CourseQueryService courseQueryService;
+
+    @Operation(
+            summary = "스크랩한 코스 목록 조회",
+            description = """
+                    저장 탭에서 내가 스크랩한 코스를 최근 스크랩순으로 조회한다.
+                    - 원본 코스가 삭제되거나 비공개로 바뀌면 목록에서 빠진다(스크랩은 원본 참조).
+                    - 화면에 필터 칩이 없어 호선/역 필터를 받지 않는다.
+                    - `nextCursor`를 그대로 `cursor`에 넣어 다음 페이지를 요청한다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "size 범위를 벗어남 (`GlobalErrorCode.INVALID_PAGE_SIZE`) 또는 커서가 잘못됨 (`GlobalErrorCode.INVALID_CURSOR`)"),
+    })
+    @GetMapping
+    public CommonResponse<SavedCourseListResponse> getSavedCourses(
+            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
+            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(description = "다음 페이지 커서 (첫 페이지는 생략)")
+            @RequestParam(required = false) String cursor,
+            @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
+            @RequestParam(required = false) Integer size) {
+        return CommonResponse.success(courseQueryService.getSavedCourses(memberId, cursor, size));
+    }
 
     @Operation(
             summary = "코스 스크랩 다중 취소",
