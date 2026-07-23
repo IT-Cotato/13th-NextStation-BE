@@ -41,7 +41,7 @@ class DrawableStationWriter {
             Line drawLine = lineRepository.findByName(row.lineName())
                     .orElseThrow(() -> new IllegalStateException("뽑기 대표 노선을 찾을 수 없습니다: lineName=" + row.lineName()));
 
-            station.get().assignAsDrawable(drawLine, row.todo());
+            station.get().assignAsDrawable(drawLine, row.description(), row.todo());
             updatedCount++;
         }
 
