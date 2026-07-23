@@ -63,4 +63,10 @@ public class Course extends BaseTimeEntity {
     public void updateName(String name) {
         this.name = name;
     }
+
+    // soft delete. @SQLRestriction("is_deleted = false")로 이후 조회에서 자동 제외된다.
+    public void delete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
 }

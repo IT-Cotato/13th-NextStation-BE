@@ -9,6 +9,7 @@ import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
+import com.cotato.nextstation.domain.course.repository.CourseSaveRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,9 @@ class CourseQueryServiceTest {
 
     @Mock
     private CoursePlaceRepository coursePlaceRepository;
+
+    @Mock
+    private CourseSaveRepository courseSaveRepository;
 
     @Mock
     private CourseConverter courseConverter;
@@ -119,10 +123,10 @@ class CourseQueryServiceTest {
         // 여기서는 서비스가 limit을 Pageable로 넘기고 변환 결과를 반환하는지 확인한다.
         List<Course> courses = List.of(course("보문역 코스"), course("성수 코스"));
         List<PopularCourseResponse> responses = List.of(
-                new PopularCourseResponse(1L, "보문역 코스", 300, 128),
-                new PopularCourseResponse(2L, "성수 코스", 200, 50));
+                new PopularCourseResponse(1L, "보문역 코스", 300, 128, false),
+                new PopularCourseResponse(2L, "성수 코스", 200, 50, false));
         given(courseRepository.findPopularPublicCoursesByStationId(eq(6L), any(Pageable.class))).willReturn(courses);
-        given(courseConverter.toPopularResponses(courses)).willReturn(responses);
+        given(courseConverter.toPopularResponses(eq(courses), any())).willReturn(responses);
 
         // when
         List<PopularCourseResponse> result = courseQueryService.getPopularCoursesByStation(6L, 3);

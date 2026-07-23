@@ -115,7 +115,7 @@ public class PlaceReviewQueryService {
             return DEFAULT_SIZE;
         }
         if (size < 1 || size > MAX_SIZE) {
-            throw new CustomException(PlaceErrorCode.INVALID_PAGE_SIZE);  // 새 에러코드 필요
+            throw new CustomException(GlobalErrorCode.INVALID_PAGE_SIZE);
         }
         return size;
     }

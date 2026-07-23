@@ -28,7 +28,7 @@ class StampCourseConverterTest {
         String lineName = "6호선";
 
         List<PopularCourseResponse> courses = List.of(
-                new PopularCourseResponse(1L, "보문역 코스", 300, 128)
+                new PopularCourseResponse(1L, "보문역 코스", 300, 128, false)
         );
 
         // when

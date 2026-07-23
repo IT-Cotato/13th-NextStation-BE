@@ -80,7 +80,8 @@ public class SwaggerConfig {
                 .group("Course")
                 .displayName("Course API")
                 .packagesToScan("com.cotato.nextstation.domain.course.controller")
-                .pathsToMatch("/api/v1/courses/**")
+                // 저장 탭 API는 /members/me 하위 경로를 쓰므로 함께 포함한다
+                .pathsToMatch("/api/v1/courses/**", "/api/v1/members/me/**")
                 .build();
     }
 

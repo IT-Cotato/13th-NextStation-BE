@@ -6,14 +6,17 @@ import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRe
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
+import com.cotato.nextstation.domain.course.service.command.CourseSaveCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +26,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+// 저장 탭 API는 경로가 /members/me 하위라 컨트롤러가 나뉘는데,
+// 같은 태그를 달아 Swagger에서는 한 섹션으로 묶는다.
+@Tag(name = "Course")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/courses")
@@ -33,6 +39,7 @@ public class CourseController {
     private static final String MEMBER_ID_DESCRIPTION = "회원 ID (Auth 적용 전까지 사용하는 임시 헤더)";
 
     private final CourseCommandService courseCommandService;
+    private final CourseSaveCommandService courseSaveCommandService;
 
     @Operation(
             summary = "코스 생성",
@@ -103,6 +110,76 @@ public class CourseController {
             @PathVariable Long courseId,
             @Valid @RequestBody CoursePlaceOrderUpdateRequest request) {
         courseCommandService.updateCoursePlaceOrder(memberId, courseId, request);
+        return CommonResponse.success(null);
+    }
+
+    @Operation(
+            summary = "코스 스크랩 추가",
+            description = """
+                    다른 사람의 코스를 보관함에 스크랩한다.
+                    - 스크랩은 원본을 참조만 하므로, 원본이 삭제되거나 비공개로 바뀌면 목록에서도 빠진다.
+                    - 코스를 복사해 내 것으로 만드는 "내 코스로 만들기"와는 다른 기능이다.
+                    - 스크랩하면 해당 코스의 저장 수가 1 증가한다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "스크랩 성공 (data 없음)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
+            @ApiResponse(responseCode = "409", description = "이미 저장한 코스 (`CourseErrorCode.DUPLICATE_COURSE_SAVE`)"),
+    })
+    @PostMapping("/{courseId}/saves")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CommonResponse<Void> saveCourse(
+            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
+            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(description = "코스 ID", example = "1")
+            @PathVariable Long courseId) {
+        courseSaveCommandService.saveCourse(memberId, courseId);
+        return CommonResponse.success(HttpStatus.CREATED, null);
+    }
+
+    @Operation(
+            summary = "코스 스크랩 취소",
+            description = """
+                    보관함에서 스크랩한 코스를 제거한다.
+                    - 원본 코스는 삭제되지 않는다.
+                    - 취소하면 해당 코스의 저장 수가 1 감소한다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "취소 성공 (data 없음)"),
+            @ApiResponse(responseCode = "404", description = "저장하지 않은 코스 (`CourseErrorCode.COURSE_SAVE_NOT_FOUND`)"),
+    })
+    @DeleteMapping("/{courseId}/saves")
+    public CommonResponse<Void> cancelCourseSave(
+            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
+            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(description = "코스 ID", example = "1")
+            @PathVariable Long courseId) {
+        courseSaveCommandService.cancelSave(memberId, courseId);
+        return CommonResponse.success(null);
+    }
+
+    @Operation(
+            summary = "코스 삭제",
+            description = """
+                    내가 만든 코스를 삭제한다.
+                    - soft delete이며, 삭제 후에는 목록·상세 조회에서 모두 제외된다.
+                    - 이 코스를 스크랩한 사람들의 보관함에서도 함께 사라진다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "삭제 성공 (data 없음)"),
+            @ApiResponse(responseCode = "403", description = "본인 코스가 아님 (`CourseErrorCode.COURSE_DELETE_FORBIDDEN`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
+    })
+    @DeleteMapping("/{courseId}")
+    public CommonResponse<Void> deleteCourse(
+            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
+            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(description = "코스 ID", example = "1")
+            @PathVariable Long courseId) {
+        courseSaveCommandService.deleteCourse(memberId, courseId);
         return CommonResponse.success(null);
     }
 }

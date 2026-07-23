@@ -7,6 +7,7 @@ import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
+import com.cotato.nextstation.domain.course.service.command.CourseSaveCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
@@ -28,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -48,6 +50,9 @@ class CourseControllerTest {
 
     @MockitoBean
     CourseCommandService courseCommandService;
+
+    @MockitoBean
+    CourseSaveCommandService courseSaveCommandService;
 
     // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
     @MockitoBean
@@ -177,5 +182,68 @@ class CourseControllerTest {
                         .content(objectMapper.writeValueAsString(new CoursePlaceOrderUpdateRequest(List.of(3L, 1L, 99L)))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_INVALID_COURSE_PLACES"));
+    }
+
+    @Test
+    @DisplayName("코스를 스크랩하면 201을 반환한다")
+    void saveCourse_created() throws Exception {
+        mockMvc.perform(post("/api/v1/courses/{courseId}/saves", 1L)
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("이미 저장한 코스를 스크랩하면 409를 반환한다")
+    void saveCourse_duplicate() throws Exception {
+        willThrow(new CustomException(CourseErrorCode.DUPLICATE_COURSE_SAVE))
+                .given(courseSaveCommandService).saveCourse(eq(1L), eq(1L));
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/saves", 1L)
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_409_DUPLICATE_COURSE_SAVE"));
+    }
+
+    @Test
+    @DisplayName("스크랩을 취소하면 200을 반환한다")
+    void cancelCourseSave_success() throws Exception {
+        mockMvc.perform(delete("/api/v1/courses/{courseId}/saves", 1L)
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("저장하지 않은 코스를 취소하면 404를 반환한다")
+    void cancelCourseSave_notSaved() throws Exception {
+        willThrow(new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND))
+                .given(courseSaveCommandService).cancelSave(eq(1L), eq(1L));
+
+        mockMvc.perform(delete("/api/v1/courses/{courseId}/saves", 1L)
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_SAVE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("본인 코스를 삭제하면 200을 반환한다")
+    void deleteCourse_success() throws Exception {
+        mockMvc.perform(delete("/api/v1/courses/{courseId}", 1L)
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("타인 코스를 삭제하면 403을 반환한다")
+    void deleteCourse_forbidden() throws Exception {
+        willThrow(new CustomException(CourseErrorCode.COURSE_DELETE_FORBIDDEN))
+                .given(courseSaveCommandService).deleteCourse(eq(1L), eq(1L));
+
+        mockMvc.perform(delete("/api/v1/courses/{courseId}", 1L)
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_403_COURSE_DELETE_FORBIDDEN"));
     }
 }
