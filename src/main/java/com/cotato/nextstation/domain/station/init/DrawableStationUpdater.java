@@ -3,6 +3,9 @@ package com.cotato.nextstation.domain.station.init;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -10,7 +13,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +34,7 @@ import java.util.List;
 public class DrawableStationUpdater implements ApplicationRunner {
 
     private static final String DRAWABLE_CSV_PATH = "data/drawable_stations.csv";
-    private static final String CSV_DELIMITER = ",";
+    private static final String[] CSV_HEADERS = {"station_name", "line_name", "description", "todo"};
 
     private final StationRepository stationRepository;
     private final DrawableStationWriter drawableStationWriter;
@@ -51,24 +53,23 @@ public class DrawableStationUpdater implements ApplicationRunner {
     }
 
     private List<DrawableStationRow> readDrawableRows() throws IOException {
+        CSVFormat format = CSVFormat.DEFAULT.builder()
+                .setHeader(CSV_HEADERS)
+                .setSkipHeaderRecord(true)
+                .setIgnoreSurroundingSpaces(true)
+                .build();
+
         List<DrawableStationRow> rows = new ArrayList<>();
-
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new ClassPathResource(DRAWABLE_CSV_PATH).getInputStream(), StandardCharsets.UTF_8))) {
-            reader.readLine(); // header
-
-            String row;
-            while ((row = reader.readLine()) != null) {
-                if (row.isBlank()) {
-                    continue;
-                }
-
-                String[] columns = row.split(CSV_DELIMITER, 3);
-                String stationName = columns[0].trim();
-                String lineName = columns[1].trim();
-                String todo = columns[2].trim();
-
-                rows.add(new DrawableStationRow(stationName, lineName, todo));
+        try (CSVParser parser = CSVParser.parse(
+                new InputStreamReader(new ClassPathResource(DRAWABLE_CSV_PATH).getInputStream(), StandardCharsets.UTF_8),
+                format)) {
+            for (CSVRecord record : parser) {
+                rows.add(new DrawableStationRow(
+                        record.get("station_name").trim(),
+                        record.get("line_name").trim(),
+                        record.get("description").trim(),
+                        record.get("todo").trim()
+                ));
             }
         }
 
