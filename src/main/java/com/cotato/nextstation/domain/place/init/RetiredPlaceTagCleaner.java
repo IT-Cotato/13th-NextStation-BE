@@ -18,10 +18,13 @@ import java.util.List;
  * PlaceSeeder가 이미 실행돼 place_tag_mapping이 이 태그들을 FK로 참조하고 있는 로컬 환경도 있어 매핑을 먼저 지우고 태그를 지운다.
  * enum에서도 상수를 제거했으므로 이름은 문자열로 다룬다.
  * 대상이 없으면 아무것도 지우지 않는 멱등 작업이라 재시작마다 실행해도 안전하다.
+ * local 프로파일에서만 명시적으로 실행되도록 허용 목록 방식으로 제한한다.
+ * 운영 DB에 남아있는 동일 데이터는 이 클래스가 아니라 scripts/cleanup-retired-place-tags.sql을
+ * 운영 DB 외부에서 직접 실행해 정리한다.
  */
 @Slf4j
 @Component
-@Profile("!prod")
+@Profile("local")
 @Order(4)
 @RequiredArgsConstructor
 public class RetiredPlaceTagCleaner implements ApplicationRunner {
