@@ -36,14 +36,11 @@ VALUES ('WALK', '산책포인트', NULL);
 DELETE FROM place_tag;
 
 INSERT INTO place_tag (name, is_active) VALUES ('NATURE', true);
-INSERT INTO place_tag (name, is_active) VALUES ('ART_SPACE', true);
-INSERT INTO place_tag (name, is_active) VALUES ('LOCAL_EXPLORE', true);
 INSERT INTO place_tag (name, is_active) VALUES ('ALLEY_TRIP', true);
 INSERT INTO place_tag (name, is_active) VALUES ('MARKET', true);
 INSERT INTO place_tag (name, is_active) VALUES ('HOTPLACE', true);
 INSERT INTO place_tag (name, is_active) VALUES ('PHOTO_SPOT', true);
 INSERT INTO place_tag (name, is_active) VALUES ('SHOPPING', true);
 INSERT INTO place_tag (name, is_active) VALUES ('EXPERIENCE', true);
-INSERT INTO place_tag (name, is_active) VALUES ('CAFE_TOUR', true);
 INSERT INTO place_tag (name, is_active) VALUES ('BUDGET', true);
 INSERT INTO place_tag (name, is_active) VALUES ('INDOOR', true);
