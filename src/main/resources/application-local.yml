@@ -22,6 +22,10 @@ spring:
   mail:
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:ap-northeast-2}
 
 logging:
   level:
@@ -29,7 +33,15 @@ logging:
     org.hibernate.orm.jdbc.bind: trace
 
 jwt:
-  secret: ${JWT_SECRET:local-dev-secret-key-change-me-32-bytes-minimum}
+  secret: ${JWT_SECRET}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
 
 kakao:
   rest-api-key: ${KAKAO_REST_API_KEY:}
+
+aws:
+  s3:
+    bucket-name: ${AWS_S3_BUCKET_NAME:}

@@ -5,11 +5,13 @@ import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.IntStream;
 
 @Component
@@ -57,6 +59,18 @@ public class CourseConverter {
     public List<CoursePlaceInfoResponse> toPlaceInfoResponses(List<CoursePlace> coursePlaces) {
         return coursePlaces.stream()
                 .map(coursePlace -> new CoursePlaceInfoResponse(coursePlace.getPlaceId(), coursePlace.getOrderNum()))
+                .toList();
+    }
+
+    public List<PopularCourseResponse> toPopularResponses(List<Course> courses, Set<Long> savedCourseIds) {
+        return courses.stream()
+                .map(course -> new PopularCourseResponse(
+                        course.getId(),
+                        course.getName(),
+                        course.getViewCount(),
+                        course.getSaveCount(),
+                        savedCourseIds.contains(course.getId())
+                ))
                 .toList();
     }
 }

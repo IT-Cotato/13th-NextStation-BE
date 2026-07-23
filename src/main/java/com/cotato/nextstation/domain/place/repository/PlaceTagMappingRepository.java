@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.place.repository;
 
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceTagMapping;
+import com.cotato.nextstation.domain.place.enums.PlaceTagName;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -19,4 +20,11 @@ public interface PlaceTagMappingRepository extends JpaRepository<PlaceTagMapping
     @Modifying
     @Query(value = "DELETE ptm FROM place_tag_mapping ptm JOIN place_tag pt ON pt.id = ptm.place_tag_id WHERE pt.name IN (:tagNames)", nativeQuery = true)
     void deleteByPlaceTagNames(@Param("tagNames") List<String> tagNames);
+
+    // Course 조회 전용 - placeIds 여러 개의 태그를 한 번에 조회
+    @EntityGraph(attributePaths = {"placeTag"})
+    List<PlaceTagMapping> findByPlaceIdIn(List<Long> placeIds);
+
+    @EntityGraph(attributePaths = {"place", "placeTag"})
+    List<PlaceTagMapping> findByPlaceTagNameIn(List<PlaceTagName> tagNames);
 }
