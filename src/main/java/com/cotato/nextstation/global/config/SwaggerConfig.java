@@ -23,13 +23,29 @@ import io.swagger.v3.oas.annotations.servers.Server;
                 @Server(url = "https://3.37.77.188.nip.io", description = "Production Server"),
         }
 )
-// Authorization: Bearer {token} 헤더가 필요한 API용 인증 스킴
-// 우측 상단 자물쇠(Authorize) 버튼에 토큰 값만 넣으면 Swagger UI가 모든 요청에 자동으로 헤더를 실어 보낸다.
+// signupTokenAuth: 회원가입 비밀번호 설정(/signup) 응답의 signupToken, 프로필 설정(/profile) API 전용
 @SecurityScheme(
-        name = "bearerAuth",
+        name = "signupTokenAuth",
         type = SecuritySchemeType.HTTP,
         scheme = "bearer",
-        bearerFormat = "JWT"
+        bearerFormat = "JWT",
+        description = "회원가입 비밀번호 설정(/signup) 응답의 signupToken. 프로필 설정(/profile) API 호출 시에만 사용한다."
+)
+// accessTokenAuth: 로그인(/login) 응답의 access token, 로그인 유지가 필요한 API 전반에서 사용
+@SecurityScheme(
+        name = "accessTokenAuth",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT",
+        description = "로그인(/login) 응답의 access token. 발급 후 1시간 만료되며, 로그인이 필요한 API 호출 시 사용한다."
+)
+// refreshTokenAuth: 로그인(/login) 시 httpOnly 쿠키로 내려가는 refresh token
+@SecurityScheme(
+        name = "refreshTokenAuth",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT",
+        description = "로그인(/login) 시 httpOnly 쿠키로 내려가는 refresh token"
 )
 @Configuration
 public class SwaggerConfig {

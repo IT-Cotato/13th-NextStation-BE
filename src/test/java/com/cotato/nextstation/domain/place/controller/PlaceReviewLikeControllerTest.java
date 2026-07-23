@@ -5,6 +5,7 @@ import com.cotato.nextstation.domain.place.exception.PlaceReviewErrorCode;
 import com.cotato.nextstation.domain.place.service.command.PlaceReviewLikeCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
+import com.cotato.nextstation.global.jwt.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,10 @@ class PlaceReviewLikeControllerTest {
 
     @MockitoBean
     PlaceReviewLikeCommandService placeReviewLikeCommandService;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
 
     @Test
     @DisplayName("좋아요를 누르면 200과 좋아요 결과를 반환한다")
