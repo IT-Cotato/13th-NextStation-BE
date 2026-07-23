@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.auth.controller;
 
+import com.cotato.nextstation.domain.auth.dto.request.LoginRequest;
 import com.cotato.nextstation.domain.auth.dto.request.ProfileSetupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupVerificationSendRequest;
@@ -10,11 +11,14 @@ import com.cotato.nextstation.domain.auth.exception.TermsErrorCode;
 import com.cotato.nextstation.domain.auth.service.command.EmailVerificationCommandService;
 import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
+import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
+import com.cotato.nextstation.domain.auth.service.query.LoginResult;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
+import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +40,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,6 +62,13 @@ class AuthControllerTest {
 
     @MockitoBean
     ProfileSetupCommandService profileSetupCommandService;
+
+    @MockitoBean
+    LoginQueryService loginQueryService;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
 
     @Test
     @DisplayName("동의한 약관 목록이 비어있으면 400을 반환한다")
@@ -339,5 +351,49 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(NicknameErrorCode.NICKNAME_INVALID_CHARACTER.getCode()));
+    }
+
+    @Test
+    @DisplayName("정상 로그인이면 200과 accessToken을 반환하고 refreshToken을 쿠키로 내려준다")
+    void login_success() throws Exception {
+        LoginRequest request = new LoginRequest("user@example.com", "abc12345!");
+        given(loginQueryService.login("user@example.com", "abc12345!"))
+                .willReturn(new LoginResult(1L, "access-token", "refresh-token"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memberId").value(1L))
+                .andExpect(jsonPath("$.data.accessToken").value("access-token"))
+                .andExpect(cookie().value("refreshToken", "refresh-token"))
+                .andExpect(cookie().httpOnly("refreshToken", true));
+    }
+
+    @Test
+    @DisplayName("이메일 또는 비밀번호가 일치하지 않으면 401을 반환한다")
+    void login_invalidCredentials() throws Exception {
+        LoginRequest request = new LoginRequest("user@example.com", "wrongpassword1!");
+        willThrow(new CustomException(AuthErrorCode.INVALID_CREDENTIALS))
+                .given(loginQueryService).login("user@example.com", "wrongpassword1!");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_CREDENTIALS.getCode()));
+    }
+
+    @Test
+    @DisplayName("이메일 형식이 올바르지 않으면 400을 반환한다")
+    void login_invalidEmailFormat() throws Exception {
+        LoginRequest request = new LoginRequest("not-an-email", "abc12345!");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.reasons.email").exists());
     }
 }

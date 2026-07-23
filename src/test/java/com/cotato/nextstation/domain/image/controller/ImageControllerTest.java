@@ -7,6 +7,7 @@ import com.cotato.nextstation.domain.image.exception.ImageErrorCode;
 import com.cotato.nextstation.domain.image.service.command.ImageCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
+import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,10 @@ class ImageControllerTest {
 
     @MockitoBean
     ImageCommandService imageCommandService;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
 
     @Test
     @DisplayName("정상 요청이면 200과 presignedUrl/imageUrl/contentType을 반환한다")

@@ -3,6 +3,7 @@ package com.cotato.nextstation.domain.auth.controller;
 import com.cotato.nextstation.domain.auth.dto.response.TermsResponse;
 import com.cotato.nextstation.domain.auth.service.query.TermsQueryService;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
+import com.cotato.nextstation.global.jwt.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,10 @@ class TermsControllerTest {
 
     @MockitoBean
     TermsQueryService termsQueryService;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
 
     @Test
     @DisplayName("약관 목록은 필수 약관 먼저 정렬된 상태로 반환된다")

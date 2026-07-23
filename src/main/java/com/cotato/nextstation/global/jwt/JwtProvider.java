@@ -13,6 +13,8 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 
+// JWT 인코딩/서명/파싱만 담당하는 저수준 컴포넌트
+// 용도가 다른 토큰들이 전부 이 클래스 하나로 발급/검증된다.
 @Component
 public class JwtProvider {
 

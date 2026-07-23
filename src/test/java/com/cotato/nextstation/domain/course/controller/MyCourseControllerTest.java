@@ -7,6 +7,7 @@ import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
+import com.cotato.nextstation.global.jwt.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,10 @@ class MyCourseControllerTest {
 
     @MockitoBean
     CourseQueryService courseQueryService;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
 
     @Test
     @DisplayName("내 코스 목록은 200과 선택 가능한 호선/코스 카드를 반환한다")
