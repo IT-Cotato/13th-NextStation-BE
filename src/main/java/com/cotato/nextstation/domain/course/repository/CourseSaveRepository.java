@@ -1,11 +1,13 @@
 package com.cotato.nextstation.domain.course.repository;
 
 import com.cotato.nextstation.domain.course.entity.CourseSave;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -27,4 +29,47 @@ public interface CourseSaveRepository extends JpaRepository<CourseSave, Long> {
             "WHERE cs.memberId = :memberId AND cs.courseId = :courseId")
     int deleteByMemberIdAndCourseId(@Param("memberId") Long memberId,
                                     @Param("courseId") Long courseId);
+
+    // 스크랩한 코스 목록 (최근 스크랩순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
+    // 스크랩은 원본 참조라 원본이 삭제되거나 비공개로 바뀌면 목록에서도 빠져야 한다.
+    // Journal INNER JOIN으로 비공개·일지 없는 코스가 걸러지고, 삭제된 코스/일지는 @SQLRestriction이 처리한다.
+    // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
+    // 대표 호선이 없는 역도 있을 수 있어 LEFT JOIN으로 둔다.
+    @Query("SELECT cs.id AS saveId, cs.createdAt AS savedAt, c.id AS courseId, c.name AS name, " +
+            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "FROM CourseSave cs " +
+            "JOIN Course c ON c.id = cs.courseId " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE cs.memberId = :memberId AND j.isPublic = true " +
+            "ORDER BY cs.createdAt DESC, cs.id DESC")
+    List<SavedCourseView> findSavedCourses(@Param("memberId") Long memberId, Pageable pageable);
+
+    // 다음 페이지. 정렬 기준이 스크랩 시각이라 커서도 코스 id가 아닌 course_save.id를 tie-breaker로 쓴다.
+    @Query("SELECT cs.id AS saveId, cs.createdAt AS savedAt, c.id AS courseId, c.name AS name, " +
+            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "FROM CourseSave cs " +
+            "JOIN Course c ON c.id = cs.courseId " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE cs.memberId = :memberId AND j.isPublic = true " +
+            "AND (cs.createdAt < :savedAt OR (cs.createdAt = :savedAt AND cs.id < :saveId)) " +
+            "ORDER BY cs.createdAt DESC, cs.id DESC")
+    List<SavedCourseView> findSavedCoursesAfterCursor(@Param("memberId") Long memberId,
+                                                      @Param("savedAt") LocalDateTime savedAt,
+                                                      @Param("saveId") Long saveId,
+                                                      Pageable pageable);
+
+    interface SavedCourseView {
+        Long getSaveId();
+        LocalDateTime getSavedAt();
+        Long getCourseId();
+        String getName();
+        Long getStationId();
+        String getStationName();
+        Long getLineId();
+        String getLineName();
+    }
 }

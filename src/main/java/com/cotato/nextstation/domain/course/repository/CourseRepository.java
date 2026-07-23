@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -48,4 +49,67 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "WHERE c.stationId = :stationId AND j.isPublic = true " +
             "ORDER BY (c.viewCount + c.saveCount * 2) DESC, c.createdAt DESC")
     List<Course> findPopularPublicCoursesByStationId(@Param("stationId") Long stationId, Pageable pageable);
+
+    // 내가 만든 코스 목록 (최신순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
+    // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
+    // 대표 호선이 없는 역도 있을 수 있어 LEFT JOIN으로 둔다.
+    // 본인 코스이므로 공개 여부는 걸지 않는다. 삭제된 코스는 @SQLRestriction이 제외한다.
+    // 호선/역 필터는 둘 다 선택 사항이라 파라미터가 null이면 조건을 건너뛴다.
+    @Query("SELECT c.id AS courseId, c.name AS name, c.createdAt AS createdAt, " +
+            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "FROM Course c " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE c.memberId = :memberId " +
+            "AND (:lineId IS NULL OR l.id = :lineId) " +
+            "AND (:stationId IS NULL OR s.id = :stationId) " +
+            "ORDER BY c.createdAt DESC, c.id DESC")
+    List<MyCourseView> findMyCourses(@Param("memberId") Long memberId,
+                                     @Param("lineId") Long lineId,
+                                     @Param("stationId") Long stationId,
+                                     Pageable pageable);
+
+    // 다음 페이지. 생성 시각이 같을 수 있어 id를 tie-breaker로 함께 비교한다.
+    @Query("SELECT c.id AS courseId, c.name AS name, c.createdAt AS createdAt, " +
+            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "FROM Course c " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE c.memberId = :memberId " +
+            "AND (:lineId IS NULL OR l.id = :lineId) " +
+            "AND (:stationId IS NULL OR s.id = :stationId) " +
+            "AND (c.createdAt < :createdAt OR (c.createdAt = :createdAt AND c.id < :courseId)) " +
+            "ORDER BY c.createdAt DESC, c.id DESC")
+    List<MyCourseView> findMyCoursesAfterCursor(@Param("memberId") Long memberId,
+                                                @Param("lineId") Long lineId,
+                                                @Param("stationId") Long stationId,
+                                                @Param("createdAt") LocalDateTime createdAt,
+                                                @Param("courseId") Long courseId,
+                                                Pageable pageable);
+
+    // 내 코스가 하나라도 있는 호선. 코스 없는 호선 칩을 비활성화하는 데 쓴다.
+    // 현재 필터와 무관하게 전체 기준으로 조회해야 필터를 바꿔 끼울 수 있다.
+    // 페이징으로는 전체 목록을 볼 수 없어 서버가 따로 알려준다.
+    @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName " +
+            "FROM Course c " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "JOIN s.drawLine l " +
+            "WHERE c.memberId = :memberId " +
+            "ORDER BY l.name")
+    List<LineView> findAvailableLines(@Param("memberId") Long memberId);
+
+    interface MyCourseView {
+        Long getCourseId();
+        String getName();
+        LocalDateTime getCreatedAt();
+        Long getStationId();
+        String getStationName();
+        Long getLineId();
+        String getLineName();
+    }
+
+    interface LineView {
+        Long getLineId();
+        String getLineName();
+    }
 }
