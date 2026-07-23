@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.course.controller;
 
+import com.cotato.nextstation.domain.course.dto.request.CourseSaveCancelAllRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseSaveCancelRequest;
 import com.cotato.nextstation.domain.course.dto.response.SavedCourseListResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseSaveCommandService;
@@ -56,6 +57,29 @@ public class SavedCourseController {
             @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
             @RequestParam(required = false) Integer size) {
         return CommonResponse.success(courseQueryService.getSavedCourses(memberId, cursor, size));
+    }
+
+    @Operation(
+            summary = "코스 스크랩 전체 취소",
+            description = """
+                    저장 탭에서 "모두 선택"으로 스크랩을 한 번에 취소한다.
+                    - 갤러리의 전체 선택처럼 **아직 화면에 불러오지 않은 스크랩까지** 취소된다.
+                      그래서 코스 ID를 받지 않고 서버가 대상을 다시 조회한다.
+                    - 전체 선택 후 일부를 해제했다면 그 코스 ID를 `exceptCourseIds`로 보낸다.
+                    - 목록에 보이는 스크랩만 대상이다(원본이 비공개로 바뀐 스크랩은 취소되지 않는다).
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "취소 성공 (data 없음)"),
+            @ApiResponse(responseCode = "404", description = "취소할 스크랩이 없음 (`CourseErrorCode.COURSE_SAVE_NOT_FOUND`)"),
+    })
+    @DeleteMapping("/all")
+    public CommonResponse<Void> cancelAllCourseSaves(
+            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
+            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @RequestBody(required = false) CourseSaveCancelAllRequest request) {
+        courseSaveCommandService.cancelAllSaves(memberId, request == null ? null : request.exceptCourseIds());
+        return CommonResponse.success(null);
     }
 
     @Operation(

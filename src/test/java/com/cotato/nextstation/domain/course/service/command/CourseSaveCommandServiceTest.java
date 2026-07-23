@@ -209,6 +209,62 @@ class CourseSaveCommandServiceTest {
     }
 
     @Test
+    @DisplayName("전체 취소는 화면에 안 불러온 스크랩까지 서버가 조회해 취소한다")
+    void cancelAllSaves_success() {
+        // given: 프론트가 첫 페이지 2개만 들고 있어도 서버는 5개 전부를 대상으로 삼는다
+        given(courseSaveRepository.findVisibleSavedCourseIds(1L)).willReturn(List.of(1L, 2L, 3L, 4L, 5L));
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(any(), any())).willReturn(1);
+
+        // when
+        courseSaveCommandService.cancelAllSaves(1L, null);
+
+        // then
+        verify(courseRepository).decreaseSaveCountAll(List.of(1L, 2L, 3L, 4L, 5L));
+    }
+
+    @Test
+    @DisplayName("전체 선택 후 해제한 코스는 취소 대상에서 빠진다")
+    void cancelAllSaves_withExceptions() {
+        // given: 전체 선택 뒤 2,4번을 해제한 경우
+        given(courseSaveRepository.findVisibleSavedCourseIds(1L)).willReturn(List.of(1L, 2L, 3L, 4L, 5L));
+        given(courseSaveRepository.deleteByMemberIdAndCourseId(any(), any())).willReturn(1);
+
+        // when
+        courseSaveCommandService.cancelAllSaves(1L, List.of(2L, 4L));
+
+        // then
+        verify(courseSaveRepository, never()).deleteByMemberIdAndCourseId(1L, 2L);
+        verify(courseSaveRepository, never()).deleteByMemberIdAndCourseId(1L, 4L);
+        verify(courseRepository).decreaseSaveCountAll(List.of(1L, 3L, 5L));
+    }
+
+    @Test
+    @DisplayName("취소할 스크랩이 없으면 예외가 발생한다")
+    void cancelAllSaves_nothingToCancel() {
+        // given
+        given(courseSaveRepository.findVisibleSavedCourseIds(1L)).willReturn(List.of());
+
+        // when & then
+        assertThatThrownBy(() -> courseSaveCommandService.cancelAllSaves(1L, null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_SAVE_NOT_FOUND.getMessage());
+        verify(courseSaveRepository, never()).deleteByMemberIdAndCourseId(any(), any());
+    }
+
+    @Test
+    @DisplayName("전체 선택 후 모두 해제하면 예외가 발생한다")
+    void cancelAllSaves_allExcluded() {
+        // given
+        given(courseSaveRepository.findVisibleSavedCourseIds(1L)).willReturn(List.of(1L, 2L));
+
+        // when & then
+        assertThatThrownBy(() -> courseSaveCommandService.cancelAllSaves(1L, List.of(1L, 2L)))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_SAVE_NOT_FOUND.getMessage());
+        verify(courseSaveRepository, never()).deleteByMemberIdAndCourseId(any(), any());
+    }
+
+    @Test
     @DisplayName("선택한 코스가 하나도 저장돼 있지 않으면 예외가 발생한다")
     void cancelSaves_noneSaved() {
         // given

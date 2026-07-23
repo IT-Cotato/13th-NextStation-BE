@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.course.controller;
 
+import com.cotato.nextstation.domain.course.dto.request.CourseSaveCancelAllRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseSaveCancelRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.SavedCourseListResponse;
@@ -132,6 +133,41 @@ class SavedCourseControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.reasons.courseIds").exists());
+    }
+
+    @Test
+    @DisplayName("전체 취소는 본문 없이 호출해도 200을 반환한다")
+    void cancelAllCourseSaves_success() throws Exception {
+        mockMvc.perform(delete("/api/v1/members/me/saved-courses/all")
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(courseSaveCommandService).cancelAllSaves(1L, null);
+    }
+
+    @Test
+    @DisplayName("전체 취소에서 해제한 코스는 제외 목록으로 전달된다")
+    void cancelAllCourseSaves_withExceptions() throws Exception {
+        mockMvc.perform(delete("/api/v1/members/me/saved-courses/all")
+                        .header(MEMBER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CourseSaveCancelAllRequest(List.of(3L, 7L)))))
+                .andExpect(status().isOk());
+
+        verify(courseSaveCommandService).cancelAllSaves(1L, List.of(3L, 7L));
+    }
+
+    @Test
+    @DisplayName("취소할 스크랩이 없으면 404를 반환한다")
+    void cancelAllCourseSaves_nothingToCancel() throws Exception {
+        willThrow(new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND))
+                .given(courseSaveCommandService).cancelAllSaves(eq(1L), any());
+
+        mockMvc.perform(delete("/api/v1/members/me/saved-courses/all")
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_SAVE_NOT_FOUND"));
     }
 
     @Test

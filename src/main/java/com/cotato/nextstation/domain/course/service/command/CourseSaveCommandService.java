@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -72,6 +73,26 @@ public class CourseSaveCommandService {
         }
 
         courseRepository.decreaseSaveCountAll(deletedCourseIds);
+    }
+
+    /**
+     * 스크랩 전체 취소(저장 탭의 "모두 선택").
+     * 갤러리의 전체 선택처럼 아직 화면에 불러오지 않은 스크랩까지 대상에 넣어야 하므로,
+     * 프론트가 가진 id 목록이 아니라 서버가 대상을 다시 조회한다.
+     * 전체 선택 후 일부만 해제한 경우는 exceptCourseIds로 받는다(해제는 보이는 항목에서만 가능).
+     */
+    public void cancelAllSaves(Long memberId, List<Long> exceptCourseIds) {
+        Set<Long> excluded = exceptCourseIds == null ? Set.of() : Set.copyOf(exceptCourseIds);
+
+        List<Long> targetCourseIds = courseSaveRepository.findVisibleSavedCourseIds(memberId).stream()
+                .filter(courseId -> !excluded.contains(courseId))
+                .toList();
+
+        if (targetCourseIds.isEmpty()) {
+            throw new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND);
+        }
+
+        cancelSaves(memberId, targetCourseIds);
     }
 
     // 코스 삭제(soft delete). 본인 코스만 삭제할 수 있다.

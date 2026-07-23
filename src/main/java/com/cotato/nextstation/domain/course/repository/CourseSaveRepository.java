@@ -30,6 +30,14 @@ public interface CourseSaveRepository extends JpaRepository<CourseSave, Long> {
     int deleteByMemberIdAndCourseId(@Param("memberId") Long memberId,
                                     @Param("courseId") Long courseId);
 
+    // "모두 선택" 대상이 되는 코스 id. 목록에 실제로 보이는 것과 같은 조건을 걸어야
+    // 화면에 뜨지도 않은 스크랩이 함께 취소되는 일이 없다.
+    @Query("SELECT c.id FROM CourseSave cs " +
+            "JOIN Course c ON c.id = cs.courseId " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "WHERE cs.memberId = :memberId AND j.isPublic = true")
+    List<Long> findVisibleSavedCourseIds(@Param("memberId") Long memberId);
+
     // 스크랩한 코스 목록 (최근 스크랩순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
     // 스크랩은 원본 참조라 원본이 삭제되거나 비공개로 바뀌면 목록에서도 빠져야 한다.
     // Journal INNER JOIN으로 비공개·일지 없는 코스가 걸러지고, 삭제된 코스/일지는 @SQLRestriction이 처리한다.
