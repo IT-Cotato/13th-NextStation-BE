@@ -25,6 +25,17 @@ public class CourseConverter {
                 .build();
     }
 
+    // "내 코스로 만들기". 원본은 originalCourseId로만 기록하고, 이후 원본과 무관한 독립 코스로 존재한다.
+    // 여행일지·컨셉투어와 조회수·저장수는 원본에서 물려받지 않고 새 코스 기준으로 시작한다.
+    public Course toCopiedCourse(Long memberId, Course original, String name) {
+        return Course.builder()
+                .memberId(memberId)
+                .stationId(original.getStationId())
+                .name(name)
+                .originalCourseId(original.getId())
+                .build();
+    }
+
     public List<CoursePlace> toCoursePlaces(Long courseId, List<Long> placeIds) {
         return IntStream.range(0, placeIds.size())
                 .mapToObj(index -> CoursePlace.builder()
