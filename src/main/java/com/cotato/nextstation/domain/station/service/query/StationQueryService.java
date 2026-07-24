@@ -44,7 +44,9 @@ public class StationQueryService {
 
     /**
      * 코스 만들기 후보 장소를 카테고리별로 묶어 반환한다.
-     * 랜덤뽑기와 달리 후보가 매번 바뀌면 사용자가 혼란스러우므로 id 순으로 고정 선택한다.
+     * 카테고리당 최대 {@value #PLACES_PER_CATEGORY}개이며, 후보가 더 많으면 잘라내고 적으면 있는 만큼 내린다.
+     * 랜덤뽑기와 달리 호출할 때마다 결과가 바뀌면 선택 중인 사용자가 혼란스러우므로 순서를 고정한다
+     * (현재 선정 기준은 id 순).
      * 뽑기 대상이 아닌 역은 빈 목록이 나가며, 역 자체가 없으면 404다.
      */
     public StationPlacesResponse getStationPlaces(Long stationId) {
@@ -65,6 +67,7 @@ public class StationQueryService {
             if (places.isEmpty()) {
                 continue;
             }
+            // 후보가 최대 개수보다 많으면 잘라낸다. 순서만 고정되면 되므로 현재는 id 순으로 정렬한다.
             List<PlaceInfoResponse> selected = places.stream()
                     .sorted(Comparator.comparing(PlaceInfoResponse::placeId))
                     .limit(PLACES_PER_CATEGORY)
