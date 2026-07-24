@@ -10,6 +10,8 @@ import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -122,15 +124,16 @@ class DepartureStationControllerTest {
     void getDepartureStations_success() throws Exception {
         given(departureStationQueryService.getDepartureStations(1L))
                 .willReturn(List.of(
-                        new DepartureStationResponse(1L, 100L, "왕십리역", List.of("2호선"), 1, LocalDateTime.now()),
-                        new DepartureStationResponse(2L, 200L, "강남역", List.of("2호선", "신분당선"), 2, LocalDateTime.now())));
+                        new DepartureStationResponse(1L, 100L, "왕십리역", List.of(new LineSummaryResponse(2L, "2호선", LineCode.LINE_2)), 1, LocalDateTime.now()),
+                        new DepartureStationResponse(2L, 200L, "강남역", List.of(new LineSummaryResponse(2L, "2호선", LineCode.LINE_2), new LineSummaryResponse(17L, "신분당선", LineCode.SINBUNDANG)), 2, LocalDateTime.now())));
 
         mockMvc.perform(get("/api/v1/departure-stations")
                         .header(MEMBER_ID_HEADER, 1L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].stationName").value("왕십리역"))
-                .andExpect(jsonPath("$.data[1].lines[1]").value("신분당선"))
+                .andExpect(jsonPath("$.data[1].lines[1].name").value("신분당선"))
+                .andExpect(jsonPath("$.data[1].lines[1].code").value("SINBUNDANG"))
                 .andExpect(jsonPath("$.data[0].orderNum").value(1));
     }
 

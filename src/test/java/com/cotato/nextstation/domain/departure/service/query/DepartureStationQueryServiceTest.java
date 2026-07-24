@@ -6,6 +6,8 @@ import com.cotato.nextstation.domain.departure.entity.MemberDepartureStation;
 import com.cotato.nextstation.domain.departure.repository.MemberDepartureStationRepository;
 import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
 import com.cotato.nextstation.domain.station.service.query.StationQueryService;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,10 +46,10 @@ class DepartureStationQueryServiceTest {
         // given
         List<MemberDepartureStation> stored = List.of(departureStation(100L, 1), departureStation(200L, 2));
         Map<Long, StationSummaryResponse> summaries = Map.of(
-                100L, new StationSummaryResponse(100L, "왕십리역", List.of("2호선")),
-                200L, new StationSummaryResponse(200L, "강남역", List.of("2호선", "신분당선")));
+                100L, new StationSummaryResponse(100L, "왕십리역", List.of(new LineSummaryResponse(2L, "2호선", LineCode.LINE_2))),
+                200L, new StationSummaryResponse(200L, "강남역", List.of(new LineSummaryResponse(2L, "2호선", LineCode.LINE_2), new LineSummaryResponse(17L, "신분당선", LineCode.SINBUNDANG))));
         List<DepartureStationResponse> expected = List.of(
-                new DepartureStationResponse(1L, 100L, "왕십리역", List.of("2호선"), 1, null));
+                new DepartureStationResponse(1L, 100L, "왕십리역", List.of(new LineSummaryResponse(2L, "2호선", LineCode.LINE_2)), 1, null));
         given(memberDepartureStationRepository.findByMemberIdOrderByOrderNumAsc(1L)).willReturn(stored);
         given(stationQueryService.getSummariesByStationIds(List.of(100L, 200L))).willReturn(summaries);
         given(departureStationConverter.toResponses(stored, summaries)).willReturn(expected);

@@ -9,6 +9,8 @@ import com.cotato.nextstation.domain.recommendation.service.command.Recommendati
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +49,8 @@ class RandomControllerTest {
 
     private RandomRecommendationResponse sampleResponse() {
         return new RandomRecommendationResponse(
-                new RecommendedStationResponse(10L, "제기동역", "제기동역 소개", "경동시장 구경하기", "1호선"),
+                new RecommendedStationResponse(10L, "제기동역", "제기동역 소개", "경동시장 구경하기",
+                        new LineSummaryResponse(1L, "1호선", LineCode.LINE_1)),
                 new CoursePreviewResponse("제기동역 환승여행 코스", List.of(
                         new CoursePreviewPlaceResponse(100L, "경동시장", "설명", "CULTURE", "문화공간", "img", 127.0, 37.5)
                 ))
@@ -64,7 +67,9 @@ class RandomControllerTest {
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data.station.stationName").value("제기동역"))
                 .andExpect(jsonPath("$.data.station.todo").value("경동시장 구경하기"))
-                .andExpect(jsonPath("$.data.station.lineName").value("1호선"))
+                .andExpect(jsonPath("$.data.station.line.id").value(1))
+                .andExpect(jsonPath("$.data.station.line.name").value("1호선"))
+                .andExpect(jsonPath("$.data.station.line.code").value("LINE_1"))
                 .andExpect(jsonPath("$.data.course.name").value("제기동역 환승여행 코스"))
                 .andExpect(jsonPath("$.data.course.places[0].categoryCode").value("CULTURE"));
     }
