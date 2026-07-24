@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.course.repository;
 
 import com.cotato.nextstation.domain.course.entity.Course;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -53,7 +54,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 카드에 필요한 역·대표 호선을 함께 가져온다(코스마다 조회하면 N+1).
     // 노출 조건과 인기순 공식은 위 역별 인기 코스와 같다.
     @Query("SELECT c.id AS courseId, c.name AS name, " +
-            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CoursePlace cp " +
             "JOIN Course c ON c.id = cp.courseId " +
             "JOIN Journal j ON j.id = c.journalId " +
@@ -70,5 +72,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         String getStationName();
         Long getLineId();
         String getLineName();
+        LineCode getLineCode();
     }
 }

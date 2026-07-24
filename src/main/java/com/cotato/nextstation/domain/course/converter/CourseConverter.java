@@ -10,6 +10,8 @@ import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -81,13 +83,21 @@ public class CourseConverter {
                 course.getName(),
                 course.getStationId(),
                 course.getStationName(),
-                course.getLineId(),
-                course.getLineName(),
+                toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
                 placeCount,
                 estimateDuration(placeCount),
                 tags,
                 imageUrl
         );
+    }
+
+    // 대표 호선은 뽑기 대상이 아닌 역에서 비어 있을 수 있어 LEFT JOIN으로 조회한다.
+    // 그 경우 id/name/code가 모두 null이므로 노선 객체 자체를 null로 내린다.
+    private LineSummaryResponse toLine(Long lineId, String lineName, LineCode lineCode) {
+        if (lineId == null) {
+            return null;
+        }
+        return new LineSummaryResponse(lineId, lineName, lineCode);
     }
 
     /**
