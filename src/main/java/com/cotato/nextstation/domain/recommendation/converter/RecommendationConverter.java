@@ -5,14 +5,19 @@ import com.cotato.nextstation.domain.recommendation.dto.response.CoursePreviewRe
 import com.cotato.nextstation.domain.recommendation.dto.response.RandomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.RecommendedStationResponse;
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceView;
+import com.cotato.nextstation.domain.station.converter.LineConverter;
 import com.cotato.nextstation.domain.station.entity.Line;
 import com.cotato.nextstation.domain.station.entity.Station;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class RecommendationConverter {
+
+    private final LineConverter lineConverter;
 
     public RandomRecommendationResponse toRandomResponse(Station station, String courseName, List<StationPlaceView> places) {
         return new RandomRecommendationResponse(
@@ -28,7 +33,7 @@ public class RecommendationConverter {
                 station.getStationName(),
                 station.getDescription(),
                 station.getTodo(),
-                drawLine != null ? drawLine.getName() : null
+                drawLine != null ? lineConverter.toSummaryResponse(drawLine) : null
         );
     }
 
