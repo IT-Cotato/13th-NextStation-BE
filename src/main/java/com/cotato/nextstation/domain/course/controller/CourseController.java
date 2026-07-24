@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.course.controller;
 
+import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseNameUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRequest;
@@ -64,6 +65,38 @@ public class CourseController {
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @Valid @RequestBody CourseCreateRequest request) {
         return CommonResponse.success(HttpStatus.CREATED, courseCommandService.createCourse(memberId, request));
+    }
+
+    @Operation(
+            summary = "내 코스로 만들기",
+            description = """
+                    다른 사람의 공개 코스를 편집 가능한 내 코스로 복제한다.
+                    - `{courseId}`는 **복사할 원본 코스**의 ID다.
+                    - 원본을 참조만 하는 스크랩과 달리, 복제본은 원본이 삭제되거나 비공개로 바뀌어도 그대로 남는다.
+                    - `placeIds`를 넘기면 그 순서대로 코스 순서가 부여되고, 생략하면 원본 순서를 그대로 따른다.
+                    - 장소를 빼거나 더할 수는 없어 `placeIds`는 원본의 장소 구성과 정확히 일치해야 한다.
+                    - 복제본의 조회수·저장 수는 0부터 시작하며, 여행일지·컨셉투어는 물려받지 않는다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "복제 성공"),
+            @ApiResponse(responseCode = "400", description = """
+                    요청 값 검증 실패 (`GlobalErrorCode.VALIDATION_ERROR`),
+                    본인이 만든 코스를 복사 (`CourseErrorCode.CANNOT_COPY_OWN_COURSE`),
+                    장소 목록이 원본 구성과 불일치 (`CourseErrorCode.INVALID_COURSE_PLACES`)
+                    또는 같은 장소 중복 (`CourseErrorCode.DUPLICATE_COURSE_PLACES`)"""),
+            @ApiResponse(responseCode = "404", description = "존재하지 않거나 공개되지 않은 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
+    })
+    @PostMapping("/{courseId}/copy")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CommonResponse<CourseCreateResponse> copyCourse(
+            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
+            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(description = "복사할 원본 코스 ID", example = "1")
+            @PathVariable Long courseId,
+            @Valid @RequestBody CourseCopyRequest request) {
+        return CommonResponse.success(HttpStatus.CREATED,
+                courseCommandService.copyCourse(memberId, courseId, request));
     }
 
     @Operation(

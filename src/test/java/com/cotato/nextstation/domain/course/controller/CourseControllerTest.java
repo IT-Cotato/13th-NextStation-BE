@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.course.controller;
 
+import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseNameUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRequest;
@@ -74,6 +75,51 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.courseId").value(1))
                 .andExpect(jsonPath("$.data.name").value("보문역 코스"))
                 .andExpect(jsonPath("$.data.createdAt").exists());
+    }
+
+    @Test
+    @DisplayName("내 코스로 만들기는 201과 새로 만들어진 코스 정보를 반환한다")
+    void copyCourse_created() throws Exception {
+        CourseCopyRequest request = new CourseCopyRequest("내 보문역 코스", List.of(3L, 1L, 2L));
+        given(courseCommandService.copyCourse(eq(1L), eq(9L), any()))
+                .willReturn(new CourseCreateResponse(10L, "내 보문역 코스", LocalDateTime.now()));
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/copy", 9L)
+                        .header(MEMBER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value(201))
+                // 응답의 courseId는 원본(9)이 아니라 새로 만들어진 코스(10)여야 한다
+                .andExpect(jsonPath("$.data.courseId").value(10))
+                .andExpect(jsonPath("$.data.name").value("내 보문역 코스"));
+    }
+
+    @Test
+    @DisplayName("본인이 만든 코스를 복사하면 400을 반환한다")
+    void copyCourse_ownCourse() throws Exception {
+        CourseCopyRequest request = new CourseCopyRequest("복사본", null);
+        willThrow(new CustomException(CourseErrorCode.CANNOT_COPY_OWN_COURSE))
+                .given(courseCommandService).copyCourse(eq(1L), eq(9L), any());
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/copy", 9L)
+                        .header(MEMBER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(CourseErrorCode.CANNOT_COPY_OWN_COURSE.getCode()));
+    }
+
+    @Test
+    @DisplayName("코스 이름이 20자를 넘으면 검증 오류로 400을 반환한다")
+    void copyCourse_nameTooLong() throws Exception {
+        CourseCopyRequest request = new CourseCopyRequest("가".repeat(21), null);
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/copy", 9L)
+                        .header(MEMBER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
