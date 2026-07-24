@@ -22,7 +22,7 @@ public interface PlaceTagMappingRepository extends JpaRepository<PlaceTagMapping
     void deleteByPlaceTagNames(@Param("tagNames") List<String> tagNames);
 
     // Course 조회 전용 - placeIds 여러 개의 태그를 한 번에 조회
-    @EntityGraph(attributePaths = {"placeTag"})
+    @EntityGraph(attributePaths = {"place", "placeTag"})
     List<PlaceTagMapping> findByPlaceIdIn(List<Long> placeIds);
 
     @EntityGraph(attributePaths = {"place", "placeTag"})
