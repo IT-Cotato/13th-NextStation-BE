@@ -13,6 +13,7 @@ import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandSer
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
 import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
 import com.cotato.nextstation.domain.auth.service.query.LoginResult;
+import com.cotato.nextstation.domain.auth.service.query.ReissueResult;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
@@ -21,6 +22,7 @@ import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -395,5 +397,49 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.reasons.email").exists());
+    }
+
+    @Test
+    @DisplayName("유효한 refreshToken 쿠키가 있으면 200과 새 accessToken을 반환한다")
+    void reissue_success() throws Exception {
+        given(loginQueryService.reissue("refresh-token"))
+                .willReturn(new ReissueResult(1L, "new-access-token"));
+
+        mockMvc.perform(post("/api/v1/auth/reissue")
+                        .cookie(new Cookie("refreshToken", "refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("new-access-token"));
+    }
+
+    @Test
+    @DisplayName("refreshToken 쿠키가 없으면 401을 반환한다")
+    void reissue_missingCookie() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/reissue"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_REFRESH_TOKEN.getCode()));
+    }
+
+    @Test
+    @DisplayName("refreshToken이 만료됐으면 401을 반환한다")
+    void reissue_expiredToken() throws Exception {
+        willThrow(new CustomException(AuthErrorCode.REFRESH_TOKEN_EXPIRED))
+                .given(loginQueryService).reissue("refresh-token");
+
+        mockMvc.perform(post("/api/v1/auth/reissue")
+                        .cookie(new Cookie("refreshToken", "refresh-token")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.REFRESH_TOKEN_EXPIRED.getCode()));
+    }
+
+    @Test
+    @DisplayName("refreshToken이 위변조됐거나 purpose가 다르면 401을 반환한다")
+    void reissue_invalidToken() throws Exception {
+        willThrow(new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN))
+                .given(loginQueryService).reissue("bad-token");
+
+        mockMvc.perform(post("/api/v1/auth/reissue")
+                        .cookie(new Cookie("refreshToken", "bad-token")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_REFRESH_TOKEN.getCode()));
     }
 }

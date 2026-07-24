@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.info.License;
@@ -42,10 +43,10 @@ import io.swagger.v3.oas.annotations.servers.Server;
 // refreshTokenAuth: 로그인(/login) 시 httpOnly 쿠키로 내려가는 refresh token
 @SecurityScheme(
         name = "refreshTokenAuth",
-        type = SecuritySchemeType.HTTP,
-        scheme = "bearer",
-        bearerFormat = "JWT",
-        description = "로그인(/login) 시 httpOnly 쿠키로 내려가는 refresh token"
+        type = SecuritySchemeType.APIKEY,
+        in = SecuritySchemeIn.COOKIE,
+        paramName = "refreshToken",
+        description = "로그인(/login) 시 httpOnly 쿠키로 내려가는 refresh token. Authorize 입력창에 로그인 응답 쿠키의 refreshToken 값만(접두사 없이) 넣으면 된다."
 )
 @Configuration
 public class SwaggerConfig {
