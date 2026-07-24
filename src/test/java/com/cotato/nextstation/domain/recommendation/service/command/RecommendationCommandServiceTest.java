@@ -8,6 +8,7 @@ import com.cotato.nextstation.domain.recommendation.repository.RecommendationLog
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceReader;
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceView;
 import com.cotato.nextstation.domain.station.entity.Line;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.domain.station.entity.Station;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
@@ -139,7 +140,7 @@ class RecommendationCommandServiceTest {
     void drawRandom_coursePreviewSelectsOnePerCategory() {
         // given
         Station station = station(10L, "제기동역");
-        ReflectionTestUtils.setField(station, "drawLine", Line.of("1호선"));
+        ReflectionTestUtils.setField(station, "drawLine", Line.of(LineCode.LINE_1));
         given(stationRepository.findByIsDrawableTrue()).willReturn(List.of(station));
         // 순서 섞고 FOOD 2개, WALK 없음
         given(stationPlaceReader.getPlacesByStation(10L)).willReturn(List.of(
