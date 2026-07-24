@@ -16,9 +16,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,13 +65,13 @@ class PlaceInfoQueryServiceTest {
         List<Long> placeIds = List.of(1L, 2L);
 
         List<PlaceTagMapping> mappings = List.of(
-                mapping(PlaceTagName.NATURE),
-                mapping(PlaceTagName.NATURE),
-                mapping(PlaceTagName.NATURE),
-                mapping(PlaceTagName.BUDGET),
-                mapping(PlaceTagName.BUDGET),
-                mapping(PlaceTagName.SHOPPING),
-                mapping(PlaceTagName.INDOOR)
+                mapping(1L, PlaceTagName.NATURE),
+                mapping(1L, PlaceTagName.NATURE),
+                mapping(1L, PlaceTagName.NATURE),
+                mapping(1L, PlaceTagName.BUDGET),
+                mapping(1L, PlaceTagName.BUDGET),
+                mapping(1L, PlaceTagName.SHOPPING),
+                mapping(1L, PlaceTagName.INDOOR)
         );
 
         given(placeTagMappingRepository.findByPlaceIdIn(placeIds)).willReturn(mappings);
@@ -89,7 +91,7 @@ class PlaceInfoQueryServiceTest {
     void getTopTagNames_lessThanLimit() {
         // given
         List<Long> placeIds = List.of(1L);
-        List<PlaceTagMapping> mappings = List.of(mapping(PlaceTagName.NATURE));
+        List<PlaceTagMapping> mappings = List.of(mapping(1L, PlaceTagName.NATURE));
 
         given(placeTagMappingRepository.findByPlaceIdIn(placeIds)).willReturn(mappings);
 
@@ -101,12 +103,49 @@ class PlaceInfoQueryServiceTest {
         assertThat(result.get(0)).isEqualTo("NATURE");
     }
 
-    private PlaceTagMapping mapping(PlaceTagName tagName) {
+    @Test
+    @DisplayName("placeId별 태그 이름 목록을 반환한다")
+    void getTagNamesByPlace_success() {
+        // given
+        List<Long> placeIds = List.of(1L, 2L);
+
+        PlaceTagMapping mapping1 = mapping(1L, PlaceTagName.NATURE);
+        PlaceTagMapping mapping2 = mapping(1L, PlaceTagName.BUDGET);
+        PlaceTagMapping mapping3 = mapping(2L, PlaceTagName.PHOTO_SPOT);
+
+        given(placeTagMappingRepository.findByPlaceIdIn(placeIds))
+                .willReturn(List.of(mapping1, mapping2, mapping3));
+
+        // when
+        Map<Long, List<String>> result = placeInfoQueryService.getTagNamesByPlace(placeIds);
+
+        // then
+        assertThat(result.get(1L)).containsExactlyInAnyOrder("NATURE", "BUDGET");
+        assertThat(result.get(2L)).containsExactly("PHOTO_SPOT");
+    }
+
+    @Test
+    @DisplayName("빈 목록이면 빈 Map을 반환한다")
+    void getTagNamesByPlace_empty() {
+        // when
+        Map<Long, List<String>> result = placeInfoQueryService.getTagNamesByPlace(List.of());
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+
+
+private PlaceTagMapping mapping(Long placeId, PlaceTagName tagName) {
+        Place place = mock(Place.class);
+        lenient().when(place.getId()).thenReturn(placeId);
+
         PlaceTag placeTag = mock(PlaceTag.class);
-        given(placeTag.getName()).willReturn(tagName);
+        lenient().when(placeTag.getName()).thenReturn(tagName);
 
         PlaceTagMapping mapping = mock(PlaceTagMapping.class);
-        given(mapping.getPlaceTag()).willReturn(placeTag);
+        lenient().when(mapping.getPlace()).thenReturn(place);
+        lenient().when(mapping.getPlaceTag()).thenReturn(placeTag);
         return mapping;
     }
 }

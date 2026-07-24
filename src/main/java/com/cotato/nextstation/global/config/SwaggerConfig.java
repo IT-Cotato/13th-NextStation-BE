@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.info.License;
@@ -42,10 +43,10 @@ import io.swagger.v3.oas.annotations.servers.Server;
 // refreshTokenAuth: 로그인(/login) 시 httpOnly 쿠키로 내려가는 refresh token
 @SecurityScheme(
         name = "refreshTokenAuth",
-        type = SecuritySchemeType.HTTP,
-        scheme = "bearer",
-        bearerFormat = "JWT",
-        description = "로그인(/login) 시 httpOnly 쿠키로 내려가는 refresh token"
+        type = SecuritySchemeType.APIKEY,
+        in = SecuritySchemeIn.COOKIE,
+        paramName = "refreshToken",
+        description = "로그인(/login) 시 httpOnly 쿠키로 내려가는 refresh token. Authorize 입력창에 로그인 응답 쿠키의 refreshToken 값만(접두사 없이) 넣으면 된다."
 )
 @Configuration
 public class SwaggerConfig {
@@ -80,8 +81,9 @@ public class SwaggerConfig {
                 .group("Course")
                 .displayName("Course API")
                 .packagesToScan("com.cotato.nextstation.domain.course.controller")
-                // 저장 탭 API는 /members/me 하위 경로를 쓰므로 함께 포함한다
-                .pathsToMatch("/api/v1/courses/**", "/api/v1/members/me/**")
+                // 저장 탭은 /members/me, 장소 상세의 코스 목록은 /places 하위 경로를 쓰므로 함께 포함한다.
+                // 패키지로도 걸러지므로 다른 도메인의 같은 경로 API가 섞이지는 않는다.
+                .pathsToMatch("/api/v1/courses/**", "/api/v1/members/me/**", "/api/v1/places/*/courses")
                 .build();
     }
 

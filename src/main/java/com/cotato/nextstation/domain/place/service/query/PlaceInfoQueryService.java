@@ -66,4 +66,20 @@ public class PlaceInfoQueryService {
         return new StationTagCountResponse(result);
     }
 
+    public Map<Long, List<String>> getTagNamesByPlace(List<Long> placeIds) {
+        if (placeIds.isEmpty()) {
+            return Map.of();
+        }
+        List<PlaceTagMapping> mappings = placeTagMappingRepository.findByPlaceIdIn(placeIds);
+
+        return mappings.stream()
+                .collect(Collectors.groupingBy(
+                        mapping -> mapping.getPlace().getId(),
+                        Collectors.mapping(
+                                mapping -> mapping.getPlaceTag().getName().name(),
+                                Collectors.toList()
+                        )
+                ));
+    }
+
 }

@@ -3,6 +3,8 @@ package com.cotato.nextstation.domain.station.entity;
 import com.cotato.nextstation.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -17,11 +19,16 @@ public class Line extends BaseEntity {
     @Column(nullable = false, unique = true)
     private String name;
 
-    public static Line of(String name) {
-        return new Line(name);
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, unique = true)
+    private LineCode code;
+
+    public static Line of(LineCode code) {
+        return new Line(code);
     }
 
-    private Line(String name) {
-        this.name = name;
+    private Line(LineCode code) {
+        this.name = code.getDisplayName();
+        this.code = code;
     }
 }
