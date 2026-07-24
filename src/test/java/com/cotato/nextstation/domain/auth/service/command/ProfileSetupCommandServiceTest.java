@@ -14,10 +14,10 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -34,7 +34,6 @@ import static org.mockito.Mockito.mock;
 @ExtendWith(MockitoExtension.class)
 class ProfileSetupCommandServiceTest {
 
-    @InjectMocks
     private ProfileSetupCommandService profileSetupCommandService;
 
     @Mock
@@ -52,6 +51,15 @@ class ProfileSetupCommandServiceTest {
     private static final LocalDate BIRTH_DATE = LocalDate.of(2001, 1, 1);
     private static final String TOKEN = "signup-token";
     private static final String AUTH_HEADER = "Bearer " + TOKEN;
+    private static final String VALID_PROFILE_IMAGE_URL =
+            "https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid.jpg";
+
+    // @Value 생성자 파라미터는 목으로 대체할 수 없어 직접 값을 넣어 생성한다
+    @BeforeEach
+    void setUp() {
+        profileSetupCommandService = new ProfileSetupCommandService(
+                memberRepository, nicknameProfanityFilter, jwtProvider, "test-bucket", "ap-northeast-2");
+    }
 
     private Member pendingMember() {
         Member member = Member.builder().email("user@example.com").password("encoded").build();
@@ -78,7 +86,7 @@ class ProfileSetupCommandServiceTest {
 
         // when
         ProfileSetupResponse response = profileSetupCommandService.setupProfile(
-                AUTH_HEADER, NICKNAME, "https://image.jpg", GENDER, BIRTH_DATE);
+                AUTH_HEADER, NICKNAME, VALID_PROFILE_IMAGE_URL, GENDER, BIRTH_DATE);
 
         // then
         assertThat(response.memberId()).isEqualTo(MEMBER_ID);
@@ -86,7 +94,22 @@ class ProfileSetupCommandServiceTest {
         assertThat(response.status()).isEqualTo(MemberStatus.ACTIVE);
         assertThat(member.getGender()).isEqualTo(GENDER);
         assertThat(member.getBirthDate()).isEqualTo(BIRTH_DATE);
-        assertThat(member.getProfileImageUrl()).isEqualTo("https://image.jpg");
+        assertThat(member.getProfileImageUrl()).isEqualTo(VALID_PROFILE_IMAGE_URL);
+    }
+
+    @Test
+    @DisplayName("본인 S3 버킷 경로가 아닌 프로필 이미지 URL이면 예외가 발생한다")
+    void setupProfile_invalidProfileImageUrl() {
+        // given
+        givenValidToken();
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
+        given(memberRepository.existsByNickname(NICKNAME)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> profileSetupCommandService.setupProfile(
+                AUTH_HEADER, NICKNAME, "https://evil.com/xss.svg", GENDER, BIRTH_DATE))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(AuthErrorCode.INVALID_PROFILE_IMAGE_URL.getMessage());
     }
 
     @Test

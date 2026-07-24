@@ -10,7 +10,6 @@ import org.springframework.http.HttpStatus;
 public enum PlaceErrorCode implements ErrorCode {
 
     PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "CLIENT_ERROR_404_PLACE_NOT_FOUND", "존재하지 않는 장소입니다."),
-    INVALID_PAGE_SIZE(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_INVALID_PAGE_SIZE", "size는 1 이상 50 이하여야 합니다."),
     ;
 
     private final HttpStatus httpStatus;

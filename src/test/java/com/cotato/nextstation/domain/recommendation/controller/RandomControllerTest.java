@@ -8,6 +8,7 @@ import com.cotato.nextstation.domain.recommendation.exception.RecommendationErro
 import com.cotato.nextstation.domain.recommendation.service.command.RecommendationCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
+import com.cotato.nextstation.global.jwt.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,10 @@ class RandomControllerTest {
 
     @MockitoBean
     RecommendationCommandService recommendationCommandService;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
 
     private RandomRecommendationResponse sampleResponse() {
         return new RandomRecommendationResponse(

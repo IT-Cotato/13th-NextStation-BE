@@ -11,6 +11,7 @@ import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.IntStream;
 
 @Component
@@ -61,13 +62,14 @@ public class CourseConverter {
                 .toList();
     }
 
-    public List<PopularCourseResponse> toPopularResponses(List<Course> courses) {
+    public List<PopularCourseResponse> toPopularResponses(List<Course> courses, Set<Long> savedCourseIds) {
         return courses.stream()
                 .map(course -> new PopularCourseResponse(
                         course.getId(),
                         course.getName(),
                         course.getViewCount(),
-                        course.getSaveCount()
+                        course.getSaveCount(),
+                        savedCourseIds.contains(course.getId())
                 ))
                 .toList();
     }

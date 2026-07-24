@@ -68,7 +68,7 @@ class PlaceInfoQueryServiceTest {
                 mapping(PlaceTagName.NATURE),
                 mapping(PlaceTagName.BUDGET),
                 mapping(PlaceTagName.BUDGET),
-                mapping(PlaceTagName.CAFE_TOUR),
+                mapping(PlaceTagName.SHOPPING),
                 mapping(PlaceTagName.INDOOR)
         );
 
@@ -81,7 +81,7 @@ class PlaceInfoQueryServiceTest {
         assertThat(result).hasSize(3);
         assertThat(result.get(0)).isEqualTo("NATURE");   // count=3, 확정 1위
         assertThat(result.get(1)).isEqualTo("BUDGET");    // count=2, 확정 2위
-        assertThat(result.get(2)).isIn("CAFE_TOUR", "INDOOR");  // count=1 동점, 둘 중 하나
+        assertThat(result.get(2)).isIn("SHOPPING", "INDOOR");  // count=1 동점, 둘 중 하나
     }
 
     @Test

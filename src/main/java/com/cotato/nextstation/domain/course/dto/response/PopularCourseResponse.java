@@ -15,6 +15,9 @@ public record PopularCourseResponse(
         int viewCount,
 
         @Schema(description = "저장 수", example = "128")
-        int saveCount
+        int saveCount,
+
+        @Schema(description = "현재 로그인 사용자가 이 코스를 저장했는지 여부. memberId 없이 조회하면 항상 false", example = "true")
+        boolean isSaved
 ) {
 }

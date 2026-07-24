@@ -10,8 +10,6 @@ public interface StationRepository extends JpaRepository<Station, Long> {
 
     Optional<Station> findByStationName(String stationName);
 
-    boolean existsByIsDrawableTrue();
-
     // 랜덤뽑기 대상(뽑기 역 50개) 조회
     List<Station> findByIsDrawableTrue();
 }
