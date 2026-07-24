@@ -1,7 +1,8 @@
 package com.cotato.nextstation.domain.course.controller;
 
 import com.cotato.nextstation.domain.course.dto.response.CourseCardResponse;
-import com.cotato.nextstation.domain.course.dto.response.LineFilterResponse;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
@@ -47,15 +48,18 @@ class MyCourseControllerTest {
     void getMyCourses_success() throws Exception {
         given(courseQueryService.getMyCourses(1L, null, null, null, null)).willReturn(
                 new MyCourseListResponse(
-                        List.of(new LineFilterResponse(1L, "1호선"), new LineFilterResponse(6L, "6호선")),
-                        List.of(new CourseCardResponse(7L, "보문역 환승여행 코스", 6L, "보문역", 6L, "6호선")),
+                        List.of(new LineSummaryResponse(1L, "1호선", LineCode.LINE_1),
+                                new LineSummaryResponse(6L, "6호선", LineCode.LINE_6)),
+                        List.of(new CourseCardResponse(7L, "보문역 환승여행 코스", 6L, "보문역",
+                                new LineSummaryResponse(6L, "6호선", LineCode.LINE_6))),
                         null, false));
 
         mockMvc.perform(get("/api/v1/members/me/courses").header(MEMBER_ID_HEADER, 1L))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.availableLines[0].lineId").value(1))
-                .andExpect(jsonPath("$.data.availableLines[0].lineName").value("1호선"))
-                .andExpect(jsonPath("$.data.availableLines[1].lineName").value("6호선"))
+                .andExpect(jsonPath("$.data.availableLines[0].id").value(1))
+                .andExpect(jsonPath("$.data.availableLines[0].name").value("1호선"))
+                .andExpect(jsonPath("$.data.availableLines[1].name").value("6호선"))
+                .andExpect(jsonPath("$.data.availableLines[1].code").value("LINE_6"))
                 .andExpect(jsonPath("$.data.courses[0].courseId").value(7))
                 .andExpect(jsonPath("$.data.courses[0].stationName").value("보문역"))
                 .andExpect(jsonPath("$.data.hasNext").value(false));
