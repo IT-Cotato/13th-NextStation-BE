@@ -66,3 +66,6 @@ src/main/resources/data/places.csv
 
 # 로컬 테스트용 signupToken 발급 스크립트
 scripts/GenerateSignupToken.java
+
+# 운영 DB 직접 실행용 마이그레이션 스크립트
+scripts/cleanup-retired-place-tags.sql
