@@ -1,0 +1,67 @@
+package com.cotato.nextstation.domain.course.controller;
+
+import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
+import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
+import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
+import com.cotato.nextstation.global.jwt.JwtProvider;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(PlaceCourseController.class)
+@AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandler.class)
+class PlaceCourseControllerTest {
+
+    @Autowired
+    MockMvc mockMvc;
+
+    @MockitoBean
+    CourseQueryService courseQueryService;
+
+    // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
+    @MockitoBean
+    JwtProvider jwtProvider;
+
+    @Test
+    @DisplayName("장소를 포함한 코스는 200과 코스 카드를 반환한다")
+    void getCoursesByPlace_success() throws Exception {
+        given(courseQueryService.getCoursesByPlace(1L)).willReturn(List.of(
+                new PlaceCourseResponse(10L, "주연의 보문역 여행", 123L, "보문역", 12L, "6호선",
+                        4, "SHORT", List.of("자연과함께", "사진찍기좋은"), "cover.jpg")));
+
+        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].courseId").value(10))
+                .andExpect(jsonPath("$.data[0].name").value("주연의 보문역 여행"))
+                .andExpect(jsonPath("$.data[0].stationName").value("보문역"))
+                .andExpect(jsonPath("$.data[0].lineName").value("6호선"))
+                .andExpect(jsonPath("$.data[0].placeCount").value(4))
+                .andExpect(jsonPath("$.data[0].travelDuration").value("SHORT"))
+                .andExpect(jsonPath("$.data[0].tags[0]").value("자연과함께"))
+                .andExpect(jsonPath("$.data[0].imageUrl").value("cover.jpg"));
+    }
+
+    @Test
+    @DisplayName("코스가 없으면 200과 빈 배열을 반환한다")
+    void getCoursesByPlace_empty() throws Exception {
+        given(courseQueryService.getCoursesByPlace(999L)).willReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 999L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+}
