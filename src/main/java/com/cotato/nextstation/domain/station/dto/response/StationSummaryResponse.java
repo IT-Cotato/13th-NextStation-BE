@@ -13,7 +13,7 @@ public record StationSummaryResponse(
         @Schema(description = "역명", example = "왕십리역")
         String stationName,
 
-        @Schema(description = "소속 노선 목록 (환승역이면 여러 개)", example = "[\"2호선\", \"5호선\", \"경의중앙선\", \"수인분당선\"]")
-        List<String> lines
+        @Schema(description = "소속 노선 목록 (환승역이면 여러 개). 노선 표시 순서는 노선 ID 순이다.")
+        List<LineSummaryResponse> lines
 ) {
 }

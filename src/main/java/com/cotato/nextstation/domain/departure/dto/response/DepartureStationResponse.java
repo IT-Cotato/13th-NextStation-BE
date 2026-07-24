@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.departure.dto.response;
 
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -17,8 +18,8 @@ public record DepartureStationResponse(
         @Schema(description = "역명 (해당 역을 못 찾으면 null)", example = "왕십리역")
         String stationName,
 
-        @Schema(description = "소속 노선 목록 (환승역이면 여러 개)", example = "[\"2호선\", \"5호선\"]")
-        List<String> lines,
+        @Schema(description = "소속 노선 목록 (환승역이면 여러 개)")
+        List<LineSummaryResponse> lines,
 
         @Schema(description = "표시 순서 (1부터)", example = "1")
         int orderNum,
