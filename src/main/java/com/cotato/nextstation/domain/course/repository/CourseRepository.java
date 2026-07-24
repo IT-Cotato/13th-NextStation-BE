@@ -32,11 +32,21 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("UPDATE Course c SET c.saveCount = c.saveCount - 1 WHERE c.id = :courseId AND c.saveCount > 0")
     void decreaseSaveCount(@Param("courseId") Long courseId);
 
-    // 다중 취소용. 코스마다 UPDATE를 날리지 않고 한 번에 처리한다.
+    /**
+     * 다중/전체 취소용. 실제로 스크랩돼 있는 코스만 저장 수를 줄이고, 지운 개수를 돌려준다.
+     * <p>
+     * 벌크 삭제는 어떤 코스가 지워졌는지 알려주지 않으므로(MySQL에 DELETE ... RETURNING이 없다),
+     * 대신 EXISTS로 "지금 스크랩이 남아 있는 코스"만 골라 감소시킨다.
+     * 이미 취소된 코스가 목록에 섞여 있어도 저장 수가 과다 감소하지 않는다.
+     * 반드시 삭제보다 먼저 실행해야 한다. 삭제 후에는 EXISTS가 전부 거짓이 된다.
+     */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Course c SET c.saveCount = c.saveCount - 1 " +
-            "WHERE c.id IN :courseIds AND c.saveCount > 0")
-    void decreaseSaveCountAll(@Param("courseIds") Collection<Long> courseIds);
+            "WHERE c.id IN :courseIds AND c.saveCount > 0 " +
+            "AND EXISTS (SELECT 1 FROM CourseSave cs " +
+            "            WHERE cs.courseId = c.id AND cs.memberId = :memberId)")
+    int decreaseSaveCountAll(@Param("memberId") Long memberId,
+                             @Param("courseIds") Collection<Long> courseIds);
 
     // 역별 인기 공개 코스 조회
     // 인기순 = view_count + save_count*2, 동률이면 최신순으로 2차 정렬

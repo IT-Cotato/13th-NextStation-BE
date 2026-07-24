@@ -30,6 +30,14 @@ public interface CourseSaveRepository extends JpaRepository<CourseSave, Long> {
     int deleteByMemberIdAndCourseId(@Param("memberId") Long memberId,
                                     @Param("courseId") Long courseId);
 
+    // 여러 스크랩을 한 번에 삭제한다. 코스마다 삭제 쿼리를 날리면 스크랩 수에 비례해 비용이 늘어난다.
+    // 어떤 코스가 지워졌는지는 알 수 없으므로, 저장 수 감소를 이 쿼리보다 먼저 실행해야 한다.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM CourseSave cs " +
+            "WHERE cs.memberId = :memberId AND cs.courseId IN :courseIds")
+    int deleteByMemberIdAndCourseIdIn(@Param("memberId") Long memberId,
+                                      @Param("courseIds") Collection<Long> courseIds);
+
     // "모두 선택" 대상이 되는 코스 id. 목록에 실제로 보이는 것과 같은 조건을 걸어야
     // 화면에 뜨지도 않은 스크랩이 함께 취소되는 일이 없다.
     @Query("SELECT c.id FROM CourseSave cs " +
