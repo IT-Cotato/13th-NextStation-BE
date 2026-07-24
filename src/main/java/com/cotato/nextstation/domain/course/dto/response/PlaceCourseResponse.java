@@ -38,7 +38,7 @@ public record PlaceCourseResponse(
         String travelDuration,
 
         @Schema(description = "코스 대표 태그 (최대 2개). 코스에 담긴 장소들의 태그를 집계한 상위 태그다.",
-                example = "[\"자연과함께\", \"카페투어\"]")
+                example = "[\"자연과함께\", \"사진찍기좋은\"]")
         List<String> tags,
 
         @Schema(description = """

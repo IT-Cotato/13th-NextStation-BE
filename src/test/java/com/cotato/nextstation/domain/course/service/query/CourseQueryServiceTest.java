@@ -124,7 +124,7 @@ class CourseQueryServiceTest {
                         coursePlace(20L, 200L, 1), coursePlace(20L, 201L, 2)));
         given(placeInfoQueryService.getPlaceInfos(any())).willReturn(List.of());
         given(placeInfoQueryService.getTopTagNames(List.of(100L, 101L, 102L)))
-                .willReturn(List.of("자연과함께", "카페투어", "가성비"));
+                .willReturn(List.of("자연과함께", "사진찍기좋은", "가성비"));
         given(placeInfoQueryService.getTopTagNames(List.of(200L, 201L)))
                 .willReturn(List.of("실내위주"));
 
@@ -140,7 +140,7 @@ class CourseQueryServiceTest {
         assertThat(countCaptor.getAllValues()).containsExactlyInAnyOrder(3, 2);
         // 카드에는 태그를 2개까지만 노출한다
         assertThat(tagsCaptor.getAllValues())
-                .containsExactlyInAnyOrder(List.of("자연과함께", "카페투어"), List.of("실내위주"));
+                .containsExactlyInAnyOrder(List.of("자연과함께", "사진찍기좋은"), List.of("실내위주"));
     }
 
     @Test

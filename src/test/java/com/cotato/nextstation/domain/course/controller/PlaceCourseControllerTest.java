@@ -40,7 +40,7 @@ class PlaceCourseControllerTest {
     void getCoursesByPlace_success() throws Exception {
         given(courseQueryService.getCoursesByPlace(1L)).willReturn(List.of(
                 new PlaceCourseResponse(10L, "주연의 보문역 여행", 123L, "보문역", 12L, "6호선",
-                        4, "SHORT", List.of("자연과함께", "카페투어"), "cover.jpg")));
+                        4, "SHORT", List.of("자연과함께", "사진찍기좋은"), "cover.jpg")));
 
         mockMvc.perform(get("/api/v1/places/{placeId}/courses", 1L))
                 .andExpect(status().isOk())

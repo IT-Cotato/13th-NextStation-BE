@@ -61,7 +61,7 @@ class CourseConverterTest {
     void toPlaceCourseResponse() {
         // when
         PlaceCourseResponse response = courseConverter.toPlaceCourseResponse(
-                view(), 4, List.of("자연과함께", "카페투어"), "cover.jpg");
+                view(), 4, List.of("자연과함께", "사진찍기좋은"), "cover.jpg");
 
         // then
         assertThat(response.courseId()).isEqualTo(10L);
@@ -71,7 +71,7 @@ class CourseConverterTest {
         assertThat(response.lineId()).isEqualTo(12L);
         assertThat(response.lineName()).isEqualTo("6호선");
         assertThat(response.placeCount()).isEqualTo(4);
-        assertThat(response.tags()).containsExactly("자연과함께", "카페투어");
+        assertThat(response.tags()).containsExactly("자연과함께", "사진찍기좋은");
         assertThat(response.imageUrl()).isEqualTo("cover.jpg");
     }
 }
