@@ -6,7 +6,6 @@ import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
-import com.cotato.nextstation.domain.course.dto.response.LineFilterResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
@@ -17,6 +16,8 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseSaveRepository.SavedCourseView;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -89,8 +90,7 @@ public class CourseConverter {
                         saved.getName(),
                         saved.getStationId(),
                         saved.getStationName(),
-                        saved.getLineId(),
-                        saved.getLineName()))
+                        toLine(saved.getLineId(), saved.getLineName(), saved.getLineCode())))
                 .toList();
         return new SavedCourseListResponse(cards, nextCursor, hasNext);
     }
@@ -103,13 +103,21 @@ public class CourseConverter {
                         myCourse.getName(),
                         myCourse.getStationId(),
                         myCourse.getStationName(),
-                        myCourse.getLineId(),
-                        myCourse.getLineName()))
+                        toLine(myCourse.getLineId(), myCourse.getLineName(), myCourse.getLineCode())))
                 .toList();
-        List<LineFilterResponse> lineFilters = availableLines.stream()
-                .map(line -> new LineFilterResponse(line.getLineId(), line.getLineName()))
+        List<LineSummaryResponse> lineFilters = availableLines.stream()
+                .map(line -> new LineSummaryResponse(line.getLineId(), line.getLineName(), line.getLineCode()))
                 .toList();
         return new MyCourseListResponse(lineFilters, cards, nextCursor, hasNext);
+    }
+
+    // 대표 호선(station.draw_line)은 뽑기 대상이 아닌 역에서 비어 있을 수 있어 LEFT JOIN으로 조회한다.
+    // 그 경우 id/name/code가 모두 null이므로 노선 객체 자체를 null로 내린다.
+    private LineSummaryResponse toLine(Long lineId, String lineName, LineCode lineCode) {
+        if (lineId == null) {
+            return null;
+        }
+        return new LineSummaryResponse(lineId, lineName, lineCode);
     }
 
     public PlaceCourseResponse toPlaceCourseResponse(PlaceCourseView course, int placeCount,
