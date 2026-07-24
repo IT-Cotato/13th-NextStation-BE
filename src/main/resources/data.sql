@@ -36,14 +36,11 @@ VALUES ('WALK', '산책포인트', NULL)
 ON DUPLICATE KEY UPDATE name = VALUES(name), default_image_url = VALUES(default_image_url);
 
 INSERT INTO place_tag (name, is_active) VALUES ('NATURE', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
-INSERT INTO place_tag (name, is_active) VALUES ('ART_SPACE', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
-INSERT INTO place_tag (name, is_active) VALUES ('LOCAL_EXPLORE', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
 INSERT INTO place_tag (name, is_active) VALUES ('ALLEY_TRIP', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
 INSERT INTO place_tag (name, is_active) VALUES ('MARKET', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
 INSERT INTO place_tag (name, is_active) VALUES ('HOTPLACE', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
 INSERT INTO place_tag (name, is_active) VALUES ('PHOTO_SPOT', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
 INSERT INTO place_tag (name, is_active) VALUES ('SHOPPING', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
 INSERT INTO place_tag (name, is_active) VALUES ('EXPERIENCE', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
-INSERT INTO place_tag (name, is_active) VALUES ('CAFE_TOUR', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
 INSERT INTO place_tag (name, is_active) VALUES ('BUDGET', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);
 INSERT INTO place_tag (name, is_active) VALUES ('INDOOR', true) ON DUPLICATE KEY UPDATE is_active = VALUES(is_active);

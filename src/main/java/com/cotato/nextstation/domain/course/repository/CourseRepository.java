@@ -108,10 +108,33 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "ORDER BY l.name")
     List<LineView> findAvailableLines(@Param("memberId") Long memberId);
 
+    // 특정 장소를 담고 있는 공개 코스를 인기순으로 조회한다 (장소 상세 화면 하단).
+    // 카드에 필요한 역·대표 호선을 함께 가져온다(코스마다 조회하면 N+1).
+    // 노출 조건과 인기순 공식은 위 역별 인기 코스와 같다.
+    @Query("SELECT c.id AS courseId, c.name AS name, " +
+            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "FROM CoursePlace cp " +
+            "JOIN Course c ON c.id = cp.courseId " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE cp.placeId = :placeId AND j.isPublic = true " +
+            "ORDER BY (c.viewCount + c.saveCount * 2) DESC, c.createdAt DESC, c.id DESC")
+    List<PlaceCourseView> findPopularPublicCoursesByPlaceId(@Param("placeId") Long placeId, Pageable pageable);
+
     interface MyCourseView {
         Long getCourseId();
         String getName();
         LocalDateTime getCreatedAt();
+        Long getStationId();
+        String getStationName();
+        Long getLineId();
+        String getLineName();
+    }
+
+    interface PlaceCourseView {
+        Long getCourseId();
+        String getName();
         Long getStationId();
         String getStationName();
         Long getLineId();

@@ -8,12 +8,14 @@ import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.LineFilterResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.SavedCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseSaveRepository.SavedCourseView;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +25,16 @@ import java.util.stream.IntStream;
 
 @Component
 public class CourseConverter {
+
+    // 소요시간 구간. 여행기록 작성 화면의 "코스 시간" 선택지(3~4시간/반나절/하루종일)와 같은 값을 쓴다.
+    // 추후 여행일지의 travel_duration으로 갈아끼울 때 값이 그대로 대응되도록 맞춰 둔 것이다.
+    private static final String DURATION_SHORT = "SHORT";
+    private static final String DURATION_HALF_DAY = "HALF_DAY";
+    private static final String DURATION_FULL_DAY = "FULL_DAY";
+
+    // 장소 수 → 구간 경계. 기획 확인 후 조정될 수 있어 분리해 뒀다.
+    private static final int HALF_DAY_MIN_PLACES = 5;
+    private static final int FULL_DAY_MIN_PLACES = 8;
 
     public Course toCourse(Long memberId, CourseCreateRequest request) {
         return Course.builder()
@@ -98,6 +110,40 @@ public class CourseConverter {
                 .map(line -> new LineFilterResponse(line.getLineId(), line.getLineName()))
                 .toList();
         return new MyCourseListResponse(lineFilters, cards, nextCursor, hasNext);
+    }
+
+    public PlaceCourseResponse toPlaceCourseResponse(PlaceCourseView course, int placeCount,
+                                                     List<String> tags, String imageUrl) {
+        return new PlaceCourseResponse(
+                course.getCourseId(),
+                course.getName(),
+                course.getStationId(),
+                course.getStationName(),
+                course.getLineId(),
+                course.getLineName(),
+                placeCount,
+                estimateDuration(placeCount),
+                tags,
+                imageUrl
+        );
+    }
+
+    /**
+     * 장소 수로 소요시간 구간을 추정한다 (3~4곳 → 3~4시간, 5~7곳 → 반나절, 8곳 이상 → 하루종일).
+     * <p>
+     * 원래는 실제로 다녀온 사람이 여행기록에 남긴 "코스 시간"을 쓰는 게 맞다.
+     * 이 목록은 공개된 여행일지가 있는 코스만 노출하므로 그 값이 항상 존재한다.
+     * 다만 아직 여행일지에 소요시간 컬럼이 없어, 들어오기 전까지만 장소 수로 대신 추정한다.
+     * 그때 값만 갈아끼우면 되도록 여행기록 선택지와 같은 구간을 쓴다.
+     */
+    private String estimateDuration(int placeCount) {
+        if (placeCount >= FULL_DAY_MIN_PLACES) {
+            return DURATION_FULL_DAY;
+        }
+        if (placeCount >= HALF_DAY_MIN_PLACES) {
+            return DURATION_HALF_DAY;
+        }
+        return DURATION_SHORT;
     }
 
     public List<PopularCourseResponse> toPopularResponses(List<Course> courses, Set<Long> savedCourseIds) {

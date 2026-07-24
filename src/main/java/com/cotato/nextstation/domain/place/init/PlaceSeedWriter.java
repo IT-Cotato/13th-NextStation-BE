@@ -39,15 +39,12 @@ class PlaceSeedWriter {
 
     private static final Map<String, PlaceTagName> PLACE_TAG_BY_TEXT = Map.ofEntries(
             Map.entry("자연과함께", PlaceTagName.NATURE),
-            Map.entry("문화공간", PlaceTagName.ART_SPACE),
-            Map.entry("동네탐색", PlaceTagName.LOCAL_EXPLORE),
             Map.entry("골목여행", PlaceTagName.ALLEY_TRIP),
             Map.entry("시장구경", PlaceTagName.MARKET),
             Map.entry("핫플레이스", PlaceTagName.HOTPLACE),
             Map.entry("사진찍기좋은", PlaceTagName.PHOTO_SPOT),
             Map.entry("쇼핑", PlaceTagName.SHOPPING),
             Map.entry("체험", PlaceTagName.EXPERIENCE),
-            Map.entry("카페투어", PlaceTagName.CAFE_TOUR),
             Map.entry("가성비", PlaceTagName.BUDGET),
             Map.entry("실내위주", PlaceTagName.INDOOR)
     );

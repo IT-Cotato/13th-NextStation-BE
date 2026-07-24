@@ -7,13 +7,17 @@ import com.cotato.nextstation.domain.auth.dto.request.SignupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupVerificationSendRequest;
 import com.cotato.nextstation.domain.auth.dto.response.LoginResponse;
 import com.cotato.nextstation.domain.auth.dto.response.ProfileSetupResponse;
+import com.cotato.nextstation.domain.auth.dto.response.ReissueResponse;
 import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
+import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.service.command.EmailVerificationCommandService;
 import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
 import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
 import com.cotato.nextstation.domain.auth.service.query.LoginResult;
+import com.cotato.nextstation.domain.auth.service.query.ReissueResult;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.util.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,9 +28,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -40,6 +46,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+    
+    @Value("${auth.refresh-cookie.secure}")
+    private boolean refreshCookieSecure;
+
+    @Value("${auth.refresh-cookie.same-site}")
+    private String refreshCookieSameSite;
 
     private final EmailVerificationCommandService emailVerificationCommandService;
     private final SignupCommandService signupCommandService;
@@ -174,13 +186,38 @@ public class AuthController {
 
         ResponseCookie refreshTokenCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, result.refreshToken())
                 .httpOnly(true)
-                .secure(true)
-                .sameSite("None")
+                .secure(refreshCookieSecure)
+                .sameSite(refreshCookieSameSite)
                 .path("/")
                 .maxAge(LoginQueryService.REFRESH_TOKEN_EXPIRATION)
                 .build();
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
 
         return CommonResponse.success(new LoginResponse(result.memberId(), result.accessToken()));
+    }
+
+    @Operation(
+            summary = "액세스 토큰 재발급",
+            description = """
+                    로그인 시 발급된 httpOnly 쿠키(`refreshToken`)를 검증해 새 accessToken을 발급한다.
+                    - accessToken이 만료(401)되면 이 API를 호출해 새 accessToken을 받고, 원래 요청을 재시도하면 된다.
+                    - Swagger UI에서 테스트하려면 우측 상단 자물쇠(Authorize) 버튼을 눌러 로그인 API 응답 쿠키의 refreshToken 값을(접두사 없이) 넣으면 된다.
+                    """
+    )
+    @SecurityRequirement(name = "refreshTokenAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "재발급 성공"),
+            @ApiResponse(responseCode = "401", description = "refreshToken 누락, 위변조, purpose 불일치, 또는 만료 (`AuthErrorCode.INVALID_REFRESH_TOKEN`, `AuthErrorCode.REFRESH_TOKEN_EXPIRED`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`AuthErrorCode.MEMBER_NOT_FOUND`)"),
+    })
+    @PostMapping("/reissue")
+    public CommonResponse<ReissueResponse> reissue(
+            @Parameter(hidden = true)
+            @CookieValue(name = REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken) {
+        if (refreshToken == null) {
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        ReissueResult result = loginQueryService.reissue(refreshToken);
+        return CommonResponse.success(new ReissueResponse(result.accessToken()));
     }
 }
