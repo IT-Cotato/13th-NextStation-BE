@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.course.repository;
 
 import com.cotato.nextstation.domain.course.entity.Course;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -66,7 +67,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 본인 코스이므로 공개 여부는 걸지 않는다. 삭제된 코스는 @SQLRestriction이 제외한다.
     // 호선/역 필터는 둘 다 선택 사항이라 파라미터가 null이면 조건을 건너뛴다.
     @Query("SELECT c.id AS courseId, c.name AS name, c.createdAt AS createdAt, " +
-            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
@@ -81,7 +83,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     // 다음 페이지. 생성 시각이 같을 수 있어 id를 tie-breaker로 함께 비교한다.
     @Query("SELECT c.id AS courseId, c.name AS name, c.createdAt AS createdAt, " +
-            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
@@ -100,7 +103,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 내 코스가 하나라도 있는 호선. 코스 없는 호선 칩을 비활성화하는 데 쓴다.
     // 현재 필터와 무관하게 전체 기준으로 조회해야 필터를 바꿔 끼울 수 있다.
     // 페이징으로는 전체 목록을 볼 수 없어 서버가 따로 알려준다.
-    @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName " +
+    @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
             "JOIN Station s ON s.id = c.stationId " +
             "JOIN s.drawLine l " +
@@ -130,6 +133,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         String getStationName();
         Long getLineId();
         String getLineName();
+        LineCode getLineCode();
     }
 
     interface PlaceCourseView {
@@ -144,5 +148,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     interface LineView {
         Long getLineId();
         String getLineName();
+        LineCode getLineCode();
     }
 }

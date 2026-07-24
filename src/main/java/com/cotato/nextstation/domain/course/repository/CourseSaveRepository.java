@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.course.repository;
 
 import com.cotato.nextstation.domain.course.entity.CourseSave;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -52,7 +53,8 @@ public interface CourseSaveRepository extends JpaRepository<CourseSave, Long> {
     // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
     // 대표 호선이 없는 역도 있을 수 있어 LEFT JOIN으로 둔다.
     @Query("SELECT cs.id AS saveId, cs.createdAt AS savedAt, c.id AS courseId, c.name AS name, " +
-            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CourseSave cs " +
             "JOIN Course c ON c.id = cs.courseId " +
             "JOIN Journal j ON j.id = c.journalId " +
@@ -64,7 +66,8 @@ public interface CourseSaveRepository extends JpaRepository<CourseSave, Long> {
 
     // 다음 페이지. 정렬 기준이 스크랩 시각이라 커서도 코스 id가 아닌 course_save.id를 tie-breaker로 쓴다.
     @Query("SELECT cs.id AS saveId, cs.createdAt AS savedAt, c.id AS courseId, c.name AS name, " +
-            "s.id AS stationId, s.stationName AS stationName, l.id AS lineId, l.name AS lineName " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CourseSave cs " +
             "JOIN Course c ON c.id = cs.courseId " +
             "JOIN Journal j ON j.id = c.journalId " +
@@ -87,5 +90,6 @@ public interface CourseSaveRepository extends JpaRepository<CourseSave, Long> {
         String getStationName();
         Long getLineId();
         String getLineName();
+        LineCode getLineCode();
     }
 }
