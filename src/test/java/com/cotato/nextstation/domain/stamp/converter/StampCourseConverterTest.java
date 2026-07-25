@@ -42,7 +42,7 @@ class StampCourseConverterTest {
         assertThat(response.courses().get(0).courseId()).isEqualTo(1L);
         assertThat(response.courses().get(0).name()).isEqualTo("보문역 코스");
         assertThat(response.courses().get(0).viewCount()).isEqualTo(300);
-        assertThat(response.courses().get(0).saveCount()).isEqualTo(128);
+        assertThat(response.courses().get(0).likeCount()).isEqualTo(128);
     }
 
     @Test
