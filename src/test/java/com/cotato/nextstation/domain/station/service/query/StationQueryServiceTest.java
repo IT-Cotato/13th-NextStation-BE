@@ -81,10 +81,11 @@ class StationQueryServiceTest {
         // when
         List<StationSummaryResponse> result = stationQueryService.searchByName("왕십리역");
 
-        // then
+        // then: id·name·code가 projection→service 변환에서 모두 올바르게 매핑되는지 객체 전체로 검증한다
         assertThat(result).containsExactly(expected);
-        assertThat(linesCaptor.getValue()).extracting(LineSummaryResponse::code)
-                .containsExactly(LineCode.LINE_2, LineCode.LINE_5);
+        assertThat(linesCaptor.getValue()).containsExactly(
+                new LineSummaryResponse(2L, "2호선", LineCode.LINE_2),
+                new LineSummaryResponse(5L, "5호선", LineCode.LINE_5));
     }
 
     @Test

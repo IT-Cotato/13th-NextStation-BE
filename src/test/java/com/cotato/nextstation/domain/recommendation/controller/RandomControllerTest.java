@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -72,6 +73,20 @@ class RandomControllerTest {
                 .andExpect(jsonPath("$.data.station.line.code").value("LINE_1"))
                 .andExpect(jsonPath("$.data.course.name").value("제기동역 환승여행 코스"))
                 .andExpect(jsonPath("$.data.course.places[0].categoryCode").value("CULTURE"));
+    }
+
+    @Test
+    @DisplayName("대표 호선이 없는 역은 line 필드가 생략되지 않고 null로 내려간다")
+    void drawRandom_nullLine() throws Exception {
+        RandomRecommendationResponse response = new RandomRecommendationResponse(
+                new RecommendedStationResponse(10L, "제기동역", "제기동역 소개", "경동시장 구경하기", null),
+                new CoursePreviewResponse("제기동역 환승여행 코스", List.of()));
+        given(recommendationCommandService.drawRandom(eq(1L))).willReturn(response);
+
+        mockMvc.perform(post("/api/v1/random").header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.station.line").hasJsonPath())
+                .andExpect(jsonPath("$.data.station.line").value(nullValue()));
     }
 
     @Test

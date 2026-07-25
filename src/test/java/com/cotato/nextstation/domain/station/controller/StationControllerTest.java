@@ -24,6 +24,7 @@ import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -105,6 +106,9 @@ class StationControllerTest {
 
         mockMvc.perform(get("/api/v1/stations/{stationId}/places", 300L))
                 .andExpect(status().isOk())
+                // 대표 호선이 없어도 line 필드는 생략되지 않고 JSON null로 존재해야 한다
+                .andExpect(jsonPath("$.data.line").hasJsonPath())
+                .andExpect(jsonPath("$.data.line").value(nullValue()))
                 .andExpect(jsonPath("$.data.categories").isEmpty());
     }
 

@@ -19,6 +19,7 @@ import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -56,6 +57,19 @@ class PlaceCourseControllerTest {
                 .andExpect(jsonPath("$.data[0].travelDuration").value("SHORT"))
                 .andExpect(jsonPath("$.data[0].tags[0]").value("자연과함께"))
                 .andExpect(jsonPath("$.data[0].imageUrl").value("cover.jpg"));
+    }
+
+    @Test
+    @DisplayName("대표 호선이 없는 역의 코스는 line 필드가 생략되지 않고 null로 내려간다")
+    void getCoursesByPlace_nullLine() throws Exception {
+        given(courseQueryService.getCoursesByPlace(2L)).willReturn(List.of(
+                new PlaceCourseResponse(11L, "코스", 200L, "역이름",
+                        null, 3, "SHORT", List.of(), null)));
+
+        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 2L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].line").hasJsonPath())
+                .andExpect(jsonPath("$.data[0].line").value(nullValue()));
     }
 
     @Test
