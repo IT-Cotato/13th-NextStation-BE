@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -61,17 +62,36 @@ public class CourseSaveCommandService {
      * 하나도 저장돼 있지 않을 때만 예외로 알린다.
      */
     public void cancelSaves(Long memberId, List<Long> courseIds) {
-        // 단건과 같은 이유로, 미리 조회한 목록이 아니라 실제로 지워진 코스만 저장 수를 줄인다.
-        List<Long> deletedCourseIds = courseIds.stream()
-                .distinct()
-                .filter(courseId -> courseSaveRepository.deleteByMemberIdAndCourseId(memberId, courseId) > 0)
-                .toList();
+        List<Long> targetCourseIds = courseIds.stream().distinct().toList();
 
-        if (deletedCourseIds.isEmpty()) {
+        // 저장 수를 먼저 줄인다. 삭제 뒤에는 "실제로 스크랩돼 있었는지"를 알 수 없어
+        // 이미 취소된 코스까지 함께 깎이기 때문이다(단건 취소와 같은 이유).
+        int decreasedCount = courseRepository.decreaseSaveCountAll(memberId, targetCourseIds);
+        if (decreasedCount == 0) {
             throw new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND);
         }
 
-        courseRepository.decreaseSaveCountAll(deletedCourseIds);
+        courseSaveRepository.deleteByMemberIdAndCourseIdIn(memberId, targetCourseIds);
+    }
+
+    /**
+     * 스크랩 전체 취소(저장 탭의 "모두 선택").
+     * 갤러리의 전체 선택처럼 아직 화면에 불러오지 않은 스크랩까지 대상에 넣어야 하므로,
+     * 프론트가 가진 id 목록이 아니라 서버가 대상을 다시 조회한다.
+     * 전체 선택 후 일부만 해제한 경우는 exceptCourseIds로 받는다(해제는 보이는 항목에서만 가능).
+     */
+    public void cancelAllSaves(Long memberId, List<Long> exceptCourseIds) {
+        Set<Long> excluded = exceptCourseIds == null ? Set.of() : Set.copyOf(exceptCourseIds);
+
+        List<Long> targetCourseIds = courseSaveRepository.findVisibleSavedCourseIds(memberId).stream()
+                .filter(courseId -> !excluded.contains(courseId))
+                .toList();
+
+        if (targetCourseIds.isEmpty()) {
+            throw new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND);
+        }
+
+        cancelSaves(memberId, targetCourseIds);
     }
 
     // 코스 삭제(soft delete). 본인 코스만 삭제할 수 있다.
