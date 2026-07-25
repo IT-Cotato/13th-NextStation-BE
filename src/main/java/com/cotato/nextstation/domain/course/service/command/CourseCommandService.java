@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,15 @@ public class CourseCommandService {
         }
     }
 
+    // 요청한 placeIds가 코스의 장소 구성과 정확히 일치하는지 검증한다 (개수·구성 모두).
+    // 순서만 바꿀 수 있고 장소를 빼거나 더할 수는 없어서, 순서 수정과 복제가 같은 규칙을 공유한다.
+    private void validateSamePlaceComposition(Collection<Long> coursePlaceIds, List<Long> requestedPlaceIds) {
+        if (coursePlaceIds.size() != requestedPlaceIds.size()
+                || !new HashSet<>(coursePlaceIds).equals(new HashSet<>(requestedPlaceIds))) {
+            throw new CustomException(CourseErrorCode.INVALID_COURSE_PLACES);
+        }
+    }
+
     // 복제 대상은 "타인의 공개 코스"로 제한한다. 스크랩과 같은 조건이다.
     private Course findCopyableCourse(Long memberId, Long courseId) {
         // 삭제된 코스는 Course의 @SQLRestriction 으로 조회에서 자동 제외된다.
@@ -110,9 +120,7 @@ public class CourseCommandService {
         }
 
         validateDistinctPlaces(requestedPlaceIds);
-        if (!new HashSet<>(originalPlaceIds).equals(new HashSet<>(requestedPlaceIds))) {
-            throw new CustomException(CourseErrorCode.INVALID_COURSE_PLACES);
-        }
+        validateSamePlaceComposition(originalPlaceIds, requestedPlaceIds);
         return requestedPlaceIds;
     }
 
@@ -129,10 +137,7 @@ public class CourseCommandService {
     private void reorder(List<CoursePlace> coursePlaces, List<Long> orderedPlaceIds) {
         Map<Long, CoursePlace> byPlaceId = coursePlaces.stream()
                 .collect(Collectors.toMap(CoursePlace::getPlaceId, Function.identity()));
-        if (byPlaceId.size() != orderedPlaceIds.size()
-                || !byPlaceId.keySet().equals(new HashSet<>(orderedPlaceIds))) {
-            throw new CustomException(CourseErrorCode.INVALID_COURSE_PLACES);
-        }
+        validateSamePlaceComposition(byPlaceId.keySet(), orderedPlaceIds);
         for (int index = 0; index < orderedPlaceIds.size(); index++) {
             byPlaceId.get(orderedPlaceIds.get(index)).updateOrderNum(index + 1);
         }
