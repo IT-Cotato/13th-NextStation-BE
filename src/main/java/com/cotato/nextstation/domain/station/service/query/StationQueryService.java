@@ -104,20 +104,6 @@ public class StationQueryService {
                 .orElseGet(List::of);
     }
 
-    // 출발역 목록 등에서 stationId들로 역 요약을 일괄 조회할 때 사용
-    public Map<Long, StationSummaryResponse> getSummariesByStationIds(Collection<Long> stationIds) {
-        if (stationIds.isEmpty()) {
-            return Map.of();
-        }
-        Map<Long, List<LineSummaryResponse>> linesByStation = groupLines(stationIds);
-        return stationRepository.findAllById(stationIds).stream()
-                .collect(Collectors.toMap(
-                        Station::getId,
-                        station -> stationConverter.toSummaryResponse(
-                                station, linesByStation.getOrDefault(station.getId(), List.of()))
-                ));
-    }
-
     // 여러 역의 소속 노선을 stationId 기준으로 묶는다.
     private Map<Long, List<LineSummaryResponse>> groupLines(Collection<Long> stationIds) {
         return stationLineRepository.findLinesByStationIdIn(stationIds).stream()
