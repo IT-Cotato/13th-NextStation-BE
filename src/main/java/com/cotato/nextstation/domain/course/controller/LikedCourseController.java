@@ -39,7 +39,7 @@ public class LikedCourseController {
             summary = "좋아요한 코스 목록 조회",
             description = """
                     저장 탭에서 내가 좋아요한 코스를 최근 좋아요순으로 조회한다.
-                    - 원본 코스가 삭제되거나 비공개로 바뀌면 목록에서 빠진다(좋아요은 원본 참조).
+                    - 원본 코스가 삭제되거나 비공개로 바뀌면 목록에서 빠진다(좋아요는 원본 참조).
                     - 화면에 필터 칩이 없어 호선/역 필터를 받지 않는다.
                     - `nextCursor`를 그대로 `cursor`에 넣어 다음 페이지를 요청한다.
                     """
@@ -66,12 +66,12 @@ public class LikedCourseController {
                     - 갤러리의 전체 선택처럼 **아직 화면에 불러오지 않은 좋아요까지** 취소된다.
                       그래서 코스 ID를 받지 않고 서버가 대상을 다시 조회한다.
                     - 전체 선택 후 일부를 해제했다면 그 코스 ID를 `exceptCourseIds`로 보낸다.
-                    - 목록에 보이는 좋아요만 대상이다(원본이 비공개로 바뀐 좋아요은 취소되지 않는다).
+                    - 목록에 보이는 좋아요만 대상이다(원본이 비공개로 바뀐 좋아요는 취소되지 않는다).
                     """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "취소 성공 (data 없음)"),
-            @ApiResponse(responseCode = "404", description = "취소할 좋아요이 없음 (`CourseErrorCode.COURSE_LIKE_NOT_FOUND`)"),
+            @ApiResponse(responseCode = "404", description = "취소할 좋아요가 없음 (`CourseErrorCode.COURSE_LIKE_NOT_FOUND`)"),
     })
     @DeleteMapping("/all")
     public CommonResponse<Void> cancelAllCourseLikes(

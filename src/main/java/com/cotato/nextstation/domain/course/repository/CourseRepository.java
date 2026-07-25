@@ -37,7 +37,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 다중/전체 취소용. 실제로 좋아요돼 있는 코스만 좋아요 수를 줄이고, 지운 개수를 돌려준다.
      * <p>
      * 벌크 삭제는 어떤 코스가 지워졌는지 알려주지 않으므로(MySQL에 DELETE ... RETURNING이 없다),
-     * 대신 EXISTS로 "지금 좋아요이 남아 있는 코스"만 골라 감소시킨다.
+     * 대신 EXISTS로 "지금 좋아요가 남아 있는 코스"만 골라 감소시킨다.
      * 이미 취소된 코스가 목록에 섞여 있어도 좋아요 수가 과다 감소하지 않는다.
      * 반드시 삭제보다 먼저 실행해야 한다. 삭제 후에는 EXISTS가 전부 거짓이 된다.
      */

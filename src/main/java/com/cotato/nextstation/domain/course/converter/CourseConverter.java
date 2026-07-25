@@ -93,15 +93,15 @@ public class CourseConverter {
                 .toList();
     }
 
-    public LikedCourseListResponse toSavedListResponse(List<LikedCourseView> likedCourses,
+    public LikedCourseListResponse toLikedListResponse(List<LikedCourseView> likedCourses,
                                                        String nextCursor, boolean hasNext) {
         List<CourseCardResponse> cards = likedCourses.stream()
-                .map(saved -> new CourseCardResponse(
-                        saved.getCourseId(),
-                        saved.getName(),
-                        saved.getStationId(),
-                        saved.getStationName(),
-                        toLine(saved.getLineId(), saved.getLineName(), saved.getLineCode())))
+                .map(liked -> new CourseCardResponse(
+                        liked.getCourseId(),
+                        liked.getName(),
+                        liked.getStationId(),
+                        liked.getStationName(),
+                        toLine(liked.getLineId(), liked.getLineName(), liked.getLineCode())))
                 .toList();
         return new LikedCourseListResponse(cards, nextCursor, hasNext);
     }

@@ -24,7 +24,7 @@ public class CourseLikeCommandService {
     private final CourseRepository courseRepository;
     private final CourseLikeRepository courseLikeRepository;
 
-    // 코스 좋아요. 좋아요은 "타인의 공개 코스"만 대상으로 한다.
+    // 코스 좋아요. 좋아요는 "타인의 공개 코스"만 대상으로 한다.
     public void likeCourse(Long memberId, Long courseId) {
         validateLikeable(memberId, courseId);
 
@@ -64,16 +64,17 @@ public class CourseLikeCommandService {
     public void cancelLikes(Long memberId, List<Long> courseIds) {
         List<Long> targetCourseIds = courseIds.stream().distinct().toList();
 
-        // 좋아요 수 감소를 삭제보다 먼저 실행한다.
-        // decreaseLikeCountAll은 "이 회원의 좋아요가 실제로 남아 있는 코스"만 EXISTS로 골라 감소시키므로,
-        // 이미 취소된 코스가 섞여 있어도 과다 감소하지 않는다(다른 회원의 좋아요가 남은 코스도 안전).
-        // 삭제를 먼저 하면 EXISTS가 전부 거짓이 되어 감소가 일어나지 않으므로 순서가 중요하다.
-        int decreasedCount = courseRepository.decreaseLikeCountAll(memberId, targetCourseIds);
-        if (decreasedCount == 0) {
+        // 취소할 좋아요 행을 먼저 비관적 잠금으로 확보한다.
+        // 같은 회원이 같은 코스를 동시에 취소해도, 한 요청이 잠금을 잡아 직렬화되므로
+        // 뒤 요청은 앞 요청이 삭제·커밋한 뒤라 빈 결과가 되어 좋아요 수가 중복 감소하지 않는다.
+        List<Long> lockedCourseIds = courseLikeRepository.findLikedCourseIdsForUpdate(memberId, targetCourseIds);
+        if (lockedCourseIds.isEmpty()) {
             throw new CustomException(CourseErrorCode.COURSE_LIKE_NOT_FOUND);
         }
 
-        courseLikeRepository.deleteByMemberIdAndCourseIdIn(memberId, targetCourseIds);
+        // 확보한 행만 정확히 감소·삭제한다. 잠금으로 "지운 것만 감소" 원칙이 보장된다.
+        courseRepository.decreaseLikeCountAll(memberId, lockedCourseIds);
+        courseLikeRepository.deleteByMemberIdAndCourseIdIn(memberId, lockedCourseIds);
     }
 
     /**

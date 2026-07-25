@@ -81,7 +81,7 @@ public class CourseQueryService {
             LikedCourseView last = pageContent.get(pageContent.size() - 1);
             nextCursor = new CursorData(last.getLikeId(), null, last.getLikedAt()).encode();
         }
-        return courseConverter.toSavedListResponse(pageContent, nextCursor, hasNext);
+        return courseConverter.toLikedListResponse(pageContent, nextCursor, hasNext);
     }
 
     private List<LikedCourseView> fetchLikedCourses(Long memberId, CursorData cursorData, Pageable pageable) {
