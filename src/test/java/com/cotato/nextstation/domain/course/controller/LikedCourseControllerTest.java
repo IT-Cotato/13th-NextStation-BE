@@ -168,7 +168,7 @@ class LikedCourseControllerTest {
     }
 
     @Test
-    @DisplayName("취소할 좋아요이 없으면 404를 반환한다")
+    @DisplayName("취소할 좋아요가 없으면 404를 반환한다")
     void cancelAllCourseLikes_nothingToCancel() throws Exception {
         willThrow(new CustomException(CourseErrorCode.COURSE_LIKE_NOT_FOUND))
                 .given(courseLikeCommandService).cancelAllLikes(eq(1L), any());
@@ -181,7 +181,7 @@ class LikedCourseControllerTest {
 
     @Test
     @DisplayName("선택한 코스가 모두 좋아요돼 있지 않으면 404를 반환한다")
-    void cancelCourseLikes_noneSaved() throws Exception {
+    void cancelCourseLikes_noneLiked() throws Exception {
         willThrow(new CustomException(CourseErrorCode.COURSE_LIKE_NOT_FOUND))
                 .given(courseLikeCommandService).cancelLikes(eq(1L), any());
 

@@ -274,7 +274,7 @@ class CourseControllerTest {
 
     @Test
     @DisplayName("좋아요하지 않은 코스를 취소하면 404를 반환한다")
-    void cancelCourseLike_notSaved() throws Exception {
+    void cancelCourseLike_notLiked() throws Exception {
         willThrow(new CustomException(CourseErrorCode.COURSE_LIKE_NOT_FOUND))
                 .given(courseLikeCommandService).cancelLike(eq(1L), eq(1L));
 

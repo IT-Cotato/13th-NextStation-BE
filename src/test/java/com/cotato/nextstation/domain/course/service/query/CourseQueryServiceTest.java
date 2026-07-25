@@ -259,7 +259,7 @@ class CourseQueryServiceTest {
     // ---------- 저장 탭 - 좋아요한 코스 목록 ----------
 
     // 프로젝션은 인터페이스라 mock으로 만든다. 스터빙이 들어 있으므로 given(...) 밖에서 미리 생성한다.
-    private LikedCourseView savedView(Long likeId, Long courseId, LocalDateTime likedAt) {
+    private LikedCourseView likedView(Long likeId, Long courseId, LocalDateTime likedAt) {
         LikedCourseView view = mock(LikedCourseView.class);
         lenient().when(view.getLikeId()).thenReturn(likeId);
         lenient().when(view.getCourseId()).thenReturn(courseId);
@@ -280,7 +280,7 @@ class CourseQueryServiceTest {
         // given: size 2를 요청했는데 3개가 조회되면 다음 페이지가 있다는 뜻이다
         LocalDateTime likedAt = LocalDateTime.of(2026, 7, 23, 12, 0);
         List<LikedCourseView> views = List.of(
-                savedView(30L, 3L, likedAt), savedView(20L, 2L, likedAt), savedView(10L, 1L, likedAt));
+                likedView(30L, 3L, likedAt), likedView(20L, 2L, likedAt), likedView(10L, 1L, likedAt));
         given(courseLikeRepository.findLikedCourses(eq(1L), any(Pageable.class))).willReturn(views);
 
         // when
@@ -293,7 +293,7 @@ class CourseQueryServiceTest {
 
         ArgumentCaptor<List<LikedCourseView>> contentCaptor = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toSavedListResponse(contentCaptor.capture(), cursorCaptor.capture(), eq(true));
+        verify(courseConverter).toLikedListResponse(contentCaptor.capture(), cursorCaptor.capture(), eq(true));
         assertThat(contentCaptor.getValue()).hasSize(2);
 
         // 다음 커서는 마지막 항목 기준(좋아요 시각 + course_like.id)으로 만들어진다
@@ -306,15 +306,15 @@ class CourseQueryServiceTest {
     @Test
     @DisplayName("마지막 페이지면 다음 커서 없이 응답한다")
     void getLikedCourses_lastPage() {
-        // given: savedView가 내부에서 스터빙하므로 given(...) 안에서 호출하면 중첩 스터빙이 된다. 미리 만들어 둔다.
-        LikedCourseView view = savedView(10L, 1L, LocalDateTime.of(2026, 7, 23, 12, 0));
+        // given: likedView가 내부에서 스터빙하므로 given(...) 안에서 호출하면 중첩 스터빙이 된다. 미리 만들어 둔다.
+        LikedCourseView view = likedView(10L, 1L, LocalDateTime.of(2026, 7, 23, 12, 0));
         given(courseLikeRepository.findLikedCourses(eq(1L), any(Pageable.class))).willReturn(List.of(view));
 
         // when
         courseQueryService.getLikedCourses(1L, null, 2);
 
         // then
-        verify(courseConverter).toSavedListResponse(any(), eq(null), eq(false));
+        verify(courseConverter).toLikedListResponse(any(), eq(null), eq(false));
     }
 
     @Test

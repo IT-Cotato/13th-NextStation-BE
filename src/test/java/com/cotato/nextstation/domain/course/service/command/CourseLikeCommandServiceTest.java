@@ -157,9 +157,10 @@ class CourseLikeCommandServiceTest {
     }
 
     @Test
-    @DisplayName("좋아요하지 않은 코스를 취소하면 예외가 발생하고 좋아요 수가 줄지 않는다")
-    void cancelLike_notSaved() {
-        // given: 지워진 행이 없다 = 좋아요돼 있지 않았다
+    @DisplayName("좋아요하지 않은(또는 동시 취소로 이미 지워진) 코스를 취소하면 예외가 발생하고 좋아요 수가 줄지 않는다")
+    void cancelLike_notLiked() {
+        // given: 지워진 행이 없다 = 좋아요돼 있지 않았거나, 동시 취소로 다른 요청이 먼저 지웠다.
+        //        어느 쪽이든 삭제 영향 행 수가 0이라 좋아요 수를 중복으로 깎지 않는다.
         given(courseLikeRepository.deleteByMemberIdAndCourseId(1L, 1L)).willReturn(0);
 
         // when & then
@@ -170,55 +171,61 @@ class CourseLikeCommandServiceTest {
     }
 
     @Test
-    @DisplayName("동시 취소로 이미 지워진 뒤라면 좋아요 수를 줄이지 않는다")
-    void cancelLike_alreadyDeletedByConcurrentRequest() {
-        // given: 조회 시점엔 있었더라도 삭제 시점에 다른 요청이 먼저 지웠다면 0행이 반환된다
-        given(courseLikeRepository.deleteByMemberIdAndCourseId(1L, 1L)).willReturn(0);
-
-        // when & then: 좋아요 수가 중복으로 깎이지 않는다
-        assertThatThrownBy(() -> courseLikeCommandService.cancelLike(1L, 1L))
-                .isInstanceOf(CustomException.class);
-        verify(courseRepository, never()).decreaseLikeCount(any());
-    }
-
-    @Test
-    @DisplayName("여러 좋아요를 취소하면 좋아요 수를 먼저 줄이고 한 번에 삭제한다")
+    @DisplayName("여러 좋아요를 취소하면 잠금으로 확보한 코스만 감소·삭제한다")
     void cancelLikes_success() {
-        // given: 1,2,3 중 2는 이미 취소돼 있어 좋아요 수는 2개만 줄어든다
-        given(courseRepository.decreaseLikeCountAll(1L, List.of(1L, 2L, 3L))).willReturn(2);
+        // given: 1,2,3을 요청했지만 2는 이미 취소돼 있어 잠금으로 확보되는 건 1,3뿐이다
+        given(courseLikeRepository.findLikedCourseIdsForUpdate(1L, List.of(1L, 2L, 3L)))
+                .willReturn(List.of(1L, 3L));
 
         // when
         courseLikeCommandService.cancelLikes(1L, List.of(1L, 2L, 3L));
 
-        // then: 삭제는 벌크로 한 번만 나간다
-        verify(courseLikeRepository).deleteByMemberIdAndCourseIdIn(1L, List.of(1L, 2L, 3L));
+        // then: 확보된 1,3만 정확히 감소·삭제된다 (이미 취소된 2는 대상에서 빠진다)
+        verify(courseRepository).decreaseLikeCountAll(1L, List.of(1L, 3L));
+        verify(courseLikeRepository).deleteByMemberIdAndCourseIdIn(1L, List.of(1L, 3L));
     }
 
     @Test
-    @DisplayName("좋아요 수 감소가 삭제보다 먼저 실행된다")
-    void cancelLikes_decreaseBeforeDelete() {
-        // given: 삭제 후에는 좋아요이 남아 있는지 알 수 없어 순서가 뒤바뀌면 좋아요 수가 과다 감소한다
-        given(courseRepository.decreaseLikeCountAll(1L, List.of(1L))).willReturn(1);
+    @DisplayName("취소 대상을 잠금으로 확보한 뒤 감소·삭제한다")
+    void cancelLikes_lockBeforeMutation() {
+        // given: 동시 취소로 좋아요 수가 중복 감소하지 않도록, 확보(잠금) → 감소 → 삭제 순으로 진행한다
+        given(courseLikeRepository.findLikedCourseIdsForUpdate(1L, List.of(1L))).willReturn(List.of(1L));
 
         // when
         courseLikeCommandService.cancelLikes(1L, List.of(1L));
 
         // then
-        InOrder inOrder = inOrder(courseRepository, courseLikeRepository);
+        InOrder inOrder = inOrder(courseLikeRepository, courseRepository);
+        inOrder.verify(courseLikeRepository).findLikedCourseIdsForUpdate(1L, List.of(1L));
         inOrder.verify(courseRepository).decreaseLikeCountAll(1L, List.of(1L));
         inOrder.verify(courseLikeRepository).deleteByMemberIdAndCourseIdIn(1L, List.of(1L));
     }
 
     @Test
+    @DisplayName("확보된 좋아요가 하나도 없으면 예외가 발생하고 감소·삭제하지 않는다")
+    void cancelLikes_noneLocked() {
+        // given: 요청한 코스가 모두 이미 취소된 상태 (동시 취소 등)
+        given(courseLikeRepository.findLikedCourseIdsForUpdate(1L, List.of(1L, 2L))).willReturn(List.of());
+
+        // when & then
+        assertThatThrownBy(() -> courseLikeCommandService.cancelLikes(1L, List.of(1L, 2L)))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_LIKE_NOT_FOUND.getMessage());
+        verify(courseRepository, never()).decreaseLikeCountAll(any(), any());
+        verify(courseLikeRepository, never()).deleteByMemberIdAndCourseIdIn(any(), any());
+    }
+
+    @Test
     @DisplayName("같은 코스를 중복으로 보내도 한 번만 처리한다")
     void cancelLikes_duplicateIds() {
-        // given
-        given(courseRepository.decreaseLikeCountAll(1L, List.of(1L))).willReturn(1);
+        // given: 중복 제거된 목록으로 잠금 조회가 호출된다
+        given(courseLikeRepository.findLikedCourseIdsForUpdate(1L, List.of(1L))).willReturn(List.of(1L));
 
         // when
         courseLikeCommandService.cancelLikes(1L, List.of(1L, 1L, 1L));
 
         // then
+        verify(courseLikeRepository).findLikedCourseIdsForUpdate(1L, List.of(1L));
         verify(courseLikeRepository).deleteByMemberIdAndCourseIdIn(1L, List.of(1L));
     }
 
@@ -227,7 +234,8 @@ class CourseLikeCommandServiceTest {
     void cancelAllLikes_success() {
         // given: 프론트가 첫 페이지 2개만 들고 있어도 서버는 5개 전부를 대상으로 삼는다
         given(courseLikeRepository.findVisibleLikedCourseIds(1L)).willReturn(List.of(1L, 2L, 3L, 4L, 5L));
-        given(courseRepository.decreaseLikeCountAll(any(), any())).willReturn(5);
+        given(courseLikeRepository.findLikedCourseIdsForUpdate(1L, List.of(1L, 2L, 3L, 4L, 5L)))
+                .willReturn(List.of(1L, 2L, 3L, 4L, 5L));
 
         // when
         courseLikeCommandService.cancelAllLikes(1L, null);
@@ -241,7 +249,8 @@ class CourseLikeCommandServiceTest {
     void cancelAllLikes_withExceptions() {
         // given: 전체 선택 뒤 2,4번을 해제한 경우
         given(courseLikeRepository.findVisibleLikedCourseIds(1L)).willReturn(List.of(1L, 2L, 3L, 4L, 5L));
-        given(courseRepository.decreaseLikeCountAll(any(), any())).willReturn(3);
+        given(courseLikeRepository.findLikedCourseIdsForUpdate(1L, List.of(1L, 3L, 5L)))
+                .willReturn(List.of(1L, 3L, 5L));
 
         // when
         courseLikeCommandService.cancelAllLikes(1L, List.of(2L, 4L));
@@ -252,7 +261,7 @@ class CourseLikeCommandServiceTest {
     }
 
     @Test
-    @DisplayName("취소할 좋아요이 없으면 예외가 발생한다")
+    @DisplayName("취소할 좋아요가 없으면 예외가 발생한다")
     void cancelAllLikes_nothingToCancel() {
         // given
         given(courseLikeRepository.findVisibleLikedCourseIds(1L)).willReturn(List.of());
@@ -272,19 +281,6 @@ class CourseLikeCommandServiceTest {
 
         // when & then
         assertThatThrownBy(() -> courseLikeCommandService.cancelAllLikes(1L, List.of(1L, 2L)))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(CourseErrorCode.COURSE_LIKE_NOT_FOUND.getMessage());
-        verify(courseLikeRepository, never()).deleteByMemberIdAndCourseIdIn(any(), any());
-    }
-
-    @Test
-    @DisplayName("선택한 코스가 하나도 좋아요돼 있지 않으면 삭제하지 않고 예외가 발생한다")
-    void cancelLikes_noneSaved() {
-        // given: 좋아요 수가 하나도 안 줄었다 = 남아 있는 좋아요이 없었다
-        given(courseRepository.decreaseLikeCountAll(any(), any())).willReturn(0);
-
-        // when & then
-        assertThatThrownBy(() -> courseLikeCommandService.cancelLikes(1L, List.of(1L, 2L)))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.COURSE_LIKE_NOT_FOUND.getMessage());
         verify(courseLikeRepository, never()).deleteByMemberIdAndCourseIdIn(any(), any());
