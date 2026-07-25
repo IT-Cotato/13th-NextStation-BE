@@ -174,7 +174,7 @@ public class CourseController {
     }
 
     @Operation(
-            summary = "코스 좋아요 취소",
+            summary = "코스 좋아요 단건 취소",
             description = """
                     보관함에서 좋아요한 코스를 제거한다.
                     - 원본 코스는 삭제되지 않는다.
