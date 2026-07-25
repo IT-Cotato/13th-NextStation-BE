@@ -256,7 +256,7 @@ class CourseQueryServiceTest {
                 .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
     }
 
-    // ---------- 좋아요 탭 - 좋아요한 코스 목록 ----------
+    // ---------- 저장 탭 - 좋아요한 코스 목록 ----------
 
     // 프로젝션은 인터페이스라 mock으로 만든다. 스터빙이 들어 있으므로 given(...) 밖에서 미리 생성한다.
     private LikedCourseView savedView(Long likeId, Long courseId, LocalDateTime likedAt) {
@@ -372,7 +372,7 @@ class CourseQueryServiceTest {
         assertThat(pageableCaptor.getValue()).isEqualTo(PageRequest.of(0, 11));
     }
 
-    // ---------- 좋아요 탭 - 내가 만든 코스 목록 ----------
+    // ---------- 저장 탭 - 내가 만든 코스 목록 ----------
 
     @Test
     @DisplayName("내 코스 목록은 호선/역 필터를 그대로 조회 조건으로 넘긴다")

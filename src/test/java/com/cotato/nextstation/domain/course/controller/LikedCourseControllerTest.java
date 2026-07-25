@@ -121,7 +121,7 @@ class LikedCourseControllerTest {
     }
 
     @Test
-    @DisplayName("여러 좋아요을 한 번에 취소하면 200을 반환한다")
+    @DisplayName("여러 좋아요를 한 번에 취소하면 200을 반환한다")
     void cancelCourseLikes_success() throws Exception {
         mockMvc.perform(delete("/api/v1/members/me/liked-courses")
                         .header(MEMBER_ID_HEADER, 1L)

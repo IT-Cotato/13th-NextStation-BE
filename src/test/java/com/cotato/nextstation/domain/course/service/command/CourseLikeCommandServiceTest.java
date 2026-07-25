@@ -144,7 +144,7 @@ class CourseLikeCommandServiceTest {
     }
 
     @Test
-    @DisplayName("좋아요을 취소하면 삭제되고 좋아요 수가 감소한다")
+    @DisplayName("좋아요를 취소하면 삭제되고 좋아요 수가 감소한다")
     void cancelLike_success() {
         // given: 삭제 쿼리가 1행을 지웠다 = 실제로 좋아요돼 있었다
         given(courseLikeRepository.deleteByMemberIdAndCourseId(1L, 1L)).willReturn(1);
@@ -182,7 +182,7 @@ class CourseLikeCommandServiceTest {
     }
 
     @Test
-    @DisplayName("여러 좋아요을 취소하면 좋아요 수를 먼저 줄이고 한 번에 삭제한다")
+    @DisplayName("여러 좋아요를 취소하면 좋아요 수를 먼저 줄이고 한 번에 삭제한다")
     void cancelLikes_success() {
         // given: 1,2,3 중 2는 이미 취소돼 있어 좋아요 수는 2개만 줄어든다
         given(courseRepository.decreaseLikeCountAll(1L, List.of(1L, 2L, 3L))).willReturn(2);
