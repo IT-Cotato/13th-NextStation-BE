@@ -57,15 +57,17 @@ public class CourseLikeCommandService {
     }
 
     /**
-     * 좋아요 다중 취소(좋아요 탭의 선택 모드). 요청한 코스 중 실제로 좋아요돼 있는 것만 취소한다.
+     * 좋아요 다중 취소(저장 탭의 선택 모드). 요청한 코스 중 실제로 좋아요돼 있는 것만 취소한다.
      * 다른 기기에서 이미 취소된 코스가 섞여 있어도 나머지는 정상 처리되도록 부분 성공을 허용하고,
      * 하나도 좋아요돼 있지 않을 때만 예외로 알린다.
      */
     public void cancelLikes(Long memberId, List<Long> courseIds) {
         List<Long> targetCourseIds = courseIds.stream().distinct().toList();
 
-        // 좋아요 수를 먼저 줄인다. 삭제 뒤에는 "실제로 좋아요돼 있었는지"를 알 수 없어
-        // 이미 취소된 코스까지 함께 깎이기 때문이다(단건 취소와 같은 이유).
+        // 좋아요 수 감소를 삭제보다 먼저 실행한다.
+        // decreaseLikeCountAll은 "이 회원의 좋아요가 실제로 남아 있는 코스"만 EXISTS로 골라 감소시키므로,
+        // 이미 취소된 코스가 섞여 있어도 과다 감소하지 않는다(다른 회원의 좋아요가 남은 코스도 안전).
+        // 삭제를 먼저 하면 EXISTS가 전부 거짓이 되어 감소가 일어나지 않으므로 순서가 중요하다.
         int decreasedCount = courseRepository.decreaseLikeCountAll(memberId, targetCourseIds);
         if (decreasedCount == 0) {
             throw new CustomException(CourseErrorCode.COURSE_LIKE_NOT_FOUND);
@@ -75,7 +77,7 @@ public class CourseLikeCommandService {
     }
 
     /**
-     * 좋아요 전체 취소(좋아요 탭의 "모두 선택").
+     * 좋아요 전체 취소(저장 탭의 "모두 선택").
      * 갤러리의 전체 선택처럼 아직 화면에 불러오지 않은 좋아요까지 대상에 넣어야 하므로,
      * 프론트가 가진 id 목록이 아니라 서버가 대상을 다시 조회한다.
      * 전체 선택 후 일부만 해제한 경우는 exceptCourseIds로 받는다(해제는 보이는 항목에서만 가능).

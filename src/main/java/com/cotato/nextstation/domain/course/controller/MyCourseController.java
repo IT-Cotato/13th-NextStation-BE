@@ -31,7 +31,7 @@ public class MyCourseController {
     @Operation(
             summary = "내가 만든 코스 목록 조회",
             description = """
-                    좋아요 탭에서 내가 만든 코스를 최신순으로 조회한다.
+                    저장 탭에서 내가 만든 코스를 최신순으로 조회한다.
                     - 본인 코스이므로 공개 여부와 무관하게 전부 보여준다.
                     - `lineId`/`stationId`는 선택 사항이며, 함께 주면 둘 다 만족하는 코스만 나온다.
                     - `availableLines`는 코스가 없는 호선 칩을 비활성화하는 데 쓴다.

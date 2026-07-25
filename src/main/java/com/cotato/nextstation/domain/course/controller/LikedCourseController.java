@@ -38,7 +38,7 @@ public class LikedCourseController {
     @Operation(
             summary = "좋아요한 코스 목록 조회",
             description = """
-                    좋아요 탭에서 내가 좋아요한 코스를 최근 좋아요순으로 조회한다.
+                    저장 탭에서 내가 좋아요한 코스를 최근 좋아요순으로 조회한다.
                     - 원본 코스가 삭제되거나 비공개로 바뀌면 목록에서 빠진다(좋아요은 원본 참조).
                     - 화면에 필터 칩이 없어 호선/역 필터를 받지 않는다.
                     - `nextCursor`를 그대로 `cursor`에 넣어 다음 페이지를 요청한다.
@@ -62,7 +62,7 @@ public class LikedCourseController {
     @Operation(
             summary = "코스 좋아요 전체 취소",
             description = """
-                    좋아요 탭에서 "모두 선택"으로 좋아요을 한 번에 취소한다.
+                    저장 탭에서 "모두 선택"으로 좋아요를 한 번에 취소한다.
                     - 갤러리의 전체 선택처럼 **아직 화면에 불러오지 않은 좋아요까지** 취소된다.
                       그래서 코스 ID를 받지 않고 서버가 대상을 다시 조회한다.
                     - 전체 선택 후 일부를 해제했다면 그 코스 ID를 `exceptCourseIds`로 보낸다.
@@ -85,7 +85,7 @@ public class LikedCourseController {
     @Operation(
             summary = "코스 좋아요 다중 취소",
             description = """
-                    좋아요 탭에서 여러 코스를 선택해 한 번에 좋아요을 취소한다.
+                    저장 탭에서 여러 코스를 선택해 한 번에 좋아요를 취소한다.
                     - 코스 상세에서 좋아요를 하나만 해제할 때는 `DELETE /courses/{courseId}/likes`를 사용한다.
                     - 요청한 코스 중 이미 취소된 것이 섞여 있어도 나머지는 정상 취소된다(부분 성공 허용).
                     - 하나도 좋아요돼 있지 않을 때만 404로 응답한다.

@@ -37,7 +37,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 // 코스 조회 전용 서비스.
-// 좋아요 탭 목록 같은 화면 조회와, 다른 도메인이 코스를 참조할 때 쓰는 포트를 함께 제공한다.
+// 저장 탭 목록 같은 화면 조회와, 다른 도메인이 코스를 참조할 때 쓰는 포트를 함께 제공한다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -61,7 +61,7 @@ public class CourseQueryService {
     private final CourseConverter courseConverter;
 
     /**
-     * 좋아요 탭 - 좋아요한 코스 목록 (최근 좋아요순).
+     * 저장 탭 - 좋아요한 코스 목록 (최근 좋아요순).
      * 원본이 삭제되거나 비공개로 바뀐 코스는 조회 단계에서 빠진다.
      * 화면에 필터 칩이 없어 필터 파라미터를 받지 않는다.
      */
@@ -94,7 +94,7 @@ public class CourseQueryService {
     }
 
     /**
-     * 좋아요 탭 - 내가 만든 코스 목록 (최신순).
+     * 저장 탭 - 내가 만든 코스 목록 (최신순).
      * 본인 코스이므로 공개 여부와 무관하게 전부 보여준다.
      * 호선/역 필터는 선택 사항이고, 필터 칩 활성화에 쓸 availableLines는 최초 조회에서만 채운다.
      */

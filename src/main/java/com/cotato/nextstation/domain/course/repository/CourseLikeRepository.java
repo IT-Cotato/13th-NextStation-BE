@@ -22,7 +22,7 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
     List<Long> findLikedCourseIds(@Param("memberId") Long memberId,
                                   @Param("courseIds") Collection<Long> courseIds);
 
-    // 좋아요을 삭제하고 실제로 지워진 행 수를 돌려준다.
+    // 좋아요를 삭제하고 실제로 지워진 행 수를 돌려준다.
     // 조회 후 삭제하면 동시 취소 시 두 요청이 모두 "있다"고 보고 좋아요 수를 각각 줄이게 되므로,
     // 삭제 쿼리의 영향 행 수를 확인 수단으로 삼아 실제로 지운 요청만 좋아요 수를 줄인다.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -31,7 +31,7 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
     int deleteByMemberIdAndCourseId(@Param("memberId") Long memberId,
                                     @Param("courseId") Long courseId);
 
-    // 여러 좋아요을 한 번에 삭제한다. 코스마다 삭제 쿼리를 날리면 좋아요 수에 비례해 비용이 늘어난다.
+    // 여러 좋아요를 한 번에 삭제한다. 코스마다 삭제 쿼리를 날리면 좋아요 수에 비례해 비용이 늘어난다.
     // 어떤 코스가 지워졌는지는 알 수 없으므로, 좋아요 수 감소를 이 쿼리보다 먼저 실행해야 한다.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM CourseLike cs " +

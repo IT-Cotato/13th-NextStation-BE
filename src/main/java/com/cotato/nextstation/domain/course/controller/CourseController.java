@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// 좋아요 탭 API는 경로가 /members/me 하위라 컨트롤러가 나뉘는데,
+// 저장 탭 API는 경로가 /members/me 하위라 컨트롤러가 나뉘는데,
 // 같은 태그를 달아 Swagger에서는 한 섹션으로 묶는다.
 @Tag(name = "Course")
 @RestController
@@ -72,7 +72,7 @@ public class CourseController {
             description = """
                     다른 사람의 공개 코스를 편집 가능한 내 코스로 복제한다.
                     - `{courseId}`는 **복사할 원본 코스**의 ID다.
-                    - 원본을 참조만 하는 좋아요과 달리, 복제본은 원본이 삭제되거나 비공개로 바뀌어도 그대로 남는다.
+                    - 원본을 참조만 하는 좋아요와 달리, 복제본은 원본이 삭제되거나 비공개로 바뀌어도 그대로 남는다.
                     - `name`은 **복제본에 부여할 이름**이며 필수다. 사용자가 이름을 고치지 않았으면
                       화면에 채워둔 **원본 이름을 그대로 실어 보낸다**. 
                     - `placeIds`를 넘기면 그 순서대로 코스 순서가 부여되고, 생략하면 원본 순서를 그대로 따른다.
@@ -159,6 +159,7 @@ public class CourseController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "좋아요 성공 (data 없음)"),
+            @ApiResponse(responseCode = "400", description = "본인이 만든 코스에 좋아요 (`CourseErrorCode.CANNOT_LIKE_OWN_COURSE`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
             @ApiResponse(responseCode = "409", description = "이미 좋아요한 코스 (`CourseErrorCode.DUPLICATE_COURSE_LIKE`)"),
     })
