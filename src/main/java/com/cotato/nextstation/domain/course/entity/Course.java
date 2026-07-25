@@ -51,10 +51,12 @@ public class Course extends BaseTimeEntity {
     private boolean isDeleted;
 
     @Builder
-    private Course(Long memberId, Long stationId, String name) {
+    private Course(Long memberId, Long stationId, String name, Long originalCourseId) {
         this.memberId = memberId;
         this.stationId = stationId;
         this.name = name;
+        // 원본 없이 새로 만든 코스는 null이고, "내 코스로 만들기"로 복제한 코스만 원본을 가리킨다.
+        this.originalCourseId = originalCourseId;
         this.viewCount = 0;
         this.saveCount = 0;
         this.isDeleted = false;
