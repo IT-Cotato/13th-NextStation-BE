@@ -15,6 +15,6 @@ public interface StampCourseRepository extends Repository<Course, Long> {
     @Query("SELECT c FROM Course c " +
             "WHERE c.stationId = :stationId " +
             "AND c.journalId IS NOT NULL " +
-            "ORDER BY (c.viewCount + c.saveCount * 2) DESC")
+            "ORDER BY (c.viewCount + c.likeCount * 2) DESC")
     List<Course> findPopularCoursesByStationId(@Param("stationId") Long stationId, Pageable pageable);
 }

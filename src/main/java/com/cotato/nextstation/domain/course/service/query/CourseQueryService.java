@@ -6,7 +6,7 @@ import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
-import com.cotato.nextstation.domain.course.dto.response.SavedCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
@@ -15,8 +15,8 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
-import com.cotato.nextstation.domain.course.repository.CourseSaveRepository;
-import com.cotato.nextstation.domain.course.repository.CourseSaveRepository.SavedCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
+import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
@@ -37,7 +37,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 // 코스 조회 전용 서비스.
-// 저장 탭 목록 같은 화면 조회와, 다른 도메인이 코스를 참조할 때 쓰는 포트를 함께 제공한다.
+// 좋아요 탭 목록 같은 화면 조회와, 다른 도메인이 코스를 참조할 때 쓰는 포트를 함께 제공한다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -56,45 +56,45 @@ public class CourseQueryService {
 
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
-    private final CourseSaveRepository courseSaveRepository;
+    private final CourseLikeRepository courseLikeRepository;
     private final PlaceInfoQueryService placeInfoQueryService;
     private final CourseConverter courseConverter;
 
     /**
-     * 저장 탭 - 스크랩한 코스 목록 (최근 스크랩순).
+     * 좋아요 탭 - 좋아요한 코스 목록 (최근 좋아요순).
      * 원본이 삭제되거나 비공개로 바뀐 코스는 조회 단계에서 빠진다.
      * 화면에 필터 칩이 없어 필터 파라미터를 받지 않는다.
      */
-    public SavedCourseListResponse getSavedCourses(Long memberId, String cursor, Integer size) {
+    public LikedCourseListResponse getLikedCourses(Long memberId, String cursor, Integer size) {
         int pageSize = resolvePageSize(size);
         Pageable pageable = PageRequest.of(0, pageSize + 1); // hasNext 판단용 1개 더 조회
 
         // 커서 해석은 한 번만 한다. 빈 문자열도 "커서 없음"으로 취급된다.
         CursorData cursorData = CursorData.decode(cursor);
-        List<SavedCourseView> savedCourses = fetchSavedCourses(memberId, cursorData, pageable);
+        List<LikedCourseView> likedCourses = fetchLikedCourses(memberId, cursorData, pageable);
 
-        boolean hasNext = savedCourses.size() > pageSize;
-        List<SavedCourseView> pageContent = hasNext ? savedCourses.subList(0, pageSize) : savedCourses;
+        boolean hasNext = likedCourses.size() > pageSize;
+        List<LikedCourseView> pageContent = hasNext ? likedCourses.subList(0, pageSize) : likedCourses;
 
         String nextCursor = null;
         if (hasNext) {
-            SavedCourseView last = pageContent.get(pageContent.size() - 1);
-            nextCursor = new CursorData(last.getSaveId(), null, last.getSavedAt()).encode();
+            LikedCourseView last = pageContent.get(pageContent.size() - 1);
+            nextCursor = new CursorData(last.getLikeId(), null, last.getLikedAt()).encode();
         }
         return courseConverter.toSavedListResponse(pageContent, nextCursor, hasNext);
     }
 
-    private List<SavedCourseView> fetchSavedCourses(Long memberId, CursorData cursorData, Pageable pageable) {
+    private List<LikedCourseView> fetchLikedCourses(Long memberId, CursorData cursorData, Pageable pageable) {
         if (cursorData == null) {
-            return courseSaveRepository.findSavedCourses(memberId, pageable);
+            return courseLikeRepository.findLikedCourses(memberId, pageable);
         }
         validateTimeCursor(cursorData);
-        return courseSaveRepository.findSavedCoursesAfterCursor(
+        return courseLikeRepository.findLikedCoursesAfterCursor(
                 memberId, cursorData.dateTimeValue(), cursorData.id(), pageable);
     }
 
     /**
-     * 저장 탭 - 내가 만든 코스 목록 (최신순).
+     * 좋아요 탭 - 내가 만든 코스 목록 (최신순).
      * 본인 코스이므로 공개 여부와 무관하게 전부 보여준다.
      * 호선/역 필터는 선택 사항이고, 필터 칩 활성화에 쓸 availableLines는 최초 조회에서만 채운다.
      */
@@ -236,19 +236,19 @@ public class CourseQueryService {
         return getPopularCoursesByStation(stationId, limit, null);
     }
 
-    // memberId를 넘기면 응답의 isSaved가 채워진다. null이면 전부 false.
+    // memberId를 넘기면 응답의 isLiked가 채워진다. null이면 전부 false.
     public List<PopularCourseResponse> getPopularCoursesByStation(Long stationId, int limit, Long memberId) {
         List<Course> courses = courseRepository.findPopularPublicCoursesByStationId(stationId, PageRequest.of(0, limit));
-        return courseConverter.toPopularResponses(courses, resolveSavedCourseIds(memberId, courses));
+        return courseConverter.toPopularResponses(courses, resolveLikedCourseIds(memberId, courses));
     }
 
-    // 조회한 코스들의 스크랩 여부를 한 번에 조회한다 (코스마다 조회하면 N+1)
-    private Set<Long> resolveSavedCourseIds(Long memberId, List<Course> courses) {
+    // 조회한 코스들의 좋아요 여부를 한 번에 조회한다 (코스마다 조회하면 N+1)
+    private Set<Long> resolveLikedCourseIds(Long memberId, List<Course> courses) {
         if (memberId == null || courses.isEmpty()) {
             return Set.of();
         }
         List<Long> courseIds = courses.stream().map(Course::getId).toList();
-        return Set.copyOf(courseSaveRepository.findSavedCourseIds(memberId, courseIds));
+        return Set.copyOf(courseLikeRepository.findLikedCourseIds(memberId, courseIds));
     }
 
     private Course findCourse(Long courseId) {

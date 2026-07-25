@@ -9,13 +9,13 @@ import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
-import com.cotato.nextstation.domain.course.dto.response.SavedCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
-import com.cotato.nextstation.domain.course.repository.CourseSaveRepository.SavedCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.springframework.stereotype.Component;
@@ -46,7 +46,7 @@ public class CourseConverter {
     }
 
     // "내 코스로 만들기" 원본은 originalCourseId로만 기록하고, 이후 원본과 무관한 독립 코스로 존재한다.
-    // 여행일지·컨셉투어와 조회수·저장수는 원본에서 물려받지 않고 새 코스 기준으로 시작한다.
+    // 여행일지·컨셉투어와 조회수·좋아요수는 원본에서 물려받지 않고 새 코스 기준으로 시작한다.
     public Course toCopiedCourse(Long memberId, Course original, String name) {
         return Course.builder()
                 .memberId(memberId)
@@ -82,7 +82,7 @@ public class CourseConverter {
                 course.getStationId(),
                 course.getJournalId(),
                 course.getViewCount(),
-                course.getSaveCount(),
+                course.getLikeCount(),
                 course.getCreatedAt()
         );
     }
@@ -93,9 +93,9 @@ public class CourseConverter {
                 .toList();
     }
 
-    public SavedCourseListResponse toSavedListResponse(List<SavedCourseView> savedCourses,
+    public LikedCourseListResponse toSavedListResponse(List<LikedCourseView> likedCourses,
                                                        String nextCursor, boolean hasNext) {
-        List<CourseCardResponse> cards = savedCourses.stream()
+        List<CourseCardResponse> cards = likedCourses.stream()
                 .map(saved -> new CourseCardResponse(
                         saved.getCourseId(),
                         saved.getName(),
@@ -103,7 +103,7 @@ public class CourseConverter {
                         saved.getStationName(),
                         toLine(saved.getLineId(), saved.getLineName(), saved.getLineCode())))
                 .toList();
-        return new SavedCourseListResponse(cards, nextCursor, hasNext);
+        return new LikedCourseListResponse(cards, nextCursor, hasNext);
     }
 
     public MyCourseListResponse toMyListResponse(List<MyCourseView> myCourses, List<LineView> availableLines,
@@ -165,14 +165,14 @@ public class CourseConverter {
         return DURATION_SHORT;
     }
 
-    public List<PopularCourseResponse> toPopularResponses(List<Course> courses, Set<Long> savedCourseIds) {
+    public List<PopularCourseResponse> toPopularResponses(List<Course> courses, Set<Long> likedCourseIds) {
         return courses.stream()
                 .map(course -> new PopularCourseResponse(
                         course.getId(),
                         course.getName(),
                         course.getViewCount(),
-                        course.getSaveCount(),
-                        savedCourseIds.contains(course.getId())
+                        course.getLikeCount(),
+                        likedCourseIds.contains(course.getId())
                 ))
                 .toList();
     }

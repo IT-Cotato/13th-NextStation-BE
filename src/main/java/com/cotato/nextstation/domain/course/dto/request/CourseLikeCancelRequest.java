@@ -5,8 +5,8 @@ import jakarta.validation.constraints.NotEmpty;
 
 import java.util.List;
 
-@Schema(description = "코스 스크랩 다중 취소 요청")
-public record CourseSaveCancelRequest(
+@Schema(description = "코스 좋아요 다중 취소 요청")
+public record CourseLikeCancelRequest(
 
         @Schema(description = "취소할 코스 ID 목록", example = "[1, 2, 3]")
         @NotEmpty(message = "취소할 코스를 선택해주세요.")

@@ -25,8 +25,8 @@ public record CourseInfoResponse(
         @Schema(description = "조회수", example = "10")
         int viewCount,
 
-        @Schema(description = "저장 수", example = "3")
-        int saveCount,
+        @Schema(description = "좋아요 수", example = "3")
+        int likeCount,
 
         @Schema(description = "코스 생성 시각", example = "2026-07-06T12:30:00")
         LocalDateTime createdAt

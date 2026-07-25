@@ -41,8 +41,8 @@ public class Course extends BaseTimeEntity {
     @Column(name = "view_count", nullable = false)
     private int viewCount;
 
-    @Column(name = "save_count", nullable = false)
-    private int saveCount;
+    @Column(name = "like_count", nullable = false)
+    private int likeCount;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -58,7 +58,7 @@ public class Course extends BaseTimeEntity {
         // 원본 없이 새로 만든 코스는 null이고, "내 코스로 만들기"로 복제한 코스만 원본을 가리킨다.
         this.originalCourseId = originalCourseId;
         this.viewCount = 0;
-        this.saveCount = 0;
+        this.likeCount = 0;
         this.isDeleted = false;
     }
 
