@@ -61,7 +61,7 @@ public class CourseQueryService {
     private final CourseConverter courseConverter;
 
     /**
-     * 저장 탭 - 좋아요한 코스 목록 (최근 좋아요순).
+     * 좋아요(하트)한 코스 목록 (최근 좋아요순).
      * 원본이 삭제되거나 비공개로 바뀐 코스는 조회 단계에서 빠진다.
      * 화면에 필터 칩이 없어 필터 파라미터를 받지 않는다.
      */

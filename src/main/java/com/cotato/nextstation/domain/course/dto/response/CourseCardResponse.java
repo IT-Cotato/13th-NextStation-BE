@@ -3,9 +3,9 @@ package com.cotato.nextstation.domain.course.dto.response;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-// 저장 탭의 코스 카드. 좋아요한 코스와 내가 만든 코스가 같은 모양이라 함께 쓴다.
+// 코스 목록 카드. 저장 탭의 "내가 만든 코스"와 "좋아요한 코스" 목록이 같은 모양이라 함께 쓴다.
 // 좋아요 수/조회수는 이 화면에 없다(둘러보기·코스 상세에서 사용).
-@Schema(description = "저장 탭 코스 카드")
+@Schema(description = "코스 목록 카드 (내가 만든 코스 / 좋아요한 코스 공용)")
 public record CourseCardResponse(
 
         @Schema(description = "코스 ID", example = "1")
