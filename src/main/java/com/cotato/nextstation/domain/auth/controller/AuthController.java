@@ -16,6 +16,7 @@ import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
 import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
 import com.cotato.nextstation.domain.auth.service.query.result.LoginResult;
 import com.cotato.nextstation.domain.auth.service.query.result.ReissueResult;
+import com.cotato.nextstation.domain.auth.util.RefreshTokenCookieFactory;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.util.ClientIpResolver;
@@ -28,7 +29,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -45,18 +45,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    private static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
-    
-    @Value("${auth.refresh-cookie.secure}")
-    private boolean refreshCookieSecure;
-
-    @Value("${auth.refresh-cookie.same-site}")
-    private String refreshCookieSameSite;
-
     private final EmailVerificationCommandService emailVerificationCommandService;
     private final SignupCommandService signupCommandService;
     private final ProfileSetupCommandService profileSetupCommandService;
     private final LoginQueryService loginQueryService;
+    private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     @Operation(
             summary = "회원가입 이메일 인증번호 발송",
@@ -184,13 +177,7 @@ public class AuthController {
     public CommonResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse httpResponse) {
         LoginResult result = loginQueryService.login(request.email(), request.password());
 
-        ResponseCookie refreshTokenCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, result.refreshToken())
-                .httpOnly(true)
-                .secure(refreshCookieSecure)
-                .sameSite(refreshCookieSameSite)
-                .path("/")
-                .maxAge(LoginQueryService.REFRESH_TOKEN_EXPIRATION)
-                .build();
+        ResponseCookie refreshTokenCookie = refreshTokenCookieFactory.create(result.refreshToken());
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
 
         return CommonResponse.success(new LoginResponse(result.memberId(), result.accessToken()));
@@ -213,7 +200,7 @@ public class AuthController {
     @PostMapping("/reissue")
     public CommonResponse<ReissueResponse> reissue(
             @Parameter(hidden = true)
-            @CookieValue(name = REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken) {
+            @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshToken) {
         if (refreshToken == null) {
             throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }

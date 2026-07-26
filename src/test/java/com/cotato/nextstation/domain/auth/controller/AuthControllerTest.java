@@ -14,6 +14,7 @@ import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
 import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
 import com.cotato.nextstation.domain.auth.service.query.result.LoginResult;
 import com.cotato.nextstation.domain.auth.service.query.result.ReissueResult;
+import com.cotato.nextstation.domain.auth.util.RefreshTokenCookieFactory;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
@@ -30,6 +31,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -67,6 +69,9 @@ class AuthControllerTest {
 
     @MockitoBean
     LoginQueryService loginQueryService;
+
+    @MockitoBean
+    RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
     @MockitoBean
@@ -361,6 +366,8 @@ class AuthControllerTest {
         LoginRequest request = new LoginRequest("user@example.com", "abc12345!");
         given(loginQueryService.login("user@example.com", "abc12345!"))
                 .willReturn(new LoginResult(1L, "access-token", "refresh-token"));
+        given(refreshTokenCookieFactory.create("refresh-token"))
+                .willReturn(ResponseCookie.from("refreshToken", "refresh-token").httpOnly(true).build());
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
