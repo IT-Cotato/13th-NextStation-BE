@@ -1,11 +1,10 @@
 package com.cotato.nextstation.domain.auth.service.command;
 
-import com.cotato.nextstation.domain.auth.entity.TermsConsent;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.exception.TermsErrorCode;
 import com.cotato.nextstation.domain.auth.repository.MemberTermsAgreementRepository;
-import com.cotato.nextstation.domain.auth.repository.TermsConsentRepository;
 import com.cotato.nextstation.domain.auth.util.KakaoSignupTokenClaims;
+import com.cotato.nextstation.domain.auth.util.TermsAgreementValidator;
 import com.cotato.nextstation.domain.member.entity.AuthProvider;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
@@ -37,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -55,23 +55,16 @@ class KakaoSignupCommandServiceTest {
     private MemberSocialAccountRepository memberSocialAccountRepository;
 
     @Mock
-    private TermsConsentRepository termsConsentRepository;
-
-    @Mock
     private MemberTermsAgreementRepository memberTermsAgreementRepository;
 
     @Mock
     private JwtProvider jwtProvider;
 
+    @Mock
+    private TermsAgreementValidator termsAgreementValidator;
+
     private static final String KAKAO_SIGNUP_TOKEN = "kakao-signup-token";
     private static final String PROVIDER_USER_ID = "555";
-
-    private TermsConsent requiredTerms(Long id) {
-        TermsConsent terms = TermsConsent.builder()
-                .title("서비스 이용약관").content("내용").version("v1.0").isRequired(true).build();
-        ReflectionTestUtils.setField(terms, "id", id);
-        return terms;
-    }
 
     private Claims validClaims(String email, String nickname, String profileImageUrl) {
         Claims claims = mock(Claims.class);
@@ -119,8 +112,6 @@ class KakaoSignupCommandServiceTest {
         given(jwtProvider.parseClaims(KAKAO_SIGNUP_TOKEN)).willReturn(claims);
         given(memberSocialAccountRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, PROVIDER_USER_ID))
                 .willReturn(Optional.empty());
-        given(termsConsentRepository.findAllLatestOrderByRequiredDescIdAsc())
-                .willReturn(List.of(requiredTerms(1L)));
         given(memberRepository.save(any(Member.class))).willReturn(savedMember());
         given(jwtProvider.generateToken(eq("1"), any(Map.class), any(Duration.class))).willReturn("signup-token");
 
@@ -142,8 +133,6 @@ class KakaoSignupCommandServiceTest {
         given(jwtProvider.parseClaims(KAKAO_SIGNUP_TOKEN)).willReturn(claims);
         given(memberSocialAccountRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, PROVIDER_USER_ID))
                 .willReturn(Optional.empty());
-        given(termsConsentRepository.findAllLatestOrderByRequiredDescIdAsc())
-                .willReturn(List.of(requiredTerms(1L)));
         given(memberRepository.save(any(Member.class))).willReturn(savedMember());
         given(jwtProvider.generateToken(eq("1"), any(Map.class), any(Duration.class))).willReturn("signup-token");
 
@@ -203,8 +192,8 @@ class KakaoSignupCommandServiceTest {
         given(jwtProvider.parseClaims(KAKAO_SIGNUP_TOKEN)).willReturn(claims);
         given(memberSocialAccountRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, PROVIDER_USER_ID))
                 .willReturn(Optional.empty());
-        given(termsConsentRepository.findAllLatestOrderByRequiredDescIdAsc())
-                .willReturn(List.of(requiredTerms(1L)));
+        willThrow(new CustomException(TermsErrorCode.REQUIRED_TERMS_NOT_AGREED))
+                .given(termsAgreementValidator).validate(List.of());
 
         // when & then
         assertThatThrownBy(() -> kakaoSignupCommandService.signup(KAKAO_SIGNUP_TOKEN, List.of(), "127.0.0.1"))
@@ -221,8 +210,8 @@ class KakaoSignupCommandServiceTest {
         given(jwtProvider.parseClaims(KAKAO_SIGNUP_TOKEN)).willReturn(claims);
         given(memberSocialAccountRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, PROVIDER_USER_ID))
                 .willReturn(Optional.empty());
-        given(termsConsentRepository.findAllLatestOrderByRequiredDescIdAsc())
-                .willReturn(List.of(requiredTerms(1L)));
+        willThrow(new CustomException(TermsErrorCode.TERMS_NOT_FOUND))
+                .given(termsAgreementValidator).validate(List.of(1L, 999L));
 
         // when & then
         assertThatThrownBy(() -> kakaoSignupCommandService.signup(KAKAO_SIGNUP_TOKEN, List.of(1L, 999L), "127.0.0.1"))

@@ -2,13 +2,11 @@ package com.cotato.nextstation.domain.auth.service.command;
 
 import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
 import com.cotato.nextstation.domain.auth.entity.MemberTermsAgreement;
-import com.cotato.nextstation.domain.auth.entity.TermsConsent;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
-import com.cotato.nextstation.domain.auth.exception.TermsErrorCode;
 import com.cotato.nextstation.domain.auth.repository.MemberTermsAgreementRepository;
-import com.cotato.nextstation.domain.auth.repository.TermsConsentRepository;
 import com.cotato.nextstation.domain.auth.util.KakaoSignupTokenClaims;
 import com.cotato.nextstation.domain.auth.util.SignupTokenClaims;
+import com.cotato.nextstation.domain.auth.util.TermsAgreementValidator;
 import com.cotato.nextstation.domain.member.entity.AuthProvider;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberSocialAccount;
@@ -30,8 +28,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -42,9 +38,9 @@ public class KakaoSignupCommandService {
 
     private final MemberRepository memberRepository;
     private final MemberSocialAccountRepository memberSocialAccountRepository;
-    private final TermsConsentRepository termsConsentRepository;
     private final MemberTermsAgreementRepository memberTermsAgreementRepository;
     private final JwtProvider jwtProvider;
+    private final TermsAgreementValidator termsAgreementValidator;
 
     @Transactional
     public SignupResponse signup(String kakaoSignupToken, List<Long> agreedTermsIds, String ipAddress) {
@@ -59,7 +55,7 @@ public class KakaoSignupCommandService {
             return reissueForExistingMember(existingSocialAccount.get().getMemberId());
         }
 
-        validateAgreedTerms(agreedTermsIds);
+        termsAgreementValidator.validate(agreedTermsIds);
 
         String email = kakaoClaims.email().isBlank() ? null : kakaoClaims.email();
         Member member;
@@ -117,27 +113,6 @@ public class KakaoSignupCommandService {
                 Map.of(SignupTokenClaims.PURPOSE_KEY, SignupTokenClaims.SIGNUP_PURPOSE),
                 SIGNUP_TOKEN_EXPIRATION
         );
-    }
-
-    // SignupCommandService.validateAgreedTerms()와 동일 로직
-    private void validateAgreedTerms(List<Long> agreedTermsIds) {
-
-        List<TermsConsent> latestTerms = termsConsentRepository.findAllLatestOrderByRequiredDescIdAsc();
-
-        Set<Long> latestTermsIds = latestTerms.stream()
-                .map(TermsConsent::getId)
-                .collect(Collectors.toSet());
-        if (!latestTermsIds.containsAll(agreedTermsIds)) {
-            throw new CustomException(TermsErrorCode.TERMS_NOT_FOUND);
-        }
-
-        Set<Long> requiredTermsIds = latestTerms.stream()
-                .filter(TermsConsent::isRequired)
-                .map(TermsConsent::getId)
-                .collect(Collectors.toSet());
-        if (!agreedTermsIds.containsAll(requiredTermsIds)) {
-            throw new CustomException(TermsErrorCode.REQUIRED_TERMS_NOT_AGREED);
-        }
     }
 
     // subject는 memberId가 아니라 providerUserId(카카오 회원번호)
