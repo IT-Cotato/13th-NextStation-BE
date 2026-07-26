@@ -26,17 +26,11 @@ public class PlaceConverter {
 
     public PlaceDetailResponse toDetailResponse(
             Place place,
+            long totalReviewCount,
             List<PlaceImage> placeImages,
             List<PlaceReview> reviews,
             List<PlaceReviewImage> reviewImages
     ) {
-
-        Map<Long, List<String>> imagesByReviewId = reviewImages.stream()
-                .collect(Collectors.groupingBy(
-                        image -> image.getPlaceReview().getId(),
-                        Collectors.mapping(PlaceReviewImage::getImageUrl, Collectors.toList())
-                ));
-
         return new PlaceDetailResponse(
                 place.getId(),
                 place.getPlaceName(),
@@ -45,6 +39,7 @@ public class PlaceConverter {
                 place.getAddress(),
                 place.getContactNumber(),
                 place.getKakaoPlaceUrl(),
+                totalReviewCount,
                 toImageUrls(place, placeImages),
                 toReviewPreviews(reviews, reviewImages)
         );
