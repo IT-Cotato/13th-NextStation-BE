@@ -20,16 +20,15 @@ import com.cotato.nextstation.global.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 
+// login()이 외부 API 호출을 포함하는데, 트랜잭션으로 감싸면 그 호출이 끝날 때까지 DB 커넥션을 붙잡고 있게 되므로 붙이지 않는다.
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class KakaoLoginQueryService {
 
     private static final Duration ACCESS_TOKEN_EXPIRATION = Duration.ofHours(1);
