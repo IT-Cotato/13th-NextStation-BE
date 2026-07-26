@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends BaseTimeEntity {
 
-    @Column(unique = true, length = 50)
+    @Column(unique = true, length = 254) // RFC 5321 이메일 최대 길이
     private String email;
 
     @Column(length = 255)
@@ -37,7 +37,7 @@ public class Member extends BaseTimeEntity {
     @Column(unique = true, length = 30)
     private String nickname;
 
-    @Column(name = "profile_image_url", length = 255)
+    @Column(name = "profile_image_url", length = 1000) // presigned URL은 서명 쿼리스트링 때문에 길어질 수 있음
     private String profileImageUrl;
 
     @Column(name = "profile_bio", length = 30)

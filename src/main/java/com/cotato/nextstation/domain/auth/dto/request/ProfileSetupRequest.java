@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
@@ -17,6 +18,7 @@ public record ProfileSetupRequest(
         String nickname,
 
         @Schema(description = "프로필 이미지 URL. presigned URL로 업로드 완료 후 받은 imageUrl을 그대로 전달(선택)", example = "https://bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid.jpg")
+        @Size(max = 1000, message = "프로필 이미지 URL은 1000자를 초과할 수 없습니다.") // Member.profileImageUrl 컬럼 길이와 동일
         String profileImageUrl,
 
         @Schema(description = "성별. '선택 안함'도 명시적으로 UNSPECIFIED를 보낸다", example = "MALE")
