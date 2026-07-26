@@ -40,11 +40,32 @@ class PlaceConverterTest {
         given(place.getCategory()).willReturn(category);
 
         // when
-        PlaceDetailResponse response = placeConverter.toDetailResponse(place, List.of(), List.of(), List.of());
+        PlaceDetailResponse response = placeConverter.toDetailResponse(place, 0L, List.of(), List.of(), List.of());
 
         // then
         assertThat(response.images()).containsExactly("https://default.jpg");
     }
+
+    @Test
+    @DisplayName("totalReviewCount가 응답에 정확히 포함된다")
+    void toDetailResponse_totalReviewCount() {
+        // given
+        Category category = mock(Category.class);
+        given(category.getDefaultImageUrl()).willReturn(null);
+        given(category.getName()).willReturn("카페");
+
+        Place place = mock(Place.class);
+        given(place.getCategory()).willReturn(category);
+
+        // when
+        PlaceDetailResponse response = placeConverter.toDetailResponse(
+                place, 24L, List.of(), List.of(), List.of()
+        );
+
+        // then
+        assertThat(response.totalReviewCount()).isEqualTo(24L);
+    }
+
 
     @Test
     @DisplayName("Place 목록을 PlaceInfoResponse 목록으로 변환한다")
