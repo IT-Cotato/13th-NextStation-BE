@@ -87,17 +87,6 @@ public class SwaggerConfig {
                 .build();
     }
 
-    // 출발역 즐겨찾기 관련 API
-    @Bean
-    public GroupedOpenApi departureStationApi() {
-        return GroupedOpenApi.builder()
-                .group("DepartureStation")
-                .displayName("Departure Station API")
-                .packagesToScan("com.cotato.nextstation.domain.departure.controller")
-                .pathsToMatch("/api/v1/departure-stations/**")
-                .build();
-    }
-
     // S3 이미지 업로드 관련 API
     @Bean
     public GroupedOpenApi imageApi() {

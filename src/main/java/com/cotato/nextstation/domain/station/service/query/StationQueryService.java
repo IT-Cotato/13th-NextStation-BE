@@ -6,11 +6,12 @@ import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
 import com.cotato.nextstation.domain.station.converter.StationConverter;
 import com.cotato.nextstation.domain.station.dto.response.StationPlaceCategoryResponse;
 import com.cotato.nextstation.domain.station.dto.response.StationPlacesResponse;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.Station;
 import com.cotato.nextstation.domain.station.exception.StationErrorCode;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository;
-import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineNameView;
+import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineView;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -78,7 +79,7 @@ public class StationQueryService {
                     categoryCode, selected.get(0).categoryName(), selected));
         }
 
-        List<String> lines = groupLineNames(List.of(stationId)).getOrDefault(stationId, List.of());
+        List<LineSummaryResponse> lines = groupLines(List.of(stationId)).getOrDefault(stationId, List.of());
         List<String> tags = resolveTopTags(allPlaces);
         String defaultCourseName = station.getStationName() + COURSE_NAME_SUFFIX;
         return stationConverter.toPlacesResponse(station, lines, tags, defaultCourseName, categories);
@@ -97,32 +98,21 @@ public class StationQueryService {
     public List<StationSummaryResponse> searchByName(String keyword) {
         return stationRepository.findByStationName(keyword)
                 .map(station -> {
-                    Map<Long, List<String>> lines = groupLineNames(List.of(station.getId()));
+                    Map<Long, List<LineSummaryResponse>> lines = groupLines(List.of(station.getId()));
                     return List.of(stationConverter.toSummaryResponse(station, lines.getOrDefault(station.getId(), List.of())));
                 })
                 .orElseGet(List::of);
     }
 
-    // 출발역 목록 등에서 stationId들로 역 요약을 일괄 조회할 때 사용
-    public Map<Long, StationSummaryResponse> getSummariesByStationIds(Collection<Long> stationIds) {
-        if (stationIds.isEmpty()) {
-            return Map.of();
-        }
-        Map<Long, List<String>> linesByStation = groupLineNames(stationIds);
-        return stationRepository.findAllById(stationIds).stream()
-                .collect(Collectors.toMap(
-                        Station::getId,
-                        station -> stationConverter.toSummaryResponse(
-                                station, linesByStation.getOrDefault(station.getId(), List.of()))
-                ));
-    }
-
-    // 여러 역의 소속 노선명을 stationId 기준으로 묶는다.
-    private Map<Long, List<String>> groupLineNames(Collection<Long> stationIds) {
-        return stationLineRepository.findLineNamesByStationIdIn(stationIds).stream()
+    // 여러 역의 소속 노선을 stationId 기준으로 묶는다.
+    private Map<Long, List<LineSummaryResponse>> groupLines(Collection<Long> stationIds) {
+        return stationLineRepository.findLinesByStationIdIn(stationIds).stream()
                 .collect(Collectors.groupingBy(
-                        StationLineNameView::getStationId,
-                        Collectors.mapping(StationLineNameView::getLineName, Collectors.toList())
+                        StationLineView::getStationId,
+                        Collectors.mapping(
+                                line -> new LineSummaryResponse(
+                                        line.getLineId(), line.getLineName(), line.getLineCode()),
+                                Collectors.toList())
                 ));
     }
 }

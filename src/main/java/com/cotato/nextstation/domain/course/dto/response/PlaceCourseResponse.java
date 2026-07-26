@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.course.dto.response;
 
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -20,11 +21,8 @@ public record PlaceCourseResponse(
         @Schema(description = "역 이름", example = "보문역")
         String stationName,
 
-        @Schema(description = "역의 대표 호선 ID", example = "12")
-        Long lineId,
-
-        @Schema(description = "카드 배지에 표시할 대표 호선 이름", example = "6호선")
-        String lineName,
+        @Schema(description = "카드 배지에 표시할 역의 대표 호선. 대표 호선이 없는 역이면 null", nullable = true)
+        LineSummaryResponse line,
 
         @Schema(description = "코스에 담긴 장소 수", example = "4")
         int placeCount,

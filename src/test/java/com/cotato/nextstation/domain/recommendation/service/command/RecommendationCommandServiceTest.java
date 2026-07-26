@@ -13,6 +13,7 @@ import com.cotato.nextstation.domain.station.entity.Station;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
+import com.cotato.nextstation.domain.station.converter.LineConverter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,7 +45,7 @@ class RecommendationCommandServiceTest {
     @Mock
     private StationPlaceReader stationPlaceReader;
 
-    private final RecommendationConverter recommendationConverter = new RecommendationConverter();
+    private final RecommendationConverter recommendationConverter = new RecommendationConverter(new LineConverter());
 
     private RecommendationCommandService recommendationCommandService;
 
@@ -154,7 +155,7 @@ class RecommendationCommandServiceTest {
         RandomRecommendationResponse response = recommendationCommandService.drawRandom(null);
 
         // then
-        assertThat(response.station().lineName()).isEqualTo("1호선");
+        assertThat(response.station().line().name()).isEqualTo("1호선");
         assertThat(response.station().description()).isEqualTo("제기동역 소개");
         assertThat(response.station().todo()).isEqualTo("제기동역 할일");
         assertThat(response.course().name()).isEqualTo("제기동역 환승여행 코스");

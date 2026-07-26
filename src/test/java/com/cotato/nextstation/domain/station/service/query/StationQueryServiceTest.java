@@ -7,7 +7,9 @@ import com.cotato.nextstation.domain.station.converter.StationConverter;
 import com.cotato.nextstation.domain.station.dto.response.StationPlaceCategoryResponse;
 import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.Station;
-import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineNameView;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
+import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineView;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository;
 import com.cotato.nextstation.domain.station.exception.StationErrorCode;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
@@ -52,10 +54,12 @@ class StationQueryServiceTest {
     @Mock
     private StationConverter stationConverter;
 
-    private StationLineNameView lineView(Long stationId, String lineName) {
-        StationLineNameView view = mock(StationLineNameView.class);
+    private StationLineView lineView(Long stationId, LineCode lineCode) {
+        StationLineView view = mock(StationLineView.class);
         given(view.getStationId()).willReturn(stationId);
-        given(view.getLineName()).willReturn(lineName);
+        given(view.getLineId()).willReturn((long) lineCode.ordinal() + 1);
+        given(view.getLineName()).willReturn(lineCode.getDisplayName());
+        given(view.getLineCode()).willReturn(lineCode);
         return view;
     }
 
@@ -64,22 +68,24 @@ class StationQueryServiceTest {
     void searchByName_found() {
         Station station = mock(Station.class);
         given(station.getId()).willReturn(42L);
-        StationLineNameView view2 = lineView(42L, "2호선");
-        StationLineNameView view5 = lineView(42L, "5호선");
+        StationLineView view2 = lineView(42L, LineCode.LINE_2);
+        StationLineView view5 = lineView(42L, LineCode.LINE_5);
         given(stationRepository.findByStationName("왕십리역")).willReturn(Optional.of(station));
-        given(stationLineRepository.findLineNamesByStationIdIn(List.of(42L)))
+        given(stationLineRepository.findLinesByStationIdIn(List.of(42L)))
                 .willReturn(List.of(view2, view5));
 
-        StationSummaryResponse expected = new StationSummaryResponse(42L, "왕십리역", List.of("2호선", "5호선"));
-        ArgumentCaptor<List<String>> linesCaptor = ArgumentCaptor.forClass(List.class);
+        StationSummaryResponse expected = new StationSummaryResponse(42L, "왕십리역", List.of());
+        ArgumentCaptor<List<LineSummaryResponse>> linesCaptor = ArgumentCaptor.forClass(List.class);
         given(stationConverter.toSummaryResponse(eq(station), linesCaptor.capture())).willReturn(expected);
 
         // when
         List<StationSummaryResponse> result = stationQueryService.searchByName("왕십리역");
 
-        // then
+        // then: id·name·code가 projection→service 변환에서 모두 올바르게 매핑되는지 객체 전체로 검증한다
         assertThat(result).containsExactly(expected);
-        assertThat(linesCaptor.getValue()).containsExactly("2호선", "5호선");
+        assertThat(linesCaptor.getValue()).containsExactly(
+                new LineSummaryResponse(2L, "2호선", LineCode.LINE_2),
+                new LineSummaryResponse(5L, "5호선", LineCode.LINE_5));
     }
 
     @Test
@@ -184,12 +190,12 @@ class StationQueryServiceTest {
     void getStationPlaces_includesLinesAndTags() {
         // given: 코스 만들기 화면 상단에 노선(6호선·우이신설선)과 태그가 표시된다
         // lineView가 내부에서 스터빙하므로 given(...) 안에서 호출하면 중첩 스터빙이 된다. 미리 만들어 둔다.
-        StationLineNameView line6 = lineView(6L, "6호선");
-        StationLineNameView lineUi = lineView(6L, "우이신설선");
+        StationLineView line6 = lineView(6L, LineCode.LINE_6);
+        StationLineView lineUi = lineView(6L, LineCode.UI_SINSEOL);
         given(stationRepository.findById(6L)).willReturn(Optional.of(station(6L, "보문역")));
         List<PlaceInfoResponse> places = List.of(place(11L, "CULTURE", "문화공간"), place(30L, "FOOD", "식당"));
         given(placeQueryService.getPlacesByStation(6L)).willReturn(places);
-        given(stationLineRepository.findLineNamesByStationIdIn(List.of(6L)))
+        given(stationLineRepository.findLinesByStationIdIn(List.of(6L)))
                 .willReturn(List.of(line6, lineUi));
         given(placeInfoQueryService.getTopTagNames(List.of(11L, 30L)))
                 .willReturn(List.of("LOCAL_EXPLORE", "NATURE", "BUDGET"));
@@ -198,10 +204,11 @@ class StationQueryServiceTest {
         stationQueryService.getStationPlaces(6L);
 
         // then
-        ArgumentCaptor<List<String>> linesCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<LineSummaryResponse>> linesCaptor = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<List<String>> tagsCaptor = ArgumentCaptor.forClass(List.class);
         verify(stationConverter).toPlacesResponse(any(), linesCaptor.capture(), tagsCaptor.capture(), any(), any());
-        assertThat(linesCaptor.getValue()).containsExactly("6호선", "우이신설선");
+        assertThat(linesCaptor.getValue()).extracting(LineSummaryResponse::code)
+                .containsExactly(LineCode.LINE_6, LineCode.UI_SINSEOL);
         assertThat(tagsCaptor.getValue()).containsExactly("LOCAL_EXPLORE", "NATURE", "BUDGET");
     }
 

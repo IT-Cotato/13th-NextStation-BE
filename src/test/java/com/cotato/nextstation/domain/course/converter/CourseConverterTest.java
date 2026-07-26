@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.course.converter;
 
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,8 +24,9 @@ class CourseConverterTest {
         given(view.getName()).willReturn("주연의 보문역 여행");
         given(view.getStationId()).willReturn(123L);
         given(view.getStationName()).willReturn("보문역");
-        given(view.getLineId()).willReturn(12L);
+        given(view.getLineId()).willReturn(6L);
         given(view.getLineName()).willReturn("6호선");
+        given(view.getLineCode()).willReturn(LineCode.LINE_6);
         return view;
     }
 
@@ -68,8 +70,9 @@ class CourseConverterTest {
         assertThat(response.name()).isEqualTo("주연의 보문역 여행");
         assertThat(response.stationId()).isEqualTo(123L);
         assertThat(response.stationName()).isEqualTo("보문역");
-        assertThat(response.lineId()).isEqualTo(12L);
-        assertThat(response.lineName()).isEqualTo("6호선");
+        assertThat(response.line().id()).isEqualTo(6L);
+        assertThat(response.line().name()).isEqualTo("6호선");
+        assertThat(response.line().code()).isEqualTo(LineCode.LINE_6);
         assertThat(response.placeCount()).isEqualTo(4);
         assertThat(response.tags()).containsExactly("자연과함께", "사진찍기좋은");
         assertThat(response.imageUrl()).isEqualTo("cover.jpg");
