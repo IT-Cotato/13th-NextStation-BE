@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends BaseTimeEntity {
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 50)
     private String email;
 
     @Column(length = 255)
@@ -34,10 +34,10 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false)
     private MemberRole role;
 
-    @Column(unique = true)
+    @Column(unique = true, length = 30)
     private String nickname;
 
-    @Column(name = "profile_image_url")
+    @Column(name = "profile_image_url", length = 255)
     private String profileImageUrl;
 
     @Column(name = "profile_bio", length = 30)
