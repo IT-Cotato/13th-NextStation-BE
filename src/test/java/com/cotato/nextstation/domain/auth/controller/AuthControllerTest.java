@@ -12,8 +12,8 @@ import com.cotato.nextstation.domain.auth.service.command.EmailVerificationComma
 import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
 import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
-import com.cotato.nextstation.domain.auth.service.query.LoginResult;
-import com.cotato.nextstation.domain.auth.service.query.ReissueResult;
+import com.cotato.nextstation.domain.auth.service.query.result.LoginResult;
+import com.cotato.nextstation.domain.auth.service.query.result.ReissueResult;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
