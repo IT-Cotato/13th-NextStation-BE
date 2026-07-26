@@ -14,10 +14,10 @@ public record PopularCourseResponse(
         @Schema(description = "조회수", example = "300")
         int viewCount,
 
-        @Schema(description = "저장 수", example = "128")
-        int saveCount,
+        @Schema(description = "좋아요 수", example = "128")
+        int likeCount,
 
-        @Schema(description = "현재 로그인 사용자가 이 코스를 저장했는지 여부. memberId 없이 조회하면 항상 false", example = "true")
-        boolean isSaved
+        @Schema(description = "현재 로그인 사용자가 이 코스를 좋아요했는지 여부. memberId 없이 조회하면 항상 false", example = "true")
+        boolean isLiked
 ) {
 }

@@ -7,7 +7,7 @@ import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRe
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
-import com.cotato.nextstation.domain.course.service.command.CourseSaveCommandService;
+import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -40,7 +40,7 @@ public class CourseController {
     private static final String MEMBER_ID_DESCRIPTION = "회원 ID (Auth 적용 전까지 사용하는 임시 헤더)";
 
     private final CourseCommandService courseCommandService;
-    private final CourseSaveCommandService courseSaveCommandService;
+    private final CourseLikeCommandService courseLikeCommandService;
 
     @Operation(
             summary = "코스 생성",
@@ -72,12 +72,12 @@ public class CourseController {
             description = """
                     다른 사람의 공개 코스를 편집 가능한 내 코스로 복제한다.
                     - `{courseId}`는 **복사할 원본 코스**의 ID다.
-                    - 원본을 참조만 하는 스크랩과 달리, 복제본은 원본이 삭제되거나 비공개로 바뀌어도 그대로 남는다.
+                    - 원본을 참조만 하는 좋아요와 달리, 복제본은 원본이 삭제되거나 비공개로 바뀌어도 그대로 남는다.
                     - `name`은 **복제본에 부여할 이름**이며 필수다. 사용자가 이름을 고치지 않았으면
                       화면에 채워둔 **원본 이름을 그대로 실어 보낸다**. 
                     - `placeIds`를 넘기면 그 순서대로 코스 순서가 부여되고, 생략하면 원본 순서를 그대로 따른다.
                     - 장소를 빼거나 더할 수는 없어 `placeIds`는 원본의 장소 구성과 정확히 일치해야 한다.
-                    - 복제본의 조회수·저장 수는 0부터 시작하며, 여행일지·컨셉투어는 물려받지 않는다.
+                    - 복제본의 조회수·좋아요 수는 0부터 시작하며, 여행일지·컨셉투어는 물려받지 않는다.
                     """
     )
     @ApiResponses({
@@ -149,49 +149,50 @@ public class CourseController {
     }
 
     @Operation(
-            summary = "코스 스크랩 추가",
+            summary = "코스 좋아요 추가",
             description = """
-                    다른 사람의 코스를 보관함에 스크랩한다.
-                    - 스크랩은 원본을 참조만 하므로, 원본이 삭제되거나 비공개로 바뀌면 목록에서도 빠진다.
+                    다른 사람의 코스를 보관함에 좋아요한다.
+                    - 좋아요는 원본을 참조만 하므로, 원본이 삭제되거나 비공개로 바뀌면 목록에서도 빠진다.
                     - 코스를 복사해 내 것으로 만드는 "내 코스로 만들기"와는 다른 기능이다.
-                    - 스크랩하면 해당 코스의 저장 수가 1 증가한다.
+                    - 좋아요하면 해당 코스의 좋아요 수가 1 증가한다.
                     """
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "스크랩 성공 (data 없음)"),
+            @ApiResponse(responseCode = "201", description = "좋아요 성공 (data 없음)"),
+            @ApiResponse(responseCode = "400", description = "본인이 만든 코스에 좋아요 (`CourseErrorCode.CANNOT_LIKE_OWN_COURSE`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
-            @ApiResponse(responseCode = "409", description = "이미 저장한 코스 (`CourseErrorCode.DUPLICATE_COURSE_SAVE`)"),
+            @ApiResponse(responseCode = "409", description = "이미 좋아요한 코스 (`CourseErrorCode.DUPLICATE_COURSE_LIKE`)"),
     })
-    @PostMapping("/{courseId}/saves")
+    @PostMapping("/{courseId}/likes")
     @ResponseStatus(HttpStatus.CREATED)
-    public CommonResponse<Void> saveCourse(
+    public CommonResponse<Void> likeCourse(
             @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId) {
-        courseSaveCommandService.saveCourse(memberId, courseId);
+        courseLikeCommandService.likeCourse(memberId, courseId);
         return CommonResponse.success(HttpStatus.CREATED, null);
     }
 
     @Operation(
-            summary = "코스 스크랩 취소",
+            summary = "코스 좋아요 단건 취소",
             description = """
-                    보관함에서 스크랩한 코스를 제거한다.
+                    보관함에서 좋아요한 코스를 제거한다.
                     - 원본 코스는 삭제되지 않는다.
-                    - 취소하면 해당 코스의 저장 수가 1 감소한다.
+                    - 취소하면 해당 코스의 좋아요 수가 1 감소한다.
                     """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "취소 성공 (data 없음)"),
-            @ApiResponse(responseCode = "404", description = "저장하지 않은 코스 (`CourseErrorCode.COURSE_SAVE_NOT_FOUND`)"),
+            @ApiResponse(responseCode = "404", description = "좋아요하지 않은 코스 (`CourseErrorCode.COURSE_LIKE_NOT_FOUND`)"),
     })
-    @DeleteMapping("/{courseId}/saves")
-    public CommonResponse<Void> cancelCourseSave(
+    @DeleteMapping("/{courseId}/likes")
+    public CommonResponse<Void> cancelCourseLike(
             @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId) {
-        courseSaveCommandService.cancelSave(memberId, courseId);
+        courseLikeCommandService.cancelLike(memberId, courseId);
         return CommonResponse.success(null);
     }
 
@@ -200,7 +201,7 @@ public class CourseController {
             description = """
                     내가 만든 코스를 삭제한다.
                     - soft delete이며, 삭제 후에는 목록·상세 조회에서 모두 제외된다.
-                    - 이 코스를 스크랩한 사람들의 보관함에서도 함께 사라진다.
+                    - 이 코스를 좋아요한 사람들의 보관함에서도 함께 사라진다.
                     """
     )
     @ApiResponses({
@@ -214,7 +215,7 @@ public class CourseController {
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId) {
-        courseSaveCommandService.deleteCourse(memberId, courseId);
+        courseLikeCommandService.deleteCourse(memberId, courseId);
         return CommonResponse.success(null);
     }
 }

@@ -46,7 +46,7 @@ public class CourseCommandService {
     /**
      * "내 코스로 만들기"
      * 타인의 공개 코스를 편집 가능한 내 코스로 복제한다.
-     * 원본을 참조만 하는 스크랩과 달리, 복제본은 원본이 삭제되거나 비공개로 바뀌어도 그대로 남는다.
+     * 원본을 참조만 하는 좋아요와 달리, 복제본은 원본이 삭제되거나 비공개로 바뀌어도 그대로 남는다.
      * 저장 화면에서 이름 입력과 순서 변경이 함께 일어나므로 한 번의 요청으로 처리한다.
      */
     public CourseCreateResponse copyCourse(Long memberId, Long courseId, CourseCopyRequest request) {
@@ -87,7 +87,7 @@ public class CourseCommandService {
         }
     }
 
-    // 복제 대상은 "타인의 공개 코스"로 제한한다. 스크랩과 같은 조건이다.
+    // 복제 대상은 "타인의 공개 코스"로 제한한다. 좋아요와 같은 조건이다.
     private Course findCopyableCourse(Long memberId, Long courseId) {
         // 삭제된 코스는 Course의 @SQLRestriction 으로 조회에서 자동 제외된다.
         Course course = courseRepository.findById(courseId)

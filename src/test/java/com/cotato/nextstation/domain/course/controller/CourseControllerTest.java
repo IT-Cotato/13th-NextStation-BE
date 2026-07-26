@@ -8,7 +8,7 @@ import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
-import com.cotato.nextstation.domain.course.service.command.CourseSaveCommandService;
+import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
@@ -53,7 +53,7 @@ class CourseControllerTest {
     CourseCommandService courseCommandService;
 
     @MockitoBean
-    CourseSaveCommandService courseSaveCommandService;
+    CourseLikeCommandService courseLikeCommandService;
 
     // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
     @MockitoBean
@@ -231,45 +231,57 @@ class CourseControllerTest {
     }
 
     @Test
-    @DisplayName("코스를 스크랩하면 201을 반환한다")
-    void saveCourse_created() throws Exception {
-        mockMvc.perform(post("/api/v1/courses/{courseId}/saves", 1L)
+    @DisplayName("코스를 좋아요하면 201을 반환한다")
+    void likeCourse_created() throws Exception {
+        mockMvc.perform(post("/api/v1/courses/{courseId}/likes", 1L)
                         .header(MEMBER_ID_HEADER, 1L))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test
-    @DisplayName("이미 저장한 코스를 스크랩하면 409를 반환한다")
-    void saveCourse_duplicate() throws Exception {
-        willThrow(new CustomException(CourseErrorCode.DUPLICATE_COURSE_SAVE))
-                .given(courseSaveCommandService).saveCourse(eq(1L), eq(1L));
+    @DisplayName("이미 좋아요한 코스를 좋아요하면 409를 반환한다")
+    void likeCourse_duplicate() throws Exception {
+        willThrow(new CustomException(CourseErrorCode.DUPLICATE_COURSE_LIKE))
+                .given(courseLikeCommandService).likeCourse(eq(1L), eq(1L));
 
-        mockMvc.perform(post("/api/v1/courses/{courseId}/saves", 1L)
+        mockMvc.perform(post("/api/v1/courses/{courseId}/likes", 1L)
                         .header(MEMBER_ID_HEADER, 1L))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_409_DUPLICATE_COURSE_SAVE"));
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_409_DUPLICATE_COURSE_LIKE"));
     }
 
     @Test
-    @DisplayName("스크랩을 취소하면 200을 반환한다")
-    void cancelCourseSave_success() throws Exception {
-        mockMvc.perform(delete("/api/v1/courses/{courseId}/saves", 1L)
+    @DisplayName("본인이 만든 코스를 좋아요하면 400을 반환한다")
+    void likeCourse_ownCourse() throws Exception {
+        willThrow(new CustomException(CourseErrorCode.CANNOT_LIKE_OWN_COURSE))
+                .given(courseLikeCommandService).likeCourse(eq(1L), eq(1L));
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/likes", 1L)
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_CANNOT_LIKE_OWN_COURSE"));
+    }
+
+    @Test
+    @DisplayName("좋아요를 취소하면 200을 반환한다")
+    void cancelCourseLike_success() throws Exception {
+        mockMvc.perform(delete("/api/v1/courses/{courseId}/likes", 1L)
                         .header(MEMBER_ID_HEADER, 1L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
     }
 
     @Test
-    @DisplayName("저장하지 않은 코스를 취소하면 404를 반환한다")
-    void cancelCourseSave_notSaved() throws Exception {
-        willThrow(new CustomException(CourseErrorCode.COURSE_SAVE_NOT_FOUND))
-                .given(courseSaveCommandService).cancelSave(eq(1L), eq(1L));
+    @DisplayName("좋아요하지 않은 코스를 취소하면 404를 반환한다")
+    void cancelCourseLike_notLiked() throws Exception {
+        willThrow(new CustomException(CourseErrorCode.COURSE_LIKE_NOT_FOUND))
+                .given(courseLikeCommandService).cancelLike(eq(1L), eq(1L));
 
-        mockMvc.perform(delete("/api/v1/courses/{courseId}/saves", 1L)
+        mockMvc.perform(delete("/api/v1/courses/{courseId}/likes", 1L)
                         .header(MEMBER_ID_HEADER, 1L))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_SAVE_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_LIKE_NOT_FOUND"));
     }
 
     @Test
@@ -285,7 +297,7 @@ class CourseControllerTest {
     @DisplayName("타인 코스를 삭제하면 403을 반환한다")
     void deleteCourse_forbidden() throws Exception {
         willThrow(new CustomException(CourseErrorCode.COURSE_DELETE_FORBIDDEN))
-                .given(courseSaveCommandService).deleteCourse(eq(1L), eq(1L));
+                .given(courseLikeCommandService).deleteCourse(eq(1L), eq(1L));
 
         mockMvc.perform(delete("/api/v1/courses/{courseId}", 1L)
                         .header(MEMBER_ID_HEADER, 1L))

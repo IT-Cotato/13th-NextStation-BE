@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 
 // 커서 페이지네이션에서 "정렬 기준값 + tie-breaker(id)"를 인코딩/디코딩하는 범용 유틸.
-// 정렬 기준이 정수(likeCount, saveCount 등)면 longValue, 시간(createdAt)이면 dateTimeValue만 채운다.
+// 정렬 기준이 정수(likeCount 등)면 longValue, 시간(createdAt)이면 dateTimeValue만 채운다.
 // place review 외 다른 도메인(course 등)에서도 동일한 구조로 재사용 가능.
 public record CursorData(Long id, Long longValue, LocalDateTime dateTimeValue) {
 
