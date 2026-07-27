@@ -1,6 +1,6 @@
 package com.cotato.nextstation.domain.auth.util;
 
-import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
+import com.cotato.nextstation.global.jwt.AuthTokenClaims;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -26,7 +26,7 @@ public class RefreshTokenCookieFactory {
                 .secure(secure)
                 .sameSite(sameSite)
                 .path("/")
-                .maxAge(LoginQueryService.REFRESH_TOKEN_EXPIRATION)
+                .maxAge(AuthTokenClaims.REFRESH_TOKEN_EXPIRATION)
                 .build();
     }
 }

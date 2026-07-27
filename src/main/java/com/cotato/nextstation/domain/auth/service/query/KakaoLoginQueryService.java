@@ -31,8 +31,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class KakaoLoginQueryService {
 
-    private static final Duration ACCESS_TOKEN_EXPIRATION = Duration.ofHours(1);
-    private static final Duration REFRESH_TOKEN_EXPIRATION = Duration.ofDays(14);
     private static final Duration KAKAO_SIGNUP_TOKEN_EXPIRATION = Duration.ofMinutes(10);
     private static final Duration SIGNUP_TOKEN_EXPIRATION = Duration.ofMinutes(30);
 
@@ -74,8 +72,8 @@ public class KakaoLoginQueryService {
         }
 
         log.info("카카오 로그인 성공: memberId={}", member.getId());
-        String accessToken = issueAuthToken(member.getId(), AuthTokenClaims.ACCESS_PURPOSE, ACCESS_TOKEN_EXPIRATION);
-        String refreshToken = issueAuthToken(member.getId(), AuthTokenClaims.REFRESH_PURPOSE, REFRESH_TOKEN_EXPIRATION);
+        String accessToken = issueAuthToken(member.getId(), AuthTokenClaims.ACCESS_PURPOSE, AuthTokenClaims.ACCESS_TOKEN_EXPIRATION);
+        String refreshToken = issueAuthToken(member.getId(), AuthTokenClaims.REFRESH_PURPOSE, AuthTokenClaims.REFRESH_TOKEN_EXPIRATION);
 
         return new KakaoLoginResult(KakaoLoginResultType.LOGIN_SUCCESS, member.getId(), accessToken, refreshToken,
                 null, null, null, null);
