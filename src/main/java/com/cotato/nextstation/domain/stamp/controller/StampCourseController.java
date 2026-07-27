@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/stamps/stations")
+@RequestMapping("/api/v1")
 public class StampCourseController {
 
     // TODO: Auth 적용 시 X-Member-Id 헤더를 @AuthenticationPrincipal 로 교체한다.
@@ -32,7 +32,7 @@ public class StampCourseController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "401", description = "인증이 필요함"),
     })
-    @GetMapping("/{stationId}/courses")
+    @PostMapping("/courses/{courseId}/complete")
     public CommonResponse<StationPopularCoursesResponse> getPopularCoursesByStation(
             @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
@@ -40,4 +40,6 @@ public class StampCourseController {
             @PathVariable Long stationId) {
         return CommonResponse.success(stampCourseQueryService.getPopularCoursesByStation(stationId));
     }
+
+
 }
