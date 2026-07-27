@@ -30,7 +30,7 @@ public class StampCourseController {
             description = """
                     코스를 완료 처리하고 스탬프를 획득한다.
                     - 본인이 만든 코스만 완료할 수 있다.
-                    - 같은 코스를 여러 번 완료할 수 있다 (재방문 허용).
+                    - 같은 코스를 여러 번 완료할 수 없다.
                     - 완료 시 발급된 memberStampId는 여행일지 작성 시 사용한다.
                     """
     )
