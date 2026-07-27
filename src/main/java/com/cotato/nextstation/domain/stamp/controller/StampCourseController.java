@@ -60,7 +60,7 @@ public class StampCourseController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "401", description = "인증이 필요함"),
     })
-    @PostMapping("/courses/{courseId}/complete")
+    @GetMapping("/stamps/stations/{stationId}/courses")
     public CommonResponse<StationPopularCoursesResponse> getPopularCoursesByStation(
             @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
