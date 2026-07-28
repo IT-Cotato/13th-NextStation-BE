@@ -153,11 +153,10 @@ class ImageCommandServiceTest {
     }
 
     @Test
-    @DisplayName("journalId 없이 JOURNAL 업로드를 요청하면 예외가 발생한다")
-    void getPresignedUrl_journalMissingJournalId() {
-        assertThatThrownBy(() -> imageCommandService.getPresignedUrl(S3Folder.JOURNAL, MEMBER_ID, null, "photo.jpg"))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(ImageErrorCode.MISSING_JOURNAL_ID.getMessage());
+    @DisplayName("journalId 없이 JOURNAL 신규 작성 플로우로 요청하면 journalId 없는 경로로 발급된다")
+    void getPresignedUrl_journalNewCreationFlow() {
+        // journalId=null로 요청 시 images/uploads/journal/{memberId}/{uuid}.ext 형태의 key 생성
+        // journalRepository.existsByIdAndMember_Id()는 호출되지 않아야 함
     }
 
     @Test

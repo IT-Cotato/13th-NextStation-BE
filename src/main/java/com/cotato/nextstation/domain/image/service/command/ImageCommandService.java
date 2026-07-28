@@ -133,11 +133,10 @@ public class ImageCommandService {
             }
             case JOURNAL -> {
                 requireMemberId(memberId);
-                if (journalId == null) {
-                    log.warn("journalId 없이 JOURNAL 이미지 presigned URL 요청: memberId={}", memberId);
-                    throw new CustomException(ImageErrorCode.MISSING_JOURNAL_ID);
-                }
-                yield "%s/%d/%d/%s.%s".formatted(folder.getPath(), memberId, journalId, uuid, extension);
+                yield (journalId != null)
+                        ? "%s/%d/%d/%s.%s".formatted(folder.getPath(), memberId, journalId, uuid, extension)
+                        : "%s/%d/%s.%s".formatted(folder.getPath(), memberId, uuid, extension);
+                        // journalId 없으면: images/uploads/journal/{memberId}/{uuid}.ext
             }
             case STATIC_PLACE -> {
                 log.warn("presigned URL 발급 대상이 아닌 폴더 요청: folder={}", folder);
