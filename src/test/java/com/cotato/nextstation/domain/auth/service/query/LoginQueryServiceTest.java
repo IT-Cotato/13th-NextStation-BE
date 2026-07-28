@@ -1,6 +1,8 @@
 package com.cotato.nextstation.domain.auth.service.query;
 
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
+import com.cotato.nextstation.domain.auth.service.query.result.LoginResult;
+import com.cotato.nextstation.domain.auth.service.query.result.ReissueResult;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;

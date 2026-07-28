@@ -43,3 +43,9 @@ app:
 aws:
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME}
+
+kakao:
+  oauth:
+    client-id: ${KAKAO_OAUTH_CLIENT_ID}
+    client-secret: ${KAKAO_OAUTH_CLIENT_SECRET}
+    redirect-uri: ${KAKAO_OAUTH_REDIRECT_URI}

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
@@ -14,6 +15,7 @@ public record SignupRequest(
         @Schema(description = "이메일 인증이 완료된 이메일 주소", example = "user@example.com")
         @NotBlank(message = "이메일은 필수입니다.")
         @Email(message = "올바른 이메일 형식이 아닙니다.")
+        @Size(max = 254, message = "이메일은 254자를 초과할 수 없습니다.") // Member.email 컬럼 길이와 동일
         String email,
 
         @Schema(description = "비밀번호 (영문·숫자·특수기호 포함 8-20자)", example = "abc12345!")
