@@ -120,6 +120,7 @@ class StampCommandServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(StampErrorCode.STATION_NOT_FOUND.getMessage());
 
-    // Station 조회 실패로 MemberStamp가 저장되지 않아야 함
-    verify(memberStampRepository, never()).save(any());
+        // Station 조회 실패로 MemberStamp가 저장되지 않아야 함
+        verify(memberStampRepository, never()).save(any());
+    }
 }
