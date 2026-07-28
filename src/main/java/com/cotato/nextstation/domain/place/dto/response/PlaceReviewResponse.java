@@ -21,8 +21,8 @@ public record PlaceReviewResponse(
         @Schema(description = "리뷰 내용")
         String content,
 
-        @Schema(description = "리뷰 이미지 URL 목록")
-        List<String> imageUrls,
+        @Schema(description = "리뷰 이미지 URL")
+        String imageUrl,
 
         @Schema(description = "좋아요 개수", example = "11")
         long likeCount,

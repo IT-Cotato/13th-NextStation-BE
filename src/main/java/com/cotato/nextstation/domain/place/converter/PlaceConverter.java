@@ -26,17 +26,11 @@ public class PlaceConverter {
 
     public PlaceDetailResponse toDetailResponse(
             Place place,
+            long totalReviewCount,
             List<PlaceImage> placeImages,
             List<PlaceReview> reviews,
             List<PlaceReviewImage> reviewImages
     ) {
-
-        Map<Long, List<String>> imagesByReviewId = reviewImages.stream()
-                .collect(Collectors.groupingBy(
-                        image -> image.getPlaceReview().getId(),
-                        Collectors.mapping(PlaceReviewImage::getImageUrl, Collectors.toList())
-                ));
-
         return new PlaceDetailResponse(
                 place.getId(),
                 place.getPlaceName(),
@@ -45,6 +39,7 @@ public class PlaceConverter {
                 place.getAddress(),
                 place.getContactNumber(),
                 place.getKakaoPlaceUrl(),
+                totalReviewCount,
                 toImageUrls(place, placeImages),
                 toReviewPreviews(reviews, reviewImages)
         );
@@ -75,13 +70,18 @@ public class PlaceConverter {
 
 
     private PlaceReviewPreviewResponse toReviewPreview(PlaceReview review, Map<Long, List<String>> imagesByReviewId) {
+        List<String> images = imagesByReviewId.getOrDefault(review.getId(), List.of());
+        // 기획상 리뷰 이미지는 1개만 업로드 가능하나,
+        // DB는 1:N으로 설계되어 있어 첫 번째 이미지만 응답에 포함한다. 필요 시 추후에 수정.
+        String imageUrl = images.isEmpty() ? null : images.get(0);
+
         return new PlaceReviewPreviewResponse(
                 review.getId(),
                 review.getJournal().getMember().getId(),
                 review.getJournal().getMember().getNickname(),
                 review.getJournal().getMember().getProfileImageUrl(),
                 review.getReview(),
-                imagesByReviewId.getOrDefault(review.getId(), List.of()),
+                imageUrl,
                 review.getCreatedAt()
         );
     }

@@ -36,6 +36,8 @@ public class PlaceQueryService {
         Place place = placeRepository.findById(placeId)
                 .orElseThrow(() -> new CustomException(PlaceErrorCode.PLACE_NOT_FOUND));
 
+        long totalReviewCount = placeReviewRepository.countByPlaceId(placeId);
+
 
         List<PlaceImage> placeImages = placeImageRepository.findByPlaceOrderBySortOrderAsc(place);
         List<PlaceReview> reviews = placeReviewRepository.findVisibleReviewsByPlaceId(
@@ -44,7 +46,7 @@ public class PlaceQueryService {
 
         List<Long> reviewIds = reviews.stream().map(PlaceReview::getId).toList();
         List<PlaceReviewImage> reviewImages = placeReviewImageRepository.findByPlaceReviewIdIn(reviewIds);
-        return placeConverter.toDetailResponse(place, placeImages, reviews, reviewImages);
+        return placeConverter.toDetailResponse(place, totalReviewCount, placeImages, reviews, reviewImages);
     }
 
     public List<PlaceInfoResponse> getPlaceInfos(List<Long> placeIds) {
