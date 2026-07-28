@@ -14,6 +14,9 @@ import java.util.List;
 
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
+    // 다중 삭제 대상 조회. memberId로 걸러서 남의 코스는 애초에 대상에서 빠진다(부분 성공 허용).
+    List<Course> findAllByMemberIdAndIdIn(Long memberId, List<Long> ids);
+
     // 좋아요 가능한 코스인지 확인한다.
     // Journal을 INNER JOIN 하므로 journalId가 NULL인 코스는 자동 제외되고,
     // 삭제된 코스/일지는 각 엔티티의 @SQLRestriction으로 걸러진다.
