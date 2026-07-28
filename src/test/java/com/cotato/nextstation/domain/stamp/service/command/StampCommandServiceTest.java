@@ -105,19 +105,21 @@ class StampCommandServiceTest {
         Long courseId = 10L;
         Long stationId = 999L;
 
+
         CourseInfoResponse courseInfo = new CourseInfoResponse(
                 courseId, "보문역 코스", memberId, stationId, null, 0, 0, LocalDateTime.now()
         );
 
-        MemberStamp memberStamp = mock(MemberStamp.class);
-
         given(courseQueryService.getCourseInfo(courseId)).willReturn(courseInfo);
-        given(memberStampRepository.save(any(MemberStamp.class))).willReturn(memberStamp);
+        given(memberStampRepository.existsByMemberIdAndCourseId(memberId, courseId)).willReturn(false);
         given(stationRepository.findById(stationId)).willReturn(Optional.empty());
+
 
         // when & then
         assertThatThrownBy(() -> stampCommandService.completeCourse(memberId, courseId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(StampErrorCode.STATION_NOT_FOUND.getMessage());
-    }
+
+    // Station 조회 실패로 MemberStamp가 저장되지 않아야 함
+    verify(memberStampRepository, never()).save(any());
 }
