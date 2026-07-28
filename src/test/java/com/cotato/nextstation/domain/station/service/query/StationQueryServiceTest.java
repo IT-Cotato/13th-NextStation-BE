@@ -3,6 +3,7 @@ package com.cotato.nextstation.domain.station.service.query;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
+import com.cotato.nextstation.domain.station.converter.LineConverter;
 import com.cotato.nextstation.domain.station.converter.StationConverter;
 import com.cotato.nextstation.domain.station.dto.response.StationPlaceCategoryResponse;
 import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -53,6 +55,9 @@ class StationQueryServiceTest {
     private PlaceInfoQueryService placeInfoQueryService;
     @Mock
     private StationConverter stationConverter;
+    // 노선 요약 변환은 단순 매핑이라 실제 구현을 그대로 쓴다
+    @Spy
+    private LineConverter lineConverter = new LineConverter();
 
     private StationLineView lineView(Long stationId, LineCode lineCode) {
         StationLineView view = mock(StationLineView.class);
