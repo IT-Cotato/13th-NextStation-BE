@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
 import java.util.List;
 
 @Schema(description = "다중 이미지 업로드용 presigned URL 발급 요청")
@@ -24,8 +26,9 @@ public record PresignedUrlsRequest(
         @Schema(description = "여행일지 id", example = "10")
         Long journalId,
 
-        @Schema(description = "원본 파일명(확장자 포함)", example = "profile.jpg")
-        @NotEmpty
+        @Schema(description = "원본 파일명(확장자 포함) 목록. 최대 10개", example = "profile.jpg")
+        @NotEmpty(message = "fileNames는 최소 1개 이상이어야 합니다.")
+        @Size(max = 10, message = "한 번에 최대 10개까지 업로드할 수 있습니다.")
         List<@NotBlank String> fileNames
 ) {
 }
