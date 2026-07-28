@@ -87,7 +87,7 @@ public class KakaoAuthController {
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 필수 약관 미동의 (`GlobalErrorCode.VALIDATION_ERROR`, `TermsErrorCode.REQUIRED_TERMS_NOT_AGREED`)"),
             @ApiResponse(responseCode = "401", description = "kakaoSignupToken 누락, 위변조, 또는 만료 (`AuthErrorCode.INVALID_KAKAO_SIGNUP_TOKEN`, `AuthErrorCode.KAKAO_SIGNUP_TOKEN_EXPIRED`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 약관 id (`TermsErrorCode.TERMS_NOT_FOUND`)"),
-            @ApiResponse(responseCode = "409", description = "이미 가입된 카카오 계정 (`AuthErrorCode.KAKAO_ACCOUNT_ALREADY_REGISTERED`)"),
+            @ApiResponse(responseCode = "409", description = "이미 가입된 카카오 계정, 또는 카카오 인증 이메일이 기존 로컬 계정과 중복 (`AuthErrorCode.KAKAO_ACCOUNT_ALREADY_REGISTERED`, `AuthErrorCode.DUPLICATE_EMAIL`)"),
     })
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/signup")
