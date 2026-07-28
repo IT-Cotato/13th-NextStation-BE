@@ -146,6 +146,24 @@ class KakaoSignupCommandServiceTest {
     }
 
     @Test
+    @DisplayName("카카오 인증 이메일이 기존 로컬 계정 이메일과 중복되면 예외가 발생한다")
+    void signup_emailDuplicatedWithLocalAccount() {
+        // given
+        Claims claims = validClaims("user@example.com", "환승러", "http://img");
+        given(jwtProvider.parseClaims(KAKAO_SIGNUP_TOKEN)).willReturn(claims);
+        given(memberSocialAccountRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, PROVIDER_USER_ID))
+                .willReturn(Optional.empty());
+        given(memberRepository.existsByEmail("user@example.com")).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> kakaoSignupCommandService.signup(KAKAO_SIGNUP_TOKEN, List.of(1L), "127.0.0.1"))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(AuthErrorCode.DUPLICATE_EMAIL.getMessage());
+        verify(memberRepository, never()).save(any());
+        verify(memberSocialAccountRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("이미 연동된(PENDING) 카카오 계정이면 재가입 대신 signupToken만 재발급한다")
     void signup_reissueForExistingPendingMember() {
         // given
