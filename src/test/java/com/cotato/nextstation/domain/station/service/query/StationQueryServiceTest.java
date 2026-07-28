@@ -27,6 +27,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -75,7 +76,8 @@ class StationQueryServiceTest {
         given(station.getId()).willReturn(42L);
         StationLineView view2 = lineView(42L, LineCode.LINE_2);
         StationLineView view5 = lineView(42L, LineCode.LINE_5);
-        given(stationRepository.findByStationName("왕십리역")).willReturn(Optional.of(station));
+        given(stationRepository.findByStationNameContainingOrderByStationNameAsc(eq("왕십리역"), any(Pageable.class)))
+                .willReturn(List.of(station));
         given(stationLineRepository.findLinesByStationIdIn(List.of(42L)))
                 .willReturn(List.of(view2, view5));
 
@@ -94,10 +96,77 @@ class StationQueryServiceTest {
     }
 
     @Test
+    @DisplayName("부분일치로 검색하면 해당 글자를 포함한 역이 모두 나온다")
+    void searchByName_partialMatch() {
+        // given: "십리"로 검색하면 왕십리역·답십리역이 모두 걸린다
+        Station wangsimni = mock(Station.class);
+        Station dapsimni = mock(Station.class);
+        given(wangsimni.getId()).willReturn(42L);
+        given(dapsimni.getId()).willReturn(43L);
+        given(stationRepository.findByStationNameContainingOrderByStationNameAsc(eq("십리"), any(Pageable.class)))
+                .willReturn(List.of(dapsimni, wangsimni));
+        given(stationLineRepository.findLinesByStationIdIn(List.of(43L, 42L))).willReturn(List.of());
+
+        StationSummaryResponse dap = new StationSummaryResponse(43L, "답십리역", List.of());
+        StationSummaryResponse wang = new StationSummaryResponse(42L, "왕십리역", List.of());
+        given(stationConverter.toSummaryResponse(eq(dapsimni), any())).willReturn(dap);
+        given(stationConverter.toSummaryResponse(eq(wangsimni), any())).willReturn(wang);
+
+        // when
+        List<StationSummaryResponse> result = stationQueryService.searchByName("십리");
+
+        // then: 리포지토리가 돌려준 순서(역명 오름차순)를 그대로 유지한다
+        assertThat(result).containsExactly(dap, wang);
+    }
+
+    @Test
+    @DisplayName("검색 결과는 20개로 제한한다")
+    void searchByName_limitedTo20() {
+        // given
+        given(stationRepository.findByStationNameContainingOrderByStationNameAsc(eq("역"), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        stationQueryService.searchByName("역");
+
+        // then: "역"처럼 짧은 검색어에 결과가 쏟아지지 않도록 상한을 넘긴다
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(stationRepository).findByStationNameContainingOrderByStationNameAsc(eq("역"), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("검색어 앞뒤 공백은 제거하고 검색한다")
+    void searchByName_trimsKeyword() {
+        // given
+        given(stationRepository.findByStationNameContainingOrderByStationNameAsc(eq("왕십리"), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        stationQueryService.searchByName("  왕십리  ");
+
+        // then
+        verify(stationRepository).findByStationNameContainingOrderByStationNameAsc(eq("왕십리"), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("검색어가 비어 있으면 조회하지 않고 빈 목록을 반환한다")
+    void searchByName_blankKeyword() {
+        // when
+        List<StationSummaryResponse> result = stationQueryService.searchByName("   ");
+
+        // then: 전체 역을 훑는 낭비를 막는다
+        assertThat(result).isEmpty();
+        verify(stationRepository, never())
+                .findByStationNameContainingOrderByStationNameAsc(any(), any(Pageable.class));
+    }
+
+    @Test
     @DisplayName("일치하는 역이 없으면 빈 목록을 반환한다")
     void searchByName_notFound() {
         // given
-        given(stationRepository.findByStationName("없는역")).willReturn(Optional.empty());
+        given(stationRepository.findByStationNameContainingOrderByStationNameAsc(eq("없는역"), any(Pageable.class)))
+                .willReturn(List.of());
 
         // when
         List<StationSummaryResponse> result = stationQueryService.searchByName("없는역");

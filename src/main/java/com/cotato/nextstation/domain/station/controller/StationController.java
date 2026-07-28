@@ -27,11 +27,13 @@ public class StationController {
     @Operation(
             summary = "역 검색",
             description = """
-                    역명으로 역을 검색한다. 
-                    - 검색 대상은 서울 내 전체 역 
-                    - 현재는 이름 전체일치 검색이다.
+                    역명으로 역을 검색한다.
+                    - 검색 대상은 서울 내 전체 역
+                    - **부분일치** 검색이다. 예를 들어 `십리`로 검색하면 왕십리역·답십리역·상왕십리역이 모두 나온다.
+                    - 결과는 역명 오름차순이며, **최대 20개**까지만 반환한다.
+                      (`역`처럼 짧은 검색어에 결과가 쏟아지는 것을 막기 위함)
                     - 환승역이면 소속 노선이 여러 개로 반환된다.
-                    - 일치하는 역이 없으면 빈 목록을 반환한다.
+                    - 검색어가 비어 있거나 일치하는 역이 없으면 빈 목록을 반환한다(404가 아니다).
                     """
     )
     @ApiResponses({
@@ -39,7 +41,7 @@ public class StationController {
     })
     @GetMapping
     public CommonResponse<List<StationSummaryResponse>> searchStations(
-            @Parameter(description = "검색할 역명 (전체일치)", example = "왕십리역")
+            @Parameter(description = "검색할 역명 (부분일치)", example = "십리")
             @RequestParam String keyword) {
         return CommonResponse.success(stationQueryService.searchByName(keyword));
     }
