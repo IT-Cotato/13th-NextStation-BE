@@ -108,7 +108,6 @@ public class CourseController {
                     - name: 최대 20자, 공백 불가
                     - placeIds: 코스의 기존 장소 구성과 정확히 일치해야 한다(개수·구성 모두). 배열 순서대로 order_num이 재할당된다.
                     - 한 트랜잭션으로 처리되어, 장소 순서 검증에 실패하면 이름 변경도 함께 롤백된다.
-                    - 이전에 분리돼 있던 `PATCH /{courseId}/name`, `PATCH /{courseId}/places/order`를 통합한 것이다.
                     """
     )
     @ApiResponses({

@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.course.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
@@ -19,11 +20,15 @@ public record CourseUpdateRequest(
         @Size(min = 3, max = 10, message = "장소는 3개 이상 10개 이하로 선택해야 합니다.")
         List<@NotNull Long> placeIds
 ) {
+    // 검증 전용 메서드다. @JsonIgnore가 없으면 요청 스키마에 boolean 필드로 노출돼
+    // 프론트가 보내야 하는 값으로 오해할 수 있다.
+    @JsonIgnore
     @AssertTrue(message = "이름 또는 장소 순서 중 하나 이상을 입력해주세요.")
     public boolean isAnyFieldProvided() {
         return name != null || placeIds != null;
     }
 
+    @JsonIgnore
     @AssertTrue(message = "코스 이름은 공백일 수 없습니다.")
     public boolean isNameNotBlank() {
         return name == null || !name.isBlank();
