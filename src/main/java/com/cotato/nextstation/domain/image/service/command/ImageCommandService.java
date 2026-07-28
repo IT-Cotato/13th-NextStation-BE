@@ -77,7 +77,7 @@ public class ImageCommandService {
     public List<PresignedUrlResponse> getPresignedUrls(
             S3Folder folder, Long memberId, Long journalId, List<String> fileNames) {
         if (folder == S3Folder.PROFILE) {
-            throw new CustomException(ImageErrorCode.UNSUPPORTED_UPLOAD_FOLDER);
+            throw new CustomException(ImageErrorCode.PROFILE_NOT_ALLOWED_IN_BATCH);
         }
         validateJournalOwnership(folder, memberId, journalId);
 
