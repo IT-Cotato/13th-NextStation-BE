@@ -15,7 +15,7 @@ public record MyCourseListResponse(
         List<LineSummaryResponse> availableLines,
 
         @Schema(description = "내가 만든 코스 목록 (최신순)")
-        List<CourseCardResponse> courses,
+        List<MyCourseCardResponse> courses,
 
         @Schema(description = "다음 페이지 커서 (없으면 마지막 페이지)")
         String nextCursor,
