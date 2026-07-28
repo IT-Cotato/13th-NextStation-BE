@@ -3,8 +3,7 @@ package com.cotato.nextstation.domain.course.service.command;
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
 import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
-import com.cotato.nextstation.domain.course.dto.request.CourseNameUpdateRequest;
-import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRequest;
+import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
@@ -175,90 +174,114 @@ class CourseCommandServiceTest {
     }
 
     @Test
-    @DisplayName("본인 코스의 이름을 수정한다")
-    void updateCourseName_success() {
+    @DisplayName("이름과 장소 순서를 함께 요청하면 둘 다 반영된다")
+    void updateCourse_bothFields_success() {
+        // given
+        Course course = course("이전 이름");
+        CoursePlace place10 = coursePlace(10L, 1);
+        CoursePlace place20 = coursePlace(20L, 2);
+        CoursePlace place30 = coursePlace(30L, 3);
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L))
+                .willReturn(List.of(place10, place20, place30));
+
+        // when
+        courseCommandService.updateCourse(1L, 1L, new CourseUpdateRequest("새 이름", List.of(30L, 10L, 20L)));
+
+        // then
+        assertThat(course.getName()).isEqualTo("새 이름");
+        assertThat(place30.getOrderNum()).isEqualTo(1);
+        assertThat(place10.getOrderNum()).isEqualTo(2);
+        assertThat(place20.getOrderNum()).isEqualTo(3);
+        verify(courseConverter).toUpdateResponse(course);
+    }
+
+    @Test
+    @DisplayName("이름만 요청하면 이름만 바뀌고 장소 순서는 조회하지 않는다")
+    void updateCourse_nameOnly() {
         // given
         Course course = course("이전 이름");
         given(courseRepository.findById(1L)).willReturn(Optional.of(course));
 
         // when
-        courseCommandService.updateCourseName(1L, 1L, new CourseNameUpdateRequest("새 이름"));
+        courseCommandService.updateCourse(1L, 1L, new CourseUpdateRequest("새 이름", null));
 
         // then
         assertThat(course.getName()).isEqualTo("새 이름");
-        verify(courseConverter).toNameResponse(course);
+        verify(coursePlaceRepository, never()).findByCourseIdOrderByOrderNumAsc(any());
     }
 
     @Test
-    @DisplayName("없는 코스의 이름을 수정하면 예외가 발생한다")
-    void updateCourseName_notFound() {
+    @DisplayName("장소 순서만 요청하면 순서만 바뀌고 이름은 그대로다")
+    void updateCourse_placeIdsOnly() {
+        // given
+        Course course = course("이전 이름");
+        CoursePlace place10 = coursePlace(10L, 1);
+        CoursePlace place20 = coursePlace(20L, 2);
+        CoursePlace place30 = coursePlace(30L, 3);
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L))
+                .willReturn(List.of(place10, place20, place30));
+
+        // when
+        courseCommandService.updateCourse(1L, 1L, new CourseUpdateRequest(null, List.of(30L, 10L, 20L)));
+
+        // then
+        assertThat(course.getName()).isEqualTo("이전 이름");
+        assertThat(place30.getOrderNum()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("없는 코스를 수정하면 예외가 발생한다")
+    void updateCourse_notFound() {
         // given
         given(courseRepository.findById(1L)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> courseCommandService.updateCourseName(1L, 1L, new CourseNameUpdateRequest("새 이름")))
+        assertThatThrownBy(() -> courseCommandService.updateCourse(1L, 1L, new CourseUpdateRequest("새 이름", null)))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
     }
 
     @Test
-    @DisplayName("타인 소유 코스의 이름을 수정하면 권한 예외가 발생하고 이름이 바뀌지 않는다")
-    void updateCourseName_forbidden() {
+    @DisplayName("타인 소유 코스를 수정하면 권한 예외가 발생하고 이름이 바뀌지 않는다")
+    void updateCourse_forbidden() {
         // given — 코스 소유자는 1번 회원, 요청자는 2번 회원
         Course course = course("이전 이름");
         given(courseRepository.findById(1L)).willReturn(Optional.of(course));
 
         // when & then
-        assertThatThrownBy(() -> courseCommandService.updateCourseName(2L, 1L, new CourseNameUpdateRequest("새 이름")))
+        assertThatThrownBy(() -> courseCommandService.updateCourse(2L, 1L, new CourseUpdateRequest("새 이름", null)))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.COURSE_FORBIDDEN.getMessage());
         assertThat(course.getName()).isEqualTo("이전 이름");
     }
 
     @Test
-    @DisplayName("요청 순서대로 장소의 order_num이 재부여된다")
-    void updateCoursePlaceOrder_success() {
-        // given
-        Course course = course("코스");
-        CoursePlace place10 = coursePlace(10L, 1);
-        CoursePlace place20 = coursePlace(20L, 2);
-        CoursePlace place30 = coursePlace(30L, 3);
-        List<CoursePlace> places = List.of(place10, place20, place30);
-        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
-        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(places);
-
-        // when
-        courseCommandService.updateCoursePlaceOrder(1L, 1L, new CoursePlaceOrderUpdateRequest(List.of(30L, 10L, 20L)));
-
-        // then
-        assertThat(place30.getOrderNum()).isEqualTo(1);
-        assertThat(place10.getOrderNum()).isEqualTo(2);
-        assertThat(place20.getOrderNum()).isEqualTo(3);
-    }
-
-    @Test
-    @DisplayName("중복된 장소로 순서를 수정하면 중복 예외가 발생한다")
-    void updateCoursePlaceOrder_duplicatePlaces() {
+    @DisplayName("중복된 장소로 순서를 요청하면 중복 예외가 발생하고 코스는 조회되지 않는다")
+    void updateCourse_duplicatePlaces() {
         // when & then
-        assertThatThrownBy(() -> courseCommandService.updateCoursePlaceOrder(
-                1L, 1L, new CoursePlaceOrderUpdateRequest(List.of(10L, 10L, 20L))))
+        assertThatThrownBy(() -> courseCommandService.updateCourse(
+                1L, 1L, new CourseUpdateRequest("새 이름", List.of(10L, 10L, 20L))))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.DUPLICATE_COURSE_PLACES.getMessage());
+        verify(courseRepository, never()).findById(any());
     }
 
     @Test
-    @DisplayName("코스에 없는 장소로 순서를 수정하면 예외가 발생한다")
-    void updateCoursePlaceOrder_mismatch() {
+    @DisplayName("코스에 없는 장소로 순서를 요청하면 예외가 발생하고 이름도 바뀌지 않는다(롤백)")
+    void updateCourse_placeMismatch_rollsBackName() {
         // given
-        Course course = course("코스");
-        List<CoursePlace> places = List.of(coursePlace(10L, 1), coursePlace(20L, 2), coursePlace(30L, 3));
+        Course course = course("이전 이름");
         given(courseRepository.findById(1L)).willReturn(Optional.of(course));
-        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(places);
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L))
+                .willReturn(List.of(coursePlace(10L, 1), coursePlace(20L, 2), coursePlace(30L, 3)));
 
-        // when & then
-        assertThatThrownBy(() -> courseCommandService.updateCoursePlaceOrder(
-                1L, 1L, new CoursePlaceOrderUpdateRequest(List.of(10L, 20L, 99L))))
+        // when & then: 장소 순서 검증에 실패하면 이름 변경도 함께 막혀야 한다
+        assertThatThrownBy(() -> courseCommandService.updateCourse(
+                1L, 1L, new CourseUpdateRequest("새 이름", List.of(10L, 20L, 99L))))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.INVALID_COURSE_PLACES.getMessage());
+        assertThat(course.getName()).isEqualTo("이전 이름");
     }
 }

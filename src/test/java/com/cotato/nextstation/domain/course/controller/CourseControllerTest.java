@@ -2,10 +2,9 @@ package com.cotato.nextstation.domain.course.controller;
 
 import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
-import com.cotato.nextstation.domain.course.dto.request.CourseNameUpdateRequest;
-import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRequest;
+import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
-import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
@@ -137,95 +136,136 @@ class CourseControllerTest {
     }
 
     @Test
-    @DisplayName("코스 이름을 수정하면 200과 courseId/name을 반환한다")
-    void updateCourseName_success() throws Exception {
-        given(courseCommandService.updateCourseName(eq(1L), eq(1L), any()))
-                .willReturn(new CourseNameResponse(1L, "나만의 보문역 코스"));
+    @DisplayName("이름과 장소 순서를 함께 수정하면 200과 courseId/name을 반환한다")
+    void updateCourse_bothFields_success() throws Exception {
+        given(courseCommandService.updateCourse(eq(1L), eq(1L), any()))
+                .willReturn(new CourseUpdateResponse(1L, "나만의 보문역 코스"));
 
-        mockMvc.perform(patch("/api/v1/courses/{courseId}/name", 1L)
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
                         .header(MEMBER_ID_HEADER, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new CourseNameUpdateRequest("나만의 보문역 코스"))))
+                        .content(objectMapper.writeValueAsString(
+                                new CourseUpdateRequest("나만의 보문역 코스", List.of(3L, 1L, 4L, 2L)))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.courseId").value(1))
                 .andExpect(jsonPath("$.data.name").value("나만의 보문역 코스"));
     }
 
     @Test
-    @DisplayName("없는 코스의 이름을 수정하면 404를 반환한다")
-    void updateCourseName_notFound() throws Exception {
-        given(courseCommandService.updateCourseName(eq(1L), eq(1L), any()))
-                .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+    @DisplayName("이름만 요청해도 200을 반환한다")
+    void updateCourse_nameOnly_success() throws Exception {
+        given(courseCommandService.updateCourse(eq(1L), eq(1L), any()))
+                .willReturn(new CourseUpdateResponse(1L, "나만의 보문역 코스"));
 
-        mockMvc.perform(patch("/api/v1/courses/{courseId}/name", 1L)
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
                         .header(MEMBER_ID_HEADER, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new CourseNameUpdateRequest("새 이름"))))
+                        .content(objectMapper.writeValueAsString(new CourseUpdateRequest("나만의 보문역 코스", null))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("나만의 보문역 코스"));
+    }
+
+    @Test
+    @DisplayName("장소 순서만 요청해도 200을 반환한다")
+    void updateCourse_placeIdsOnly_success() throws Exception {
+        given(courseCommandService.updateCourse(eq(1L), eq(1L), any()))
+                .willReturn(new CourseUpdateResponse(1L, "보문역 코스"));
+
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
+                        .header(MEMBER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CourseUpdateRequest(null, List.of(3L, 1L, 4L, 2L)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.courseId").value(1));
+    }
+
+    @Test
+    @DisplayName("이름과 장소 순서를 모두 생략하면 400을 반환한다")
+    void updateCourse_bothMissing() throws Exception {
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
+                        .header(MEMBER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CourseUpdateRequest(null, null))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.reasons.anyFieldProvided").exists());
+    }
+
+    @Test
+    @DisplayName("없는 코스를 수정하면 404를 반환한다")
+    void updateCourse_notFound() throws Exception {
+        given(courseCommandService.updateCourse(eq(1L), eq(1L), any()))
+                .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
+                        .header(MEMBER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CourseUpdateRequest("새 이름", null))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("타인 소유 코스의 이름을 수정하면 403을 반환한다")
-    void updateCourseName_forbidden() throws Exception {
-        given(courseCommandService.updateCourseName(eq(1L), eq(1L), any()))
+    @DisplayName("타인 소유 코스를 수정하면 403을 반환한다")
+    void updateCourse_forbidden() throws Exception {
+        given(courseCommandService.updateCourse(eq(1L), eq(1L), any()))
                 .willThrow(new CustomException(CourseErrorCode.COURSE_FORBIDDEN));
 
-        mockMvc.perform(patch("/api/v1/courses/{courseId}/name", 1L)
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
                         .header(MEMBER_ID_HEADER, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new CourseNameUpdateRequest("새 이름"))))
+                        .content(objectMapper.writeValueAsString(new CourseUpdateRequest("새 이름", null))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_403_COURSE_FORBIDDEN"));
     }
 
     @Test
     @DisplayName("코스 이름이 20자를 초과하면 400을 반환한다")
-    void updateCourseName_tooLong() throws Exception {
+    void updateCourse_nameTooLong() throws Exception {
         String tooLongName = "가".repeat(21);
 
-        mockMvc.perform(patch("/api/v1/courses/{courseId}/name", 1L)
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
                         .header(MEMBER_ID_HEADER, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new CourseNameUpdateRequest(tooLongName))))
+                        .content(objectMapper.writeValueAsString(new CourseUpdateRequest(tooLongName, null))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.reasons.name").exists());
     }
 
     @Test
-    @DisplayName("코스 이름이 비어 있으면 400을 반환한다")
-    void updateCourseName_blank() throws Exception {
-        mockMvc.perform(patch("/api/v1/courses/{courseId}/name", 1L)
+    @DisplayName("코스 이름이 공백이면 400을 반환한다")
+    void updateCourse_nameBlank() throws Exception {
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
                         .header(MEMBER_ID_HEADER, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new CourseNameUpdateRequest(""))))
+                        .content(objectMapper.writeValueAsString(new CourseUpdateRequest("   ", null))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.reasons.name").exists());
+                .andExpect(jsonPath("$.reasons.nameNotBlank").exists());
     }
 
     @Test
-    @DisplayName("코스 장소 순서를 수정하면 200과 데이터 없는 응답을 반환한다")
-    void updateCoursePlaceOrder_success() throws Exception {
-        mockMvc.perform(patch("/api/v1/courses/{courseId}/places/order", 1L)
+    @DisplayName("장소가 3개 미만이면 400을 반환한다")
+    void updateCourse_tooFewPlaces() throws Exception {
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
                         .header(MEMBER_ID_HEADER, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new CoursePlaceOrderUpdateRequest(List.of(3L, 1L, 4L, 2L)))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data").doesNotExist());
+                        .content(objectMapper.writeValueAsString(new CourseUpdateRequest(null, List.of(3L, 1L)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.reasons.placeIds").exists());
     }
 
     @Test
     @DisplayName("장소 목록이 코스 구성과 다르면 400을 반환한다")
-    void updateCoursePlaceOrder_invalidPlaces() throws Exception {
+    void updateCourse_invalidPlaces() throws Exception {
         willThrow(new CustomException(CourseErrorCode.INVALID_COURSE_PLACES))
-                .given(courseCommandService).updateCoursePlaceOrder(eq(1L), eq(1L), any());
+                .given(courseCommandService).updateCourse(eq(1L), eq(1L), any());
 
-        mockMvc.perform(patch("/api/v1/courses/{courseId}/places/order", 1L)
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
                         .header(MEMBER_ID_HEADER, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new CoursePlaceOrderUpdateRequest(List.of(3L, 1L, 99L)))))
+                        .content(objectMapper.writeValueAsString(new CourseUpdateRequest(null, List.of(3L, 1L, 99L)))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_INVALID_COURSE_PLACES"));
     }
