@@ -3,6 +3,7 @@ package com.cotato.nextstation.domain.station.service.query;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
+import com.cotato.nextstation.domain.station.converter.LineConverter;
 import com.cotato.nextstation.domain.station.converter.StationConverter;
 import com.cotato.nextstation.domain.station.dto.response.StationPlaceCategoryResponse;
 import com.cotato.nextstation.domain.station.dto.response.StationPlacesResponse;
@@ -42,6 +43,7 @@ public class StationQueryService {
     private final PlaceQueryService placeQueryService;
     private final PlaceInfoQueryService placeInfoQueryService;
     private final StationConverter stationConverter;
+    private final LineConverter lineConverter;
 
     /**
      * 코스 만들기 후보 장소를 카테고리별로 묶어 반환한다.
@@ -109,10 +111,7 @@ public class StationQueryService {
         return stationLineRepository.findLinesByStationIdIn(stationIds).stream()
                 .collect(Collectors.groupingBy(
                         StationLineView::getStationId,
-                        Collectors.mapping(
-                                line -> new LineSummaryResponse(
-                                        line.getLineId(), line.getLineName(), line.getLineCode()),
-                                Collectors.toList())
+                        Collectors.mapping(lineConverter::toSummaryResponse, Collectors.toList())
                 ));
     }
 }
