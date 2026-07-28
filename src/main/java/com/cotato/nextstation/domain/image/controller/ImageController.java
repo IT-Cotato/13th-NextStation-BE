@@ -42,6 +42,7 @@ public class ImageController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "발급 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 확장자 없는 파일명, 또는 지원하지 않는 확장자 (`GlobalErrorCode.VALIDATION_ERROR`, `ImageErrorCode.INVALID_FILE_NAME`, `ImageErrorCode.UNSUPPORTED_FILE_EXTENSION`)"),
+            @ApiResponse(responseCode = "403", description = "본인의 여행일지에만 이미지를 업로드할 수 있습니다"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
     @PostMapping("/presigned-url")
@@ -70,6 +71,7 @@ public class ImageController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "발급 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패"),
+            @ApiResponse(responseCode = "403", description = "본인의 여행일지에만 이미지를 업로드할 수 있습니다"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
     @PostMapping("/presigned-urls/batch")
@@ -87,7 +89,7 @@ public class ImageController {
             description = """
                     S3에서 이미지를 삭제한다.
                     - 프로필 이미지 교체, 여행일지 삭제 등 기존 이미지가 더 이상 필요 없을 때 사용한다.
-                    - 이미지 교체 시 흐름: 이 API로 기존 이미지 삭제 → 새 presigned URL 발급 → S3 업로드
+                    - 이미지 교체 시 흐름:  새 presigned URL 발급 → S3 업로드 → 도메인 URL 갱신 → 이 API로 기존 이미지 삭제
                     - 로그인한 본인의 이미지만 삭제할 수 있다.
                     """
     )
