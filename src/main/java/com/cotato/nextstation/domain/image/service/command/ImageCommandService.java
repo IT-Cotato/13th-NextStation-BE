@@ -7,12 +7,14 @@ import com.cotato.nextstation.global.exception.CustomException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -22,13 +24,16 @@ public class ImageCommandService {
     private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(10);
 
     private final S3Presigner s3Presigner;
+    private final S3Client s3Client;
     private final String bucketName;
     private final String region;
 
     public ImageCommandService(S3Presigner s3Presigner,
+                                S3Client s3Client,
                                 @Value("${aws.s3.bucket-name}") String bucketName,
                                 @Value("${spring.cloud.aws.region.static}") String region) {
         this.s3Presigner = s3Presigner;
+        this.s3Client = s3Client;
         this.bucketName = bucketName;
         this.region = region;
     }
@@ -59,6 +64,14 @@ public class ImageCommandService {
         PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
 
         return new PresignedUrlResponse(presignedRequest.url().toString(), imageUrl, contentType);
+    }
+
+    // 다중 Presigned URL 생성
+    public List<PresignedUrlResponse> getPresignedUrls(
+            S3Folder folder, Long memberId, Long journalId, List<String> fileNames) {
+        return fileNames.stream()
+                .map(fileName -> getPresignedUrl(folder, memberId, journalId, fileName))
+                .toList();
     }
 
     /** S3 객체 키 생성
