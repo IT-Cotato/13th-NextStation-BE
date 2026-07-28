@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
@@ -72,6 +73,22 @@ public class ImageCommandService {
         return fileNames.stream()
                 .map(fileName -> getPresignedUrl(folder, memberId, journalId, fileName))
                 .toList();
+    }
+
+    // 이미지 삭제
+    public void deleteImage(String imageUrl) {
+        String key = extractKeyFromImageUrl(imageUrl);
+        DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build();
+        s3Client.deleteObject(deleteRequest);
+        log.info("S3 이미지 삭제 완료: key={}", key);
+    }
+
+    private String extractKeyFromImageUrl(String imageUrl) {
+        String prefix = "https://%s.s3.%s.amazonaws.com/".formatted(bucketName, region);
+        return imageUrl.substring(prefix.length());
     }
 
     /** S3 객체 키 생성

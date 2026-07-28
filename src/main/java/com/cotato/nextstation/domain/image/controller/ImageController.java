@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.image.controller;
 
 import com.cotato.nextstation.domain.image.dto.request.PresignedUrlRequest;
+import com.cotato.nextstation.domain.image.dto.request.PresignedUrlsRequest;
 import com.cotato.nextstation.domain.image.dto.response.PresignedUrlResponse;
 import com.cotato.nextstation.domain.image.service.command.ImageCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
@@ -9,10 +10,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -41,5 +41,42 @@ public class ImageController {
     public CommonResponse<PresignedUrlResponse> getPresignedUrl(@Valid @RequestBody PresignedUrlRequest request) {
         return CommonResponse.success(imageCommandService.getPresignedUrl(
                 request.folder(), request.memberId(), request.journalId(), request.fileName()));
+    }
+
+    @Operation(
+            summary = "다중 이미지 업로드용 presigned URL 일괄 발급",
+            description = """
+                S3에 여러 이미지를 직접 업로드할 수 있는 presigned URL을 한 번에 발급한다.
+                - 발급받은 각 presignedUrl로 이미지 바이너리를 PUT 요청하면 업로드가 완료된다.
+                    - Content-Type 헤더에 응답의 contentType을 그대로 실어야 한다.
+                - presignedUrl은 10분 후 만료된다.
+                - 업로드 완료 후, 응답의 imageUrl 목록을 여행일지 작성 API 등
+                  이미지 URL이 필요한 다음 요청에 그대로 실어 보내면 된다.
+                - folder는 도메인에 맞추어서 요청한다. (JOURNAL: 여행일지 이미지)
+                    - PROFILE은 단일 업로드 API(/presigned-url)를 사용할 것
+                    - 아래 Request body의 Schema 설명 참고
+                - fileNames 순서대로 응답이 반환되므로, 순서가 보장된다.
+                """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "발급 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패"),
+    })
+    @PostMapping("/presigned-urls/batch")
+    public CommonResponse<List<PresignedUrlResponse>> getPresignedUrls(
+            @Valid @RequestBody PresignedUrlsRequest request) {
+        return CommonResponse.success(imageCommandService.getPresignedUrls(
+                request.folder(), request.memberId(), request.journalId(), request.fileNames()));
+    }
+
+
+    @Operation(summary = "이미지 삭제")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "삭제 성공"),
+    })
+    @DeleteMapping
+    public CommonResponse<Void> deleteImage(@RequestParam String imageUrl) {
+        imageCommandService.deleteImage(imageUrl);
+        return CommonResponse.success(null);
     }
 }
