@@ -79,7 +79,8 @@ public class ImageCommandService {
         if (folder != S3Folder.JOURNAL) {
             throw new CustomException(ImageErrorCode.PROFILE_NOT_ALLOWED_IN_BATCH);
         }
-        validateJournalOwnership(folder, memberId, journalId);
+
+        // journalId null이면 각 단일 발급에서 journalId 없는 경로로 처리됨
 
         return fileNames.stream()
                 .map(fileName -> getPresignedUrl(folder, memberId, journalId, fileName))
