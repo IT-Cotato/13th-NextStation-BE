@@ -3,7 +3,9 @@ package com.cotato.nextstation.domain.place.converter;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.place.dto.response.PlaceDetailResponse;
+import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.*;
+import com.cotato.nextstation.domain.place.enums.CategoryCode;
 import com.cotato.nextstation.domain.place.repository.PlaceImageRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,25 +49,31 @@ class PlaceConverterTest {
     }
 
     @Test
-    @DisplayName("totalReviewCount가 응답에 정확히 포함된다")
-    void toDetailResponse_totalReviewCount() {
+    @DisplayName("Place 목록을 PlaceInfoResponse 목록으로 변환한다")
+    void toPlaceInfoResponses_success() {
         // given
         Category category = mock(Category.class);
-        given(category.getDefaultImageUrl()).willReturn(null);
-        given(category.getName()).willReturn("카페");
+        given(category.getCode()).willReturn(CategoryCode.CULTURE);
+        given(category.getName()).willReturn("문화공간");
 
         Place place = mock(Place.class);
+        given(place.getId()).willReturn(1L);
+        given(place.getPlaceName()).willReturn("보문숲길도서관");
+        given(place.getDescription()).willReturn("혼자 조용히 머물기 좋은 동네 도서관");
         given(place.getCategory()).willReturn(category);
+        given(place.getXCoordinate()).willReturn(127.123);
+        given(place.getYCoordinate()).willReturn(37.456);
+
+        given(placeImageRepository.findByPlaceIdIn(List.of(1L))).willReturn(List.of());
 
         // when
-        PlaceDetailResponse response = placeConverter.toDetailResponse(
-                place, 24L, List.of(), List.of(), List.of()
-        );
+        List<PlaceInfoResponse> result = placeConverter.toPlaceInfoResponses(List.of(place));
 
         // then
-        assertThat(response.totalReviewCount()).isEqualTo(24L);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).placeId()).isEqualTo(1L);
+        assertThat(result.get(0).categoryCode()).isEqualTo("CULTURE");
     }
-
 
     @Test
     @DisplayName("리뷰 이미지가 여러 개면 첫 번째 이미지만 응답에 포함된다")
