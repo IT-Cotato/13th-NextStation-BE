@@ -18,7 +18,7 @@ public enum ImageErrorCode implements ErrorCode {
     PROFILE_NOT_ALLOWED_IN_BATCH(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_PROFILE_NOT_ALLOWED_IN_BATCH", "프로필 이미지는 단일 업로드 API를 사용해주세요."),
     IMAGE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "CLIENT_ERROR_403_IMAGE_ACCESS_DENIED", "본인의 이미지만 삭제할 수 있습니다."),
     JOURNAL_ACCESS_DENIED(HttpStatus.FORBIDDEN, "CLIENT_ERROR_403_JOURNAL_ACCESS_DENIED", "본인의 여행일지에만 이미지를 업로드할 수 있습니다."),
-
+    INVALID_IMAGE_URL_FORMAT(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_403_INVALID_IMAGE_URL_FORMAT", "잘못된 형식의 이미지 URL입니다.")
             ;
 
     private final HttpStatus httpStatus;

@@ -101,12 +101,17 @@ public class ImageCommandService {
 
     private String extractKeyFromImageUrl(String imageUrl) {
         String prefix = "https://%s.s3.%s.amazonaws.com/".formatted(bucketName, region);
+        if (!imageUrl.startsWith(prefix)) {
+            throw new CustomException(ImageErrorCode.INVALID_IMAGE_URL_FORMAT);
+        }
         return imageUrl.substring(prefix.length());
     }
 
-    // key 경로(images/uploads/{folder}/{memberId}/...)에 인증된 memberId가 포함돼 있는지 확인
+    // key 형식: images/uploads/{folder}/{memberId}/... (PROFILE) 또는 .../{memberId}/{journalId}/... (JOURNAL)
+    // memberId는 폴더 종류와 무관하게 항상 4번째 세그먼트(index 3)에 위치한다.
     private void validateOwnership(String key, Long memberId) {
-        boolean owned = key.contains("/" + memberId + "/");
+        String[] segments = key.split("/");
+        boolean owned = segments.length > 3 && segments[3].equals(String.valueOf(memberId));
         if (!owned) {
             throw new CustomException(ImageErrorCode.IMAGE_ACCESS_DENIED);
         }
