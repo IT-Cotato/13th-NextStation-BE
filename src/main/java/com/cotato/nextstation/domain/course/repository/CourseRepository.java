@@ -66,6 +66,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 대표 호선이 없는 역도 있을 수 있어 LEFT JOIN으로 둔다.
     // 본인 코스이므로 공개 여부는 걸지 않는다. 삭제된 코스는 @SQLRestriction이 제외한다.
     // 호선/역 필터는 둘 다 선택 사항이라 파라미터가 null이면 조건을 건너뛴다.
+    //
+    // 호선 필터는 대표 호선이 아니라 역이 속한 호선 전체(StationLine)를 기준으로 판단한다.
+    // 대표 호선은 카드 배지에 뭘 보여줄지 정한 표시용 값이라, 그걸로 걸러내면 환승역 코스가
+    // 실제로 갈 수 있는 다른 호선 탭에서 사라진다(예: 동묘앞역 코스가 6호선 탭에서 누락).
     @Query("SELECT c.id AS courseId, c.name AS name, c.createdAt AS createdAt, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -73,7 +77,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE c.memberId = :memberId " +
-            "AND (:lineId IS NULL OR l.id = :lineId) " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
             "ORDER BY c.createdAt DESC, c.id DESC")
     List<MyCourseView> findMyCourses(@Param("memberId") Long memberId,
@@ -89,7 +94,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE c.memberId = :memberId " +
-            "AND (:lineId IS NULL OR l.id = :lineId) " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
             "AND (c.createdAt < :createdAt OR (c.createdAt = :createdAt AND c.id < :courseId)) " +
             "ORDER BY c.createdAt DESC, c.id DESC")
@@ -103,10 +109,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 내 코스가 하나라도 있는 호선. 코스 없는 호선 칩을 비활성화하는 데 쓴다.
     // 현재 필터와 무관하게 전체 기준으로 조회해야 필터를 바꿔 끼울 수 있다.
     // 페이징으로는 전체 목록을 볼 수 없어 서버가 따로 알려준다.
+    // 호선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
+    // "칩은 비활성인데 필터를 걸면 결과가 나오는" 불일치가 생긴다.
     @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
             "JOIN Station s ON s.id = c.stationId " +
-            "JOIN s.drawLine l " +
+            "JOIN StationLine sl ON sl.station.id = s.id " +
+            "JOIN sl.line l " +
             "WHERE c.memberId = :memberId " +
             "ORDER BY l.name")
     List<LineView> findAvailableLines(@Param("memberId") Long memberId);
