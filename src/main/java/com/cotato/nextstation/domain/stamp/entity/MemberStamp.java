@@ -1,10 +1,7 @@
 package com.cotato.nextstation.domain.stamp.entity;
 
 import com.cotato.nextstation.global.entity.BaseTimeEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Index;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,6 +14,12 @@ import lombok.NoArgsConstructor;
         indexes = {
                 @Index(name = "idx_member_stamp_member", columnList = "member_id"),
                 @Index(name = "idx_member_stamp_member_course", columnList = "member_id, course_id")
+        },
+        uniqueConstraints = {
+        @UniqueConstraint(
+                name = "uk_member_stamp_member_course",
+                columnNames = {"member_id", "course_id"}
+            )
         }
 )
 @Getter

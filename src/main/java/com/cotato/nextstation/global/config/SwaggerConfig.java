@@ -127,7 +127,7 @@ public class SwaggerConfig {
                 .group("Stamp")
                 .displayName("Stamp API")
                 .packagesToScan("com.cotato.nextstation.domain.stamp.controller")
-                .pathsToMatch("/api/v1/stamps/**")
+                .pathsToMatch("/api/v1/stamps/**", "/api/v1/courses/*/complete")
                 .build();
     }
 
