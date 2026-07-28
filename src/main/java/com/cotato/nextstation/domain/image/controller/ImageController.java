@@ -5,9 +5,13 @@ import com.cotato.nextstation.domain.image.dto.request.PresignedUrlsRequest;
 import com.cotato.nextstation.domain.image.dto.response.PresignedUrlResponse;
 import com.cotato.nextstation.domain.image.service.command.ImageCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.security.AuthenticationPrincipal;
+import com.cotato.nextstation.global.security.JwtPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -37,10 +41,14 @@ public class ImageController {
             @ApiResponse(responseCode = "200", description = "발급 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 확장자 없는 파일명, 또는 지원하지 않는 확장자 (`GlobalErrorCode.VALIDATION_ERROR`, `ImageErrorCode.INVALID_FILE_NAME`, `ImageErrorCode.UNSUPPORTED_FILE_EXTENSION`)"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @PostMapping("/presigned-url")
-    public CommonResponse<PresignedUrlResponse> getPresignedUrl(@Valid @RequestBody PresignedUrlRequest request) {
+    public CommonResponse<PresignedUrlResponse> getPresignedUrl(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            @Valid @RequestBody PresignedUrlRequest request
+    ) {
         return CommonResponse.success(imageCommandService.getPresignedUrl(
-                request.folder(), request.memberId(), request.journalId(), request.fileName()));
+                request.folder(), principal.memberId(), request.journalId(), request.fileName()));
     }
 
     @Operation(
@@ -61,11 +69,14 @@ public class ImageController {
             @ApiResponse(responseCode = "200", description = "발급 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @PostMapping("/presigned-urls/batch")
     public CommonResponse<List<PresignedUrlResponse>> getPresignedUrls(
-            @Valid @RequestBody PresignedUrlsRequest request) {
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            @Valid @RequestBody PresignedUrlsRequest request
+    ) {
         return CommonResponse.success(imageCommandService.getPresignedUrls(
-                request.folder(), request.memberId(), request.journalId(), request.fileNames()));
+                request.folder(), principal.memberId(), request.journalId(), request.fileNames()));
     }
 
 
@@ -75,14 +86,22 @@ public class ImageController {
                     S3에서 이미지를 삭제한다.
                     - 프로필 이미지 교체, 여행일지 삭제 등 기존 이미지가 더 이상 필요 없을 때 사용한다.
                     - 이미지 교체 시 흐름: 이 API로 기존 이미지 삭제 → 새 presigned URL 발급 → S3 업로드
+                    - 로그인한 본인의 이미지만 삭제할 수 있다.
                     """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "삭제 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "인증 실패 (`GlobalErrorCode.EXPIRED_TOKEN`/`INVALID_TOKEN`/`UNAUTHORIZED`)"),
+            @ApiResponse(responseCode = "403", description = "본인 이미지가 아님"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @DeleteMapping
-    public CommonResponse<Void> deleteImage(@RequestParam String imageUrl) {
-        imageCommandService.deleteImage(imageUrl);
+    public CommonResponse<Void> deleteImage(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            @RequestParam String imageUrl
+    ) {
+        imageCommandService.deleteImage(imageUrl, principal.memberId());
         return CommonResponse.success(null);
     }
 }

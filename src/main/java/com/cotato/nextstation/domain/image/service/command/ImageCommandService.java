@@ -80,8 +80,10 @@ public class ImageCommandService {
     }
 
     // 이미지 삭제
-    public void deleteImage(String imageUrl) {
+    public void deleteImage(String imageUrl, Long memberId) {
         String key = extractKeyFromImageUrl(imageUrl);
+        validateOwnership(key, memberId);
+
         DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
@@ -93,6 +95,14 @@ public class ImageCommandService {
     private String extractKeyFromImageUrl(String imageUrl) {
         String prefix = "https://%s.s3.%s.amazonaws.com/".formatted(bucketName, region);
         return imageUrl.substring(prefix.length());
+    }
+
+    // key 경로(images/uploads/{folder}/{memberId}/...)에 인증된 memberId가 포함돼 있는지 확인
+    private void validateOwnership(String key, Long memberId) {
+        boolean owned = key.contains("/" + memberId + "/");
+        if (!owned) {
+            throw new CustomException(ImageErrorCode.IMAGE_ACCESS_DENIED);
+        }
     }
 
     /** S3 객체 키 생성
