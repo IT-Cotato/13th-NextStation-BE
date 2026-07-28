@@ -58,6 +58,13 @@ public class KakaoSignupCommandService {
         termsAgreementValidator.validate(agreedTermsIds);
 
         String email = kakaoClaims.email().isBlank() ? null : kakaoClaims.email();
+
+        // 카카오 인증 이메일이 기존 로컬(이메일/비밀번호) 계정과 겹치는 경우, 계정 연동은 아직 미지원이라 명확한 에러로 막는다.
+        if (email != null && memberRepository.existsByEmail(email)) {
+            log.warn("카카오 인증 이메일이 기존 계정과 중복: providerUserId={}", kakaoClaims.providerUserId());
+            throw new CustomException(AuthErrorCode.DUPLICATE_EMAIL);
+        }
+
         Member member;
         try {
             member = memberRepository.save(Member.builder().email(email).build());
