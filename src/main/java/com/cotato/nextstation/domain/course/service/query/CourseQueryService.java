@@ -19,6 +19,7 @@ import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
+import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
@@ -58,6 +59,7 @@ public class CourseQueryService {
     private final CoursePlaceRepository coursePlaceRepository;
     private final CourseLikeRepository courseLikeRepository;
     private final PlaceInfoQueryService placeInfoQueryService;
+    private final MemberStampQueryService memberStampQueryService;
     private final CourseConverter courseConverter;
 
     /**
@@ -121,7 +123,11 @@ public class CourseQueryService {
                 ? courseRepository.findAvailableLines(memberId)
                 : List.of();
 
-        return courseConverter.toMyListResponse(pageContent, availableLines, nextCursor, hasNext);
+        // 카드 스탬프 모양이 여행 완료 여부에 따라 달라진다. 페이지에 실린 코스만 한 번에 확인한다.
+        List<Long> courseIds = pageContent.stream().map(MyCourseView::getCourseId).toList();
+        Set<Long> completedCourseIds = memberStampQueryService.getCompletedCourseIds(memberId, courseIds);
+
+        return courseConverter.toMyListResponse(pageContent, completedCourseIds, availableLines, nextCursor, hasNext);
     }
 
     private List<MyCourseView> fetchMyCourses(Long memberId, Long lineId, Long stationId,

@@ -6,6 +6,7 @@ import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.MyCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
@@ -106,15 +107,17 @@ public class CourseConverter {
         return new LikedCourseListResponse(cards, nextCursor, hasNext);
     }
 
-    public MyCourseListResponse toMyListResponse(List<MyCourseView> myCourses, List<LineView> availableLines,
+    public MyCourseListResponse toMyListResponse(List<MyCourseView> myCourses, Set<Long> completedCourseIds,
+                                                 List<LineView> availableLines,
                                                  String nextCursor, boolean hasNext) {
-        List<CourseCardResponse> cards = myCourses.stream()
-                .map(myCourse -> new CourseCardResponse(
+        List<MyCourseCardResponse> cards = myCourses.stream()
+                .map(myCourse -> new MyCourseCardResponse(
                         myCourse.getCourseId(),
                         myCourse.getName(),
                         myCourse.getStationId(),
                         myCourse.getStationName(),
-                        toLine(myCourse.getLineId(), myCourse.getLineName(), myCourse.getLineCode())))
+                        toLine(myCourse.getLineId(), myCourse.getLineName(), myCourse.getLineCode()),
+                        completedCourseIds.contains(myCourse.getCourseId())))
                 .toList();
         List<LineSummaryResponse> lineFilters = availableLines.stream()
                 .map(line -> new LineSummaryResponse(line.getLineId(), line.getLineName(), line.getLineCode()))

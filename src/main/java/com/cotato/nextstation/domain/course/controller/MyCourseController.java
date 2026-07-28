@@ -36,6 +36,8 @@ public class MyCourseController {
                     - `lineId`/`stationId`는 선택 사항이며, 함께 주면 둘 다 만족하는 코스만 나온다.
                     - `availableLines`는 코스가 없는 호선 칩을 비활성화하는 데 쓴다.
                       현재 필터와 무관하게 전체 기준이며, 최초 조회(cursor 없음)에서만 채워진다.
+                    - `isCompleted`는 여행 완료 처리(`POST /courses/{courseId}/complete`) 여부다.
+                      완료한 코스는 스탬프가 채워진 모양으로 표시한다.
                     - `nextCursor`를 그대로 `cursor`에 넣어 다음 페이지를 요청한다.
                     """
     )
