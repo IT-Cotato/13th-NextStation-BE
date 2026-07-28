@@ -12,6 +12,7 @@ public record PlaceDetailResponse(
         String address,
         String contactNumber,
         String kakaoPlaceUrl,
+        long totalReviewCount,
 
         List<String> images,
         List<PlaceReviewPreviewResponse> reviews

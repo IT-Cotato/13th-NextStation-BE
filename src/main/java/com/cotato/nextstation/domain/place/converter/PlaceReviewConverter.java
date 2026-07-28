@@ -50,13 +50,16 @@ public class PlaceReviewConverter {
             Map<Long, List<String>> imagesByReviewId,
             Set<Long> likedReviewIds
     ) {
+        List<String> images = imagesByReviewId.getOrDefault(review.getId(), List.of());
+        String imageUrl = images.isEmpty() ? null : images.get(0);  // 첫 번째 이미지 or null
+
         return new PlaceReviewResponse(
                 review.getId(),
                 review.getJournal().getMember().getId(),
                 review.getJournal().getMember().getNickname(),
                 review.getJournal().getMember().getProfileImageUrl(),
                 review.getReview(),
-                imagesByReviewId.getOrDefault(review.getId(), List.of()),
+                imageUrl,
                 review.getLikeCount(),
                 likedReviewIds.contains(review.getId()),
                 review.getCreatedAt()

@@ -22,8 +22,8 @@ public record PlaceReviewPreviewResponse(
         @Schema(description = "리뷰 내용", example = "골목이 조용해서 사진 찍기 좋았어요.")
         String content,
 
-        @Schema(description = "리뷰 이미지 URL 목록")
-        List<String> imageUrls,
+        @Schema(description = "리뷰 이미지 URL")
+        String imageUrl,
 
         @Schema(description = "작성일시", example = "2026-07-06T10:00:00")
         LocalDateTime createdAt

@@ -87,6 +87,17 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // 회원 관련 API (내 프로필 등)
+    @Bean
+    public GroupedOpenApi memberApi() {
+        return GroupedOpenApi.builder()
+                .group("Member")
+                .displayName("Member API")
+                .packagesToScan("com.cotato.nextstation.domain.member.controller")
+                .pathsToMatch("/api/v1/members/**")
+                .build();
+    }
+
     // S3 이미지 업로드 관련 API
     @Bean
     public GroupedOpenApi imageApi() {

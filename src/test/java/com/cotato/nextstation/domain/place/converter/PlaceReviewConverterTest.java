@@ -123,4 +123,41 @@ class PlaceReviewConverterTest {
         assertThat(withCount.totalCount()).isEqualTo(24L);
         assertThat(withoutCount.totalCount()).isNull();
     }
+
+
+    @Test
+    @DisplayName("리뷰 이미지는 1개만 반환된다 (기획상 이미지 1개 제한)")
+    void toListResponse_singleImageUrl() {
+        // given
+        PlaceReview review = mockReview(501L, "리뷰", 1L, "닉네임");
+
+        // imageUrl이 있는 경우
+        Map<Long, List<String>> imagesWithUrl = Map.of(501L, List.of("https://img1.jpg", "https://img2.jpg"));
+
+        // when
+        PlaceReviewListResponse response = placeReviewConverter.toListResponse(
+                1L, List.of(review), imagesWithUrl, Set.of(), null, false);
+
+        // then — 첫 번째 이미지 1개만 반환
+        PlaceReviewResponse result = response.reviews().get(0);
+        assertThat(result.imageUrl()).isEqualTo("https://img1.jpg");
+    }
+
+
+    @Test
+    @DisplayName("리뷰 이미지가 없으면 imageUrl이 null이다")
+    void toListResponse_nullImageUrl() {
+        // given
+        PlaceReview review = mockReview(501L, "리뷰", 1L, "닉네임");
+
+        // when
+        PlaceReviewListResponse response = placeReviewConverter.toListResponse(
+                1L, List.of(review), Map.of(), Set.of(), null, false);
+
+        // then
+        PlaceReviewResponse result = response.reviews().get(0);
+        assertThat(result.imageUrl()).isNull();
+    }
 }
+
+

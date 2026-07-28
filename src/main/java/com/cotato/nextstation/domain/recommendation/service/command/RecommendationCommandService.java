@@ -8,6 +8,8 @@ import com.cotato.nextstation.domain.recommendation.repository.RecommendationLog
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceReader;
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceView;
 import com.cotato.nextstation.domain.station.entity.Station;
+import com.cotato.nextstation.domain.station.repository.StationLineRepository;
+import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineView;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class RecommendationCommandService {
     private static final List<String> CATEGORY_DISPLAY_ORDER = List.of("CULTURE", "FOOD", "CAFE", "WALK");
 
     private final StationRepository stationRepository;
+    private final StationLineRepository stationLineRepository;
     private final RecommendationLogRepository recommendationLogRepository;
     private final StationPlaceReader stationPlaceReader;
     private final RecommendationConverter recommendationConverter;
@@ -43,9 +46,11 @@ public class RecommendationCommandService {
                         .build()
         );
 
+        // 환승역이면 결과 화면에 소속 노선을 모두 칩으로 노출하므로 대표 노선만이 아니라 전체를 조회한다.
+        List<StationLineView> lines = stationLineRepository.findLinesByStationIdIn(List.of(picked.getId()));
         List<StationPlaceView> previewPlaces = selectOnePerCategory(stationPlaceReader.getPlacesByStation(picked.getId()));
         String courseName = picked.getStationName() + COURSE_NAME_SUFFIX;
-        return recommendationConverter.toRandomResponse(picked, courseName, previewPlaces);
+        return recommendationConverter.toRandomResponse(picked, lines, courseName, previewPlaces);
     }
 
     private Station pickDrawableStation(Long memberId) {

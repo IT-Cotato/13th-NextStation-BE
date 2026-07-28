@@ -1,5 +1,7 @@
 package com.cotato.nextstation.domain.place.converter;
 
+import com.cotato.nextstation.domain.journal.entity.Journal;
+import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.place.dto.response.PlaceDetailResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.*;
@@ -40,7 +42,7 @@ class PlaceConverterTest {
         given(place.getCategory()).willReturn(category);
 
         // when
-        PlaceDetailResponse response = placeConverter.toDetailResponse(place, List.of(), List.of(), List.of());
+        PlaceDetailResponse response = placeConverter.toDetailResponse(place, 0L, List.of(), List.of(), List.of());
 
         // then
         assertThat(response.images()).containsExactly("https://default.jpg");
@@ -52,6 +54,7 @@ class PlaceConverterTest {
         // given
         Category category = mock(Category.class);
         given(category.getCode()).willReturn(CategoryCode.CULTURE);
+        given(category.getName()).willReturn("문화공간");
 
         Place place = mock(Place.class);
         given(place.getId()).willReturn(1L);
@@ -60,6 +63,8 @@ class PlaceConverterTest {
         given(place.getCategory()).willReturn(category);
         given(place.getXCoordinate()).willReturn(127.123);
         given(place.getYCoordinate()).willReturn(37.456);
+
+        given(placeImageRepository.findByPlaceIdIn(List.of(1L))).willReturn(List.of());
 
         // when
         List<PlaceInfoResponse> result = placeConverter.toPlaceInfoResponses(List.of(place));
@@ -70,5 +75,79 @@ class PlaceConverterTest {
         assertThat(result.get(0).categoryCode()).isEqualTo("CULTURE");
     }
 
+    @Test
+    @DisplayName("리뷰 이미지가 여러 개면 첫 번째 이미지만 응답에 포함된다")
+    void toDetailResponse_reviewPreview_multipleImages_picksFirst() {
+        // given
+        Category category = mock(Category.class);
+        given(category.getDefaultImageUrl()).willReturn(null);
+        given(category.getName()).willReturn("카페");
 
+        Place place = mock(Place.class);
+        given(place.getCategory()).willReturn(category);
+
+        Member member = mock(Member.class);
+        given(member.getId()).willReturn(1L);
+        given(member.getNickname()).willReturn("닉네임");
+        given(member.getProfileImageUrl()).willReturn("http://profile.jpg");
+
+        Journal journal = mock(Journal.class);
+        given(journal.getMember()).willReturn(member);
+
+        PlaceReview review = mock(PlaceReview.class);
+        given(review.getId()).willReturn(10L);
+        given(review.getJournal()).willReturn(journal);
+        given(review.getReview()).willReturn("맛있어요");
+
+        PlaceReviewImage firstImage = mock(PlaceReviewImage.class);
+        given(firstImage.getPlaceReview()).willReturn(review);
+        given(firstImage.getImageUrl()).willReturn("http://first.jpg");
+
+        PlaceReviewImage secondImage = mock(PlaceReviewImage.class);
+        given(secondImage.getPlaceReview()).willReturn(review);
+        given(secondImage.getImageUrl()).willReturn("http://second.jpg");
+
+        // when
+        PlaceDetailResponse response = placeConverter.toDetailResponse(
+                place, 1L, List.of(), List.of(review), List.of(firstImage, secondImage)
+        );
+
+        // then
+        assertThat(response.reviews()).hasSize(1);
+        assertThat(response.reviews().get(0).imageUrl()).isEqualTo("http://first.jpg");
+    }
+
+    @Test
+    @DisplayName("리뷰 이미지가 없으면 imageUrl은 null이다")
+    void toDetailResponse_reviewPreview_noImages_returnsNull() {
+        // given
+        Category category = mock(Category.class);
+        given(category.getDefaultImageUrl()).willReturn(null);
+        given(category.getName()).willReturn("카페");
+
+        Place place = mock(Place.class);
+        given(place.getCategory()).willReturn(category);
+
+        Member member = mock(Member.class);
+        given(member.getId()).willReturn(1L);
+        given(member.getNickname()).willReturn("닉네임");
+        given(member.getProfileImageUrl()).willReturn("http://profile.jpg");
+
+        Journal journal = mock(Journal.class);
+        given(journal.getMember()).willReturn(member);
+
+        PlaceReview review = mock(PlaceReview.class);
+        given(review.getId()).willReturn(10L);
+        given(review.getJournal()).willReturn(journal);
+        given(review.getReview()).willReturn("맛있어요");
+
+        // when
+        PlaceDetailResponse response = placeConverter.toDetailResponse(
+                place, 1L, List.of(), List.of(review), List.of()
+        );
+
+        // then
+        assertThat(response.reviews()).hasSize(1);
+        assertThat(response.reviews().get(0).imageUrl()).isNull();
+    }
 }
