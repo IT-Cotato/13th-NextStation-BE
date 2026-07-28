@@ -3,6 +3,9 @@ package com.cotato.nextstation.domain.image.service.command;
 import com.cotato.nextstation.domain.image.dto.response.PresignedUrlResponse;
 import com.cotato.nextstation.domain.image.enums.S3Folder;
 import com.cotato.nextstation.domain.image.exception.ImageErrorCode;
+import com.cotato.nextstation.domain.journal.entity.Journal;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository;
+import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,18 +13,25 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.net.URI;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class ImageCommandServiceTest {
@@ -30,15 +40,23 @@ class ImageCommandServiceTest {
     private static final String REGION = "ap-northeast-2";
     private static final Long MEMBER_ID = 1L;
     private static final Long JOURNAL_ID = 10L;
+    private static final Long OTHER_MEMBER_ID = 999L;
 
     @Mock
     private S3Presigner s3Presigner;
 
+    @Mock
+    private S3Client s3Client;
+
+    @Mock
+    private JournalRepository journalRepository;
+
     private ImageCommandService imageCommandService;
+
 
     @BeforeEach
     void setUp() {
-        imageCommandService = new ImageCommandService(s3Presigner, BUCKET_NAME, REGION);
+        imageCommandService = new ImageCommandService(s3Presigner, s3Client, journalRepository, BUCKET_NAME, REGION);
     }
 
     private void givenPresignedUrl(String url) throws Exception {
@@ -68,6 +86,7 @@ class ImageCommandServiceTest {
     @DisplayName("JOURNAL 폴더 정상 요청이면 images/uploads/journal/{memberId}/{journalId}/{uuid}.{ext} 형태의 key로 발급된다")
     void getPresignedUrl_journalSuccess() throws Exception {
         // given
+        given(journalRepository.existsByIdAndMember_Id(JOURNAL_ID, MEMBER_ID)).willReturn(true);
         givenPresignedUrl("https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/journal/1/10/uuid.png?X-Amz-Signature=abc");
 
         // when
@@ -91,7 +110,8 @@ class ImageCommandServiceTest {
     })
     void getPresignedUrl_contentTypeMapping(String fileName, String expectedContentType) throws Exception {
         // given
-        givenPresignedUrl("https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid." + expectedContentType);
+        String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+        givenPresignedUrl("https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid." + extension);
 
         // when
         PresignedUrlResponse response = imageCommandService.getPresignedUrl(S3Folder.PROFILE, MEMBER_ID, null, fileName);
@@ -147,4 +167,61 @@ class ImageCommandServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ImageErrorCode.UNSUPPORTED_UPLOAD_FOLDER.getMessage());
     }
+
+    @Test
+    @DisplayName("정상 소유자가 이미지를 삭제하면 S3 삭제가 호출된다")
+    void deleteImage_success() {
+        // given
+        String imageUrl = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid.jpg";
+
+        // when
+        imageCommandService.deleteImage(imageUrl, MEMBER_ID);
+
+        // then
+        ArgumentCaptor<DeleteObjectRequest> captor = ArgumentCaptor.forClass(DeleteObjectRequest.class);
+        verify(s3Client).deleteObject(captor.capture());
+        assertThat(captor.getValue().key()).isEqualTo("images/uploads/profile/1/uuid.jpg");
+    }
+
+    @Test
+    @DisplayName("타 회원 key의 journalId가 내 memberId와 겹쳐도 소유권 검증에 실패해 삭제되지 않는다")
+    void deleteImage_ownershipMismatch_journalIdCoincidence() {
+        // given: 소유자 memberId=999, journalId=1 → key에 "/1/"이 우연히 포함됨
+        String imageUrl = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/journal/"
+                + OTHER_MEMBER_ID + "/" + MEMBER_ID + "/uuid.jpg";
+
+        // when & then: memberId=1로 삭제 시도 → 거부되어야 함
+        assertThatThrownBy(() -> imageCommandService.deleteImage(imageUrl, MEMBER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ImageErrorCode.IMAGE_ACCESS_DENIED.getMessage());
+
+        verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    @DisplayName("버킷 URL prefix로 시작하지 않는 imageUrl이면 예외가 발생한다")
+    void deleteImage_invalidUrlPrefix() {
+        // given
+        String imageUrl = "https://malicious-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid.jpg";
+
+        // when & then
+        assertThatThrownBy(() -> imageCommandService.deleteImage(imageUrl, MEMBER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ImageErrorCode.INVALID_IMAGE_URL_FORMAT.getMessage());
+
+        verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    @DisplayName("타인 journalId로 JOURNAL presigned URL을 요청하면 예외가 발생한다")
+    void getPresignedUrl_journalAccessDenied() {
+        // given: memberId=1은 journalId=10의 소유자가 아님
+        given(journalRepository.existsByIdAndMember_Id(JOURNAL_ID, MEMBER_ID)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> imageCommandService.getPresignedUrl(S3Folder.JOURNAL, MEMBER_ID, JOURNAL_ID, "photo.jpg"))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ImageErrorCode.JOURNAL_ACCESS_DENIED.getMessage());
+    }
+
 }
