@@ -3,6 +3,8 @@ package com.cotato.nextstation.domain.image.service.command;
 import com.cotato.nextstation.domain.image.dto.response.PresignedUrlResponse;
 import com.cotato.nextstation.domain.image.enums.S3Folder;
 import com.cotato.nextstation.domain.image.exception.ImageErrorCode;
+import com.cotato.nextstation.domain.journal.entity.Journal;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,23 +26,27 @@ public class ImageCommandService {
 
     private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(10);
 
+    private final JournalRepository journalRepository;
     private final S3Presigner s3Presigner;
     private final S3Client s3Client;
     private final String bucketName;
     private final String region;
 
     public ImageCommandService(S3Presigner s3Presigner,
-                                S3Client s3Client,
-                                @Value("${aws.s3.bucket-name}") String bucketName,
+                               S3Client s3Client,
+                               JournalRepository journalRepository,
+                               @Value("${aws.s3.bucket-name}") String bucketName,
                                 @Value("${spring.cloud.aws.region.static}") String region) {
         this.s3Presigner = s3Presigner;
         this.s3Client = s3Client;
+        this.journalRepository = journalRepository;
         this.bucketName = bucketName;
         this.region = region;
     }
 
     // Presigned URL 생성
     public PresignedUrlResponse getPresignedUrl(S3Folder folder, Long memberId, Long journalId, String fileName) {
+        validateJournalOwnership(folder, memberId, journalId);
 
         String extension = getExtension(fileName);
         String contentType = mapContentType(extension);
@@ -73,6 +79,7 @@ public class ImageCommandService {
         if (folder == S3Folder.PROFILE) {
             throw new CustomException(ImageErrorCode.UNSUPPORTED_UPLOAD_FOLDER);
         }
+        validateJournalOwnership(folder, memberId, journalId);
 
         return fileNames.stream()
                 .map(fileName -> getPresignedUrl(folder, memberId, journalId, fileName))
@@ -160,5 +167,21 @@ public class ImageCommandService {
                 throw new CustomException(ImageErrorCode.UNSUPPORTED_FILE_EXTENSION);
             }
         };
+    }
+
+    // JOURNAL 폴더 요청일 때만 journalId 소유권을 검증한다.
+    // PROFILE 등 journalId를 안 쓰는 폴더는 건드리지 않는다.
+    private void validateJournalOwnership(S3Folder folder, Long memberId, Long journalId) {
+        if (folder != S3Folder.JOURNAL || journalId == null ) {
+            // 여행일지 신규 작성 플로우 — 사진을 먼저 올리고 journal은 나중에 생성되므로
+            // 아직 존재하지 않는 journalId에 대한 소유권 검증은 건너뛴다.
+            return;
+        }
+
+        boolean owned = journalRepository.existsByIdAndMember_Id(journalId, memberId);
+
+        if (!owned) {
+            throw new CustomException(ImageErrorCode.JOURNAL_ACCESS_DENIED);
+        }
     }
 }
