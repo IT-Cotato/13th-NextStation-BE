@@ -197,11 +197,13 @@ public class CourseController {
     }
 
     @Operation(
-            summary = "코스 삭제",
+            summary = "내가 만든 코스 단건 삭제",
             description = """
                     내가 만든 코스를 삭제한다.
                     - soft delete이며, 삭제 후에는 목록·상세 조회에서 모두 제외된다.
                     - 이 코스를 좋아요한 사람들의 보관함에서도 함께 사라진다.
+                    - 저장 탭 선택 모드에서 여러 코스를 한 번에 지울 때는
+                      `DELETE /members/me/courses`(다중 삭제)를 사용한다.
                     """
     )
     @ApiResponses({
