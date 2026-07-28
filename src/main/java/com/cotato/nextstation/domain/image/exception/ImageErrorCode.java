@@ -15,7 +15,7 @@ public enum ImageErrorCode implements ErrorCode {
     MISSING_MEMBER_ID(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_MISSING_MEMBER_ID", "memberId가 필요합니다."),
     MISSING_JOURNAL_ID(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_MISSING_JOURNAL_ID", "여행일지 이미지 업로드에는 journalId가 필요합니다."),
     UNSUPPORTED_UPLOAD_FOLDER(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_UNSUPPORTED_UPLOAD_FOLDER", "presigned URL 발급 대상이 아닌 폴더입니다."),
-
+    PROFILE_NOT_ALLOWED_IN_BATCH(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_PROFILE_NOT_ALLOWED_IN_BATCH", "프로필 이미지는 단일 업로드 API를 사용해주세요.")
     ;
 
     private final HttpStatus httpStatus;

@@ -29,7 +29,7 @@ public class ImageController {
                         - Content-Type 헤더에 응답의 contentType을 그대로 실어야 한다.
                     - presignedUrl은 10분 후 만료된다.
                     - 업로드 완료 후, 응답의 imageUrl을 프로필 설정 API 등 이미지 URL이 필요한 다음 요청에 그대로 실어 보내면 된다.
-                    - folder는 도메인에 맞추어서 요청한다. (PROFILE: 프로필 이미지, JOURNAL: 여행일지 이미지)
+                    - folder는 도메인에 맞추어서 요청한다. (PROFILE: 프로필 이미지, JOURNAL: 여행일지 이미지 및 장소 리뷰 사진)
                        - 아래 Request body의 Schema 설명 참고
                     """
     )
@@ -52,9 +52,8 @@ public class ImageController {
                 - presignedUrl은 10분 후 만료된다.
                 - 업로드 완료 후, 응답의 imageUrl 목록을 여행일지 작성 API 등
                   이미지 URL이 필요한 다음 요청에 그대로 실어 보내면 된다.
-                - folder는 도메인에 맞추어서 요청한다. (JOURNAL: 여행일지 이미지)
+                - folder는 도메인에 맞추어서 요청한다. (JOURNAL: 여행일지 대표 사진 및 장소 리뷰 사진)
                     - PROFILE은 단일 업로드 API(/presigned-url)를 사용할 것
-                    - 아래 Request body의 Schema 설명 참고
                 - fileNames 순서대로 응답이 반환되므로, 순서가 보장된다.
                 """
     )
@@ -70,7 +69,14 @@ public class ImageController {
     }
 
 
-    @Operation(summary = "이미지 삭제")
+    @Operation(
+            summary = "S3 이미지 삭제",
+            description = """
+                    S3에서 이미지를 삭제한다.
+                    - 프로필 이미지 교체, 여행일지 삭제 등 기존 이미지가 더 이상 필요 없을 때 사용한다.
+                    - 이미지 교체 시 흐름: 이 API로 기존 이미지 삭제 → 새 presigned URL 발급 → S3 업로드
+                    """
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "삭제 성공"),
     })

@@ -70,6 +70,10 @@ public class ImageCommandService {
     // 다중 Presigned URL 생성
     public List<PresignedUrlResponse> getPresignedUrls(
             S3Folder folder, Long memberId, Long journalId, List<String> fileNames) {
+        if (folder == S3Folder.PROFILE) {
+            throw new CustomException(ImageErrorCode.UNSUPPORTED_UPLOAD_FOLDER);
+        }
+
         return fileNames.stream()
                 .map(fileName -> getPresignedUrl(folder, memberId, journalId, fileName))
                 .toList();
