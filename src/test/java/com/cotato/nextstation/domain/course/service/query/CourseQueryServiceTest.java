@@ -17,6 +17,7 @@ import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
+import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
@@ -33,6 +34,7 @@ import org.springframework.data.domain.Pageable;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,6 +65,9 @@ class CourseQueryServiceTest {
 
     @Mock
     private PlaceInfoQueryService placeInfoQueryService;
+
+    @Mock
+    private MemberStampQueryService memberStampQueryService;
 
     @Mock
     private CourseConverter courseConverter;
@@ -417,7 +422,7 @@ class CourseQueryServiceTest {
         // then
         verify(courseRepository, never()).findAvailableLines(any());
         ArgumentCaptor<List<LineView>> linesCaptor = ArgumentCaptor.forClass(List.class);
-        verify(courseConverter).toMyListResponse(any(), linesCaptor.capture(), any(), eq(false));
+        verify(courseConverter).toMyListResponse(any(), any(), linesCaptor.capture(), any(), eq(false));
         assertThat(linesCaptor.getValue()).isEmpty();
     }
 
@@ -450,10 +455,45 @@ class CourseQueryServiceTest {
 
         // then
         ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toMyListResponse(any(), any(), cursorCaptor.capture(), eq(true));
+        verify(courseConverter).toMyListResponse(any(), any(), any(), cursorCaptor.capture(), eq(true));
         CursorData nextCursor = CursorData.decode(cursorCaptor.getValue());
         assertThat(nextCursor.id()).isEqualTo(3L);
         assertThat(nextCursor.dateTimeValue()).isEqualTo(createdAt);
+    }
+
+    @Test
+    @DisplayName("내 코스 목록은 완료한 코스 id 집합을 조회해 변환에 넘긴다")
+    void getMyCourses_passesCompletedCourseIds() {
+        // given
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 28, 12, 0);
+        List<MyCourseView> views = List.of(myView(3L, createdAt), myView(7L, createdAt));
+        given(courseRepository.findMyCourses(eq(1L), any(), any(), any(Pageable.class))).willReturn(views);
+        given(courseRepository.findAvailableLines(1L)).willReturn(List.of());
+        given(memberStampQueryService.getCompletedCourseIds(1L, List.of(3L, 7L))).willReturn(Set.of(7L));
+
+        // when
+        courseQueryService.getMyCourses(1L, null, null, null, 10);
+
+        // then
+        ArgumentCaptor<Set<Long>> completedCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(courseConverter).toMyListResponse(any(), completedCaptor.capture(), any(), any(), eq(false));
+        assertThat(completedCaptor.getValue()).containsExactly(7L);
+    }
+
+    @Test
+    @DisplayName("완료 여부는 페이지에 실린 코스만 한 번에 조회한다 (다음 페이지 확인용 초과분 제외)")
+    void getMyCourses_completedLookupExcludesExtraRow() {
+        // given: size 1 요청 → 2개 조회되지만 초과분은 응답에서 잘리므로 조회 대상도 아니다
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 28, 12, 0);
+        List<MyCourseView> views = List.of(myView(3L, createdAt), myView(2L, createdAt));
+        given(courseRepository.findMyCourses(eq(1L), any(), any(), any(Pageable.class))).willReturn(views);
+        given(courseRepository.findAvailableLines(1L)).willReturn(List.of());
+
+        // when
+        courseQueryService.getMyCourses(1L, null, null, null, 1);
+
+        // then
+        verify(memberStampQueryService).getCompletedCourseIds(1L, List.of(3L));
     }
 
     @Test
