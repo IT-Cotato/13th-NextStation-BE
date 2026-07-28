@@ -7,9 +7,12 @@ import com.cotato.nextstation.domain.recommendation.exception.RecommendationErro
 import com.cotato.nextstation.domain.recommendation.repository.RecommendationLogRepository;
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceReader;
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceView;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.Line;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.domain.station.entity.Station;
+import com.cotato.nextstation.domain.station.repository.StationLineRepository;
+import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineView;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -45,6 +50,9 @@ class RecommendationCommandServiceTest {
     @Mock
     private StationPlaceReader stationPlaceReader;
 
+    @Mock
+    private StationLineRepository stationLineRepository;
+
     private final RecommendationConverter recommendationConverter = new RecommendationConverter(new LineConverter());
 
     private RecommendationCommandService recommendationCommandService;
@@ -52,7 +60,9 @@ class RecommendationCommandServiceTest {
     @BeforeEach
     void setUp() {
         recommendationCommandService = new RecommendationCommandService(
-                stationRepository, recommendationLogRepository, stationPlaceReader, recommendationConverter);
+                stationRepository, stationLineRepository, recommendationLogRepository,
+                stationPlaceReader, recommendationConverter);
+        lenient().when(stationLineRepository.findLinesByStationIdIn(any())).thenReturn(List.of());
     }
 
     private Station station(Long id, String name) {
@@ -60,6 +70,21 @@ class RecommendationCommandServiceTest {
                 .stationName(name).description(name + " 소개").todo(name + " 할일").isDrawable(true).build();
         ReflectionTestUtils.setField(station, "id", id);
         return station;
+    }
+
+    private Line line(Long id, LineCode code) {
+        Line line = Line.of(code);
+        ReflectionTestUtils.setField(line, "id", id);
+        return line;
+    }
+
+    private StationLineView lineView(Long stationId, Long lineId, LineCode code) {
+        StationLineView view = mock(StationLineView.class);
+        lenient().when(view.getStationId()).thenReturn(stationId);
+        lenient().when(view.getLineId()).thenReturn(lineId);
+        lenient().when(view.getLineName()).thenReturn(code.getDisplayName());
+        lenient().when(view.getLineCode()).thenReturn(code);
+        return view;
     }
 
     private StationPlaceView place(Long id, String categoryCode) {
@@ -141,7 +166,6 @@ class RecommendationCommandServiceTest {
     void drawRandom_coursePreviewSelectsOnePerCategory() {
         // given
         Station station = station(10L, "제기동역");
-        ReflectionTestUtils.setField(station, "drawLine", Line.of(LineCode.LINE_1));
         given(stationRepository.findByIsDrawableTrue()).willReturn(List.of(station));
         // 순서 섞고 FOOD 2개, WALK 없음
         given(stationPlaceReader.getPlacesByStation(10L)).willReturn(List.of(
@@ -155,9 +179,7 @@ class RecommendationCommandServiceTest {
         RandomRecommendationResponse response = recommendationCommandService.drawRandom(null);
 
         // then
-        assertThat(response.station().line().name()).isEqualTo("1호선");
         assertThat(response.station().description()).isEqualTo("제기동역 소개");
-        assertThat(response.station().todo()).isEqualTo("제기동역 할일");
         assertThat(response.course().name()).isEqualTo("제기동역 환승여행 코스");
         assertThat(response.course().places())
                 .extracting(p -> p.categoryCode())
@@ -186,5 +208,92 @@ class RecommendationCommandServiceTest {
 
         // then: 항상 같은 장소만 나오지는 않는다 (후보 20개 중 30회 시도)
         assertThat(pickedIds).hasSizeGreaterThan(1);
+    }
+
+    @Test
+    @DisplayName("환승역은 소속 노선이 모두 내려가고 대표 노선이 맨 앞에 온다")
+    void drawRandom_returnsAllLinesWithDrawLineFirst() {
+        // given: 6호선·우이신설선 환승역이고 대표 노선은 우이신설선
+        Station station = station(10L, "보문역");
+        ReflectionTestUtils.setField(station, "drawLine", line(21L, LineCode.UI_SINSEOL));
+        List<StationLineView> lineViews = List.of(
+                lineView(10L, 6L, LineCode.LINE_6),
+                lineView(10L, 21L, LineCode.UI_SINSEOL)
+        );
+        given(stationRepository.findByIsDrawableTrue()).willReturn(List.of(station));
+        given(stationLineRepository.findLinesByStationIdIn(List.of(10L))).willReturn(lineViews);
+        given(stationPlaceReader.getPlacesByStation(anyLong())).willReturn(List.of());
+
+        // when
+        RandomRecommendationResponse response = recommendationCommandService.drawRandom(null);
+
+        // then
+        assertThat(response.station().lines())
+                .extracting(LineSummaryResponse::name)
+                .containsExactly("우이신설선", "6호선");
+    }
+
+    @Test
+    @DisplayName("대표 노선이 없으면 소속 노선을 조회 순서(노선 ID 순) 그대로 내려준다")
+    void drawRandom_keepsLineOrderWithoutDrawLine() {
+        // given
+        Station station = station(10L, "보문역");
+        List<StationLineView> lineViews = List.of(
+                lineView(10L, 6L, LineCode.LINE_6),
+                lineView(10L, 21L, LineCode.UI_SINSEOL)
+        );
+        given(stationRepository.findByIsDrawableTrue()).willReturn(List.of(station));
+        given(stationLineRepository.findLinesByStationIdIn(List.of(10L))).willReturn(lineViews);
+        given(stationPlaceReader.getPlacesByStation(anyLong())).willReturn(List.of());
+
+        // when
+        RandomRecommendationResponse response = recommendationCommandService.drawRandom(null);
+
+        // then
+        assertThat(response.station().lines())
+                .extracting(LineSummaryResponse::name)
+                .containsExactly("6호선", "우이신설선");
+    }
+
+    @Test
+    @DisplayName("역 할 일은 줄 단위로 나뉘고 번호 접두사는 제거된다")
+    void drawRandom_splitsTodoIntoItems() {
+        // given
+        Station station = stationWithTodo(10L, "보문역",
+                "1. 성북천을 따라 가볍게 산책하기\n2. 보문동 골목과 생활 상권 둘러보기\n\n3) 대학가 카페 들르기");
+        given(stationRepository.findByIsDrawableTrue()).willReturn(List.of(station));
+        given(stationPlaceReader.getPlacesByStation(anyLong())).willReturn(List.of());
+
+        // when
+        RandomRecommendationResponse response = recommendationCommandService.drawRandom(null);
+
+        // then: 빈 줄은 버리고 "1. " 같은 번호는 떼어낸다
+        assertThat(response.station().todos()).containsExactly(
+                "성북천을 따라 가볍게 산책하기",
+                "보문동 골목과 생활 상권 둘러보기",
+                "대학가 카페 들르기"
+        );
+    }
+
+    @Test
+    @DisplayName("역 할 일이 비어 있으면 빈 목록을 내려준다")
+    void drawRandom_emptyTodo() {
+        // given
+        Station station = stationWithTodo(10L, "보문역", null);
+        given(stationRepository.findByIsDrawableTrue()).willReturn(List.of(station));
+        given(stationPlaceReader.getPlacesByStation(anyLong())).willReturn(List.of());
+
+        // when
+        RandomRecommendationResponse response = recommendationCommandService.drawRandom(null);
+
+        // then
+        assertThat(response.station().todos()).isEmpty();
+    }
+
+    private Station stationWithTodo(Long id, String name, String todo) {
+        Station station = Station.builder()
+                .stationName(name).description(name + " 소개").todo(todo).isDrawable(true).build();
+        ReflectionTestUtils.setField(station, "id", id);
+        return station;
     }
 }
