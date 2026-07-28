@@ -1,7 +1,6 @@
 package com.cotato.nextstation.domain.stamp.service.query;
 
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
-import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.stamp.converter.StampCourseConverter;
 import com.cotato.nextstation.domain.stamp.dto.response.StationPopularCoursesResponse;
@@ -11,7 +10,6 @@ import com.cotato.nextstation.domain.station.repository.StationLineRepository;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;

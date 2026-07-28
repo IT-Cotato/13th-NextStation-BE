@@ -1,4 +1,4 @@
-package com.cotato.nextstation.domain.auth.service.query;
+package com.cotato.nextstation.domain.auth.service.query.result;
 
 /**
  * LoginQueryService -> AuthController 전달 전용

@@ -1,6 +1,8 @@
 package com.cotato.nextstation.domain.auth.service.query;
 
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
+import com.cotato.nextstation.domain.auth.service.query.result.LoginResult;
+import com.cotato.nextstation.domain.auth.service.query.result.ReissueResult;
 import com.cotato.nextstation.domain.auth.util.EmailMasker;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
@@ -26,9 +28,6 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class LoginQueryService {
 
-    private static final Duration ACCESS_TOKEN_EXPIRATION = Duration.ofHours(1);
-    public static final Duration REFRESH_TOKEN_EXPIRATION = Duration.ofDays(14);
-
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
@@ -53,8 +52,8 @@ public class LoginQueryService {
             throw new CustomException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
-        String accessToken = issueToken(member.getId(), AuthTokenClaims.ACCESS_PURPOSE, ACCESS_TOKEN_EXPIRATION);
-        String refreshToken = issueToken(member.getId(), AuthTokenClaims.REFRESH_PURPOSE, REFRESH_TOKEN_EXPIRATION);
+        String accessToken = issueToken(member.getId(), AuthTokenClaims.ACCESS_PURPOSE, AuthTokenClaims.ACCESS_TOKEN_EXPIRATION);
+        String refreshToken = issueToken(member.getId(), AuthTokenClaims.REFRESH_PURPOSE, AuthTokenClaims.REFRESH_TOKEN_EXPIRATION);
 
         log.info("로그인 성공: memberId={}", member.getId());
         return new LoginResult(member.getId(), accessToken, refreshToken);
@@ -100,7 +99,7 @@ public class LoginQueryService {
             throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
-        String accessToken = issueToken(member.getId(), AuthTokenClaims.ACCESS_PURPOSE, ACCESS_TOKEN_EXPIRATION);
+        String accessToken = issueToken(member.getId(), AuthTokenClaims.ACCESS_PURPOSE, AuthTokenClaims.ACCESS_TOKEN_EXPIRATION);
         log.info("accessToken 재발급 성공: memberId={}", member.getId());
         return new ReissueResult(member.getId(), accessToken);
     }
