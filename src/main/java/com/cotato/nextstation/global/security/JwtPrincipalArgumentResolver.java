@@ -35,7 +35,20 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
     @Override
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
                                    NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
-        String token = extractToken(webRequest.getHeader("Authorization"));
+        String authorizationHeader = webRequest.getHeader("Authorization");
+
+        if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
+            // 비로그인도 허용하는 API는 토큰 없이 들어올 수 있다. 이때만 null로 넘긴다.
+            if (!isRequired(parameter)) {
+                return null;
+            }
+            log.warn("Authorization 헤더 없이 인증이 필요한 API 요청");
+            throw new CustomException(GlobalErrorCode.UNAUTHORIZED);
+        }
+
+        // 토큰을 보냈는데 만료·위조인 경우는 required와 무관하게 401이다.
+        // 조용히 비로그인으로 넘기면 사용자는 로그인한 줄 아는데 좋아요 표시만 빠져 보인다.
+        String token = authorizationHeader.substring(BEARER_PREFIX.length()).trim();
 
         Claims claims;
         try {
@@ -61,11 +74,8 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
         }
     }
 
-    private String extractToken(String authorizationHeader) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
-            log.warn("Authorization 헤더 없이 인증이 필요한 API 요청");
-            throw new CustomException(GlobalErrorCode.UNAUTHORIZED);
-        }
-        return authorizationHeader.substring(BEARER_PREFIX.length()).trim();
+    private boolean isRequired(MethodParameter parameter) {
+        AuthenticationPrincipal annotation = parameter.getParameterAnnotation(AuthenticationPrincipal.class);
+        return annotation == null || annotation.required();
     }
 }
