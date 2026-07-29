@@ -178,15 +178,18 @@ class StationQueryServiceTest {
     }
 
     @Test
-    @DisplayName("\"역\" 한 글자만 입력하면 조회하지 않고 빈 목록을 반환한다")
+    @DisplayName("\"역\" 한 글자는 떼지 않고 그대로 검색해 이름 안쪽에 \"역\"이 든 역을 찾는다")
     void searchByName_onlyNameSuffix() {
-        // when: 모든 역명이 "역"으로 끝나 변별력이 없다. 정규화하면 빈 검색어가 된다
-        List<StationSummaryResponse> result = stationQueryService.searchByName("역");
+        // given: 여기서 "역"을 떼면 빈 검색어가 되어 역삼역·동대문역사문화공원역을 못 찾는다.
+        // 역명은 이미 꼬리를 뗀 상태로 비교하므로 이름 안쪽에 "역"이 든 역만 걸린다
+        given(stationRepository.searchByNormalizedName(eq("역"), eq("역"), any(Pageable.class)))
+                .willReturn(List.of());
 
-        // then: 308개 전체를 훑어 가나다순 앞 20개를 보여주던 동작을 막는다
-        assertThat(result).isEmpty();
-        verify(stationRepository, never())
-                .searchByNormalizedName(any(), any(), any(Pageable.class));
+        // when
+        stationQueryService.searchByName("역");
+
+        // then
+        verify(stationRepository).searchByNormalizedName(eq("역"), eq("역"), any(Pageable.class));
     }
 
     @Test

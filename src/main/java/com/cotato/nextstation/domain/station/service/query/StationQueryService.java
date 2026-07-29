@@ -114,7 +114,6 @@ public class StationQueryService {
      */
     public List<StationSummaryResponse> searchByName(String keyword) {
         String normalized = normalizeKeyword(keyword);
-        // "역" 한 글자만 입력한 경우가 여기 걸린다. 전체 역을 훑을 뿐 의미 있는 결과가 아니다.
         if (normalized.isEmpty()) {
             return List.of();
         }
@@ -136,14 +135,16 @@ public class StationQueryService {
     }
 
     // 서울 내 역은 모두 "역"으로 끝나 꼬리의 "역"은 역을 구분하지 못한다.
-    // 떼고 비교해야 "왕십리"와 "왕십리역"이 같은 결과를 내고, "역" 한 글자는 빈 검색어가 된다.
+    // 떼고 비교해야 "왕십리"와 "왕십리역"이 같은 결과를 낸다.
     // 역삼역·역촌역처럼 이름 안쪽의 "역"은 그대로 두어야 하므로 꼬리에서 한 번만 뗀다.
     private String normalizeKeyword(String keyword) {
         if (keyword == null) {
             return "";
         }
         String trimmed = keyword.trim();
-        if (trimmed.endsWith(STATION_NAME_SUFFIX)) {
+        // "역" 한 글자는 떼지 않는다. 떼면 빈 검색어가 되는데, 이건 역삼역·동대문역사문화공원역처럼
+        // 이름에 "역"이 든 역을 찾으려는 입력이다. 역명 쪽은 이미 꼬리를 뗐으므로 그 역들만 걸린다.
+        if (trimmed.length() > STATION_NAME_SUFFIX.length() && trimmed.endsWith(STATION_NAME_SUFFIX)) {
             return trimmed.substring(0, trimmed.length() - STATION_NAME_SUFFIX.length());
         }
         return trimmed;
