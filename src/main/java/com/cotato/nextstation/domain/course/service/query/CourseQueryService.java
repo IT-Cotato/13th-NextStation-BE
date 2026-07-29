@@ -3,16 +3,20 @@ package com.cotato.nextstation.domain.course.service.query;
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
+import com.cotato.nextstation.domain.course.entity.CourseSort;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
@@ -30,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,6 +59,9 @@ public class CourseQueryService {
 
     // 카드에 노출할 태그 수 (디자인상 2개)
     private static final int TAGS_PER_CARD = 2;
+
+    // 모든 역명이 이 접미사로 끝나 검색어로서 변별력이 없다. 역 검색과 같은 규칙으로 뗀다.
+    private static final String STATION_NAME_SUFFIX = "역";
 
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
@@ -158,6 +166,139 @@ public class CourseQueryService {
     }
 
     /**
+     * 둘러보기 코스 목록. 노선따라 둘러보기와 코스 검색이 같은 조회를 쓴다.
+     * <p>
+     * 공개된 여행일지가 있는 코스만 나온다. 카드를 누르면 여행일지 상세로 가므로
+     * 응답에 journalId를 함께 내린다.
+     * <p>
+     * 필터·검색어는 모두 선택 사항이고, 정렬은 최신순이 기본이다.
+     * {@code memberId}는 하트를 채울지 판단하는 데만 쓰며 비로그인이면 null이다.
+     */
+    public ExploreCourseListResponse getExploreCourses(Long memberId, Long lineId, Long stationId,
+                                                       String keyword, CourseSort sort,
+                                                       String cursor, Integer size) {
+        int pageSize = resolvePageSize(size);
+        Pageable pageable = PageRequest.of(0, pageSize + 1); // hasNext 판단용 1개 더 조회
+        CourseSort resolvedSort = (sort == null) ? CourseSort.LATEST : sort;
+
+        CursorData cursorData = CursorData.decode(cursor);
+        List<ExploreCourseView> courses = fetchExploreCourses(
+                lineId, stationId, normalizeKeyword(keyword), resolvedSort, cursorData, pageable);
+
+        boolean hasNext = courses.size() > pageSize;
+        List<ExploreCourseView> pageContent = hasNext ? courses.subList(0, pageSize) : courses;
+
+        String nextCursor = null;
+        if (hasNext) {
+            nextCursor = encodeExploreCursor(pageContent.get(pageContent.size() - 1), resolvedSort);
+        }
+        return courseConverter.toExploreListResponse(toExploreCards(memberId, pageContent), nextCursor, hasNext);
+    }
+
+    private List<ExploreCourseView> fetchExploreCourses(Long lineId, Long stationId, String keyword,
+                                                        CourseSort sort, CursorData cursorData, Pageable pageable) {
+        if (cursorData != null) {
+            validateExploreCursor(cursorData, sort);
+        }
+        Long courseId = (cursorData == null) ? null : cursorData.id();
+        LocalDateTime createdAt = (cursorData == null) ? null : cursorData.dateTimeValue();
+
+        if (sort == CourseSort.POPULAR) {
+            Long score = (cursorData == null) ? null : cursorData.longValue();
+            return courseRepository.findExploreCoursesByPopular(
+                    lineId, stationId, keyword, score, createdAt, courseId, pageable);
+        }
+        return courseRepository.findExploreCoursesByLatest(
+                lineId, stationId, keyword, createdAt, courseId, pageable);
+    }
+
+    // 커서가 정렬과 맞는지 확인한다. 인기순 커서에는 점수가 들어 있고 최신순에는 없다.
+    // 정렬을 바꾸면서 이전 커서를 그대로 보내면 순서가 뒤엉키므로 아예 막는다.
+    private void validateExploreCursor(CursorData cursorData, CourseSort sort) {
+        boolean scoreRequired = (sort == CourseSort.POPULAR);
+        boolean malformed = cursorData.id() == null
+                || cursorData.dateTimeValue() == null
+                || scoreRequired != (cursorData.longValue() != null);
+        if (malformed) {
+            throw new CustomException(GlobalErrorCode.INVALID_CURSOR);
+        }
+    }
+
+    private String encodeExploreCursor(ExploreCourseView last, CourseSort sort) {
+        Long score = (sort == CourseSort.POPULAR)
+                ? (long) (last.getViewCount() + last.getLikeCount() * 2)
+                : null;
+        return new CursorData(last.getCourseId(), score, last.getCreatedAt()).encode();
+    }
+
+    // 역 검색과 같은 규칙으로 다듬는다. 모든 역명이 "역"으로 끝나 꼬리의 "역"은 역을 구분하지 못한다.
+    // "역" 한 글자는 떼지 않는다. 역삼역처럼 이름에 "역"이 든 역을 찾으려는 입력이다.
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+        String trimmed = keyword.trim();
+        if (trimmed.length() > STATION_NAME_SUFFIX.length() && trimmed.endsWith(STATION_NAME_SUFFIX)) {
+            return trimmed.substring(0, trimmed.length() - STATION_NAME_SUFFIX.length());
+        }
+        return trimmed;
+    }
+
+    // 카드에 필요한 태그와 좋아요 여부를 페이지 단위로 한 번에 채운다 (코스마다 조회하면 N+1).
+    private List<ExploreCourseResponse> toExploreCards(Long memberId, List<ExploreCourseView> courses) {
+        if (courses.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> courseIds = courses.stream().map(ExploreCourseView::getCourseId).toList();
+        Map<Long, List<Long>> placeIdsByCourse = groupPlaceIdsByCourse(courseIds);
+        Map<Long, List<String>> tagsByCourse = resolveTagsByCourse(placeIdsByCourse);
+        Set<Long> likedCourseIds = resolveLikedCourseIds(memberId, courseIds);
+
+        return courses.stream()
+                .map(course -> courseConverter.toExploreCourseResponse(
+                        course,
+                        tagsByCourse.getOrDefault(course.getCourseId(), List.of()),
+                        likedCourseIds.contains(course.getCourseId()),
+                        null)) // TODO: 여행일지 대표 사진. JournalImage 머지 후 연결한다
+                .toList();
+    }
+
+    /**
+     * 코스별 대표 태그를 한 번에 집계한다.
+     * <p>
+     * 장소 태그를 페이지 전체에 대해 한 번만 조회하고, 코스마다 담긴 장소들의 태그를 세서
+     * 많이 나온 순으로 자른다. 코스별로 태그 조회를 부르면 페이지 크기만큼 쿼리가 나간다.
+     */
+    private Map<Long, List<String>> resolveTagsByCourse(Map<Long, List<Long>> placeIdsByCourse) {
+        List<Long> allPlaceIds = placeIdsByCourse.values().stream()
+                .flatMap(List::stream)
+                .distinct()
+                .toList();
+        Map<Long, List<String>> tagsByPlace = placeInfoQueryService.getTagNamesByPlace(allPlaceIds);
+
+        Map<Long, List<String>> result = new LinkedHashMap<>();
+        placeIdsByCourse.forEach((courseId, placeIds) -> {
+            Map<String, Long> tagCounts = placeIds.stream()
+                    .flatMap(placeId -> tagsByPlace.getOrDefault(placeId, List.of()).stream())
+                    .collect(Collectors.groupingBy(tag -> tag, Collectors.counting()));
+            result.put(courseId, tagCounts.entrySet().stream()
+                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                    .limit(TAGS_PER_CARD)
+                    .map(Map.Entry::getKey)
+                    .toList());
+        });
+        return result;
+    }
+
+    private Set<Long> resolveLikedCourseIds(Long memberId, List<Long> courseIds) {
+        if (memberId == null || courseIds.isEmpty()) {
+            return Set.of();
+        }
+        return Set.copyOf(courseLikeRepository.findLikedCourseIds(memberId, courseIds));
+    }
+
+    /**
      * 장소 상세 화면 하단의 "이 장소를 포함한 코스".
      * 인기순 상위 6개를 뽑되 노출 순서는 매번 섞는다. 같은 장소를 다시 열었을 때
      * 늘 같은 순서면 아래쪽 코스가 계속 묻히기 때문이다.
@@ -245,16 +386,12 @@ public class CourseQueryService {
     // memberId를 넘기면 응답의 isLiked가 채워진다. null이면 전부 false.
     public List<PopularCourseResponse> getPopularCoursesByStation(Long stationId, int limit, Long memberId) {
         List<Course> courses = courseRepository.findPopularPublicCoursesByStationId(stationId, PageRequest.of(0, limit));
-        return courseConverter.toPopularResponses(courses, resolveLikedCourseIds(memberId, courses));
+        return courseConverter.toPopularResponses(courses, resolveLikedCourses(memberId, courses));
     }
 
     // 조회한 코스들의 좋아요 여부를 한 번에 조회한다 (코스마다 조회하면 N+1)
-    private Set<Long> resolveLikedCourseIds(Long memberId, List<Course> courses) {
-        if (memberId == null || courses.isEmpty()) {
-            return Set.of();
-        }
-        List<Long> courseIds = courses.stream().map(Course::getId).toList();
-        return Set.copyOf(courseLikeRepository.findLikedCourseIds(memberId, courseIds));
+    private Set<Long> resolveLikedCourses(Long memberId, List<Course> courses) {
+        return resolveLikedCourseIds(memberId, courses.stream().map(Course::getId).toList());
     }
 
     private Course findCourse(Long courseId) {
