@@ -25,6 +25,22 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "WHERE c.id = :courseId AND j.isPublic = true")
     boolean existsPublicById(@Param("courseId") Long courseId);
 
+    /**
+     * 코스 상세를 열 때 조회수를 올린다.
+     * <p>
+     * like_count와 같은 이유로 DB에서 직접 증가시킨다. 엔티티를 읽어 +1 하면
+     * 동시 조회 시 한쪽 증가분이 유실된다.
+     * <p>
+     * 본인이 자기 코스를 열었을 때는 올리지 않는다. 저장 탭에서 자기 코스를 드나들 때마다
+     * 오르면 인기순(view_count + like_count×2)이 자주 열어본 사람 순으로 부풀려진다.
+     * 비로그인 조회는 본인일 수 없으므로 항상 올린다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Course c SET c.viewCount = c.viewCount + 1 " +
+            "WHERE c.id = :courseId AND (:viewerMemberId IS NULL OR c.memberId <> :viewerMemberId)")
+    int increaseViewCount(@Param("courseId") Long courseId,
+                          @Param("viewerMemberId") Long viewerMemberId);
+
     // like_count는 DB에서 직접 증감시킨다.
     // 엔티티를 읽어 +1 하면 동시 좋아요 시 한쪽 증가분이 유실된다.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
