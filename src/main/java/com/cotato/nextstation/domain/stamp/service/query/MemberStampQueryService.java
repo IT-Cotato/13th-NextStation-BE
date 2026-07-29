@@ -48,4 +48,6 @@ public class MemberStampQueryService {
     public boolean existsByMemberIdAndId(Long memberId, Long memberStampId) {
         return memberStampRepository.existsByMemberIdAndId(memberId, memberStampId);
     }
+
+
 }
