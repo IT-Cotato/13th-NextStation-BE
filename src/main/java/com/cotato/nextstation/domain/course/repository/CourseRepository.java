@@ -236,6 +236,24 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "ORDER BY c.likeCount DESC, c.createdAt DESC, c.id DESC")
     List<ExploreCourseView> findMostLikedCourses(Pageable pageable);
 
+    /**
+     * 둘러보기에 노출할 노선 목록. 노선 칩을 그리는 데 쓴다.
+     * <p>
+     * 공개 코스가 하나라도 있는 노선만 내려준다. 칩을 눌렀는데 빈 목록이 나오면 안 되기 때문이다.
+     * 저장 탭 필터와 같은 기준으로 역이 속한 호선 전체를 본다.
+     * <p>
+     * 뽑기 역이 늘어나면 노선도 자연히 늘어나므로 목록을 하드코딩하지 않고 데이터에서 유도한다.
+     */
+    @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "JOIN StationLine sl ON sl.station.id = s.id " +
+            "JOIN sl.line l " +
+            "WHERE j.isPublic = true " +
+            "ORDER BY l.name")
+    List<LineView> findExploreLines();
+
     interface ExploreCourseView {
         Long getCourseId();
         Long getJournalId();
