@@ -2,6 +2,8 @@ package com.cotato.nextstation.domain.auth.controller;
 
 import com.cotato.nextstation.domain.auth.dto.request.EmailVerificationConfirmRequest;
 import com.cotato.nextstation.domain.auth.dto.request.LoginRequest;
+import com.cotato.nextstation.domain.auth.dto.request.PasswordResetRequest;
+import com.cotato.nextstation.domain.auth.dto.request.PasswordResetSendRequest;
 import com.cotato.nextstation.domain.auth.dto.request.ProfileSetupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupVerificationSendRequest;
@@ -11,6 +13,7 @@ import com.cotato.nextstation.domain.auth.dto.response.ReissueResponse;
 import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.service.command.EmailVerificationCommandService;
+import com.cotato.nextstation.domain.auth.service.command.PasswordResetCommandService;
 import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
 import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
@@ -50,6 +53,7 @@ public class AuthController {
     private final ProfileSetupCommandService profileSetupCommandService;
     private final LoginQueryService loginQueryService;
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
+    private final PasswordResetCommandService passwordResetCommandService;
 
     @Operation(
             summary = "회원가입 이메일 인증번호 발송",
@@ -206,5 +210,72 @@ public class AuthController {
         }
         ReissueResult result = loginQueryService.reissue(refreshToken);
         return CommonResponse.success(new ReissueResponse(result.accessToken()));
+    }
+
+    @Operation(
+            summary = "비밀번호 재설정 이메일 인증번호 발송",
+            description = """
+                    가입된 로컬 계정 이메일로 6자리 인증번호를 발송한다.
+                    - 인증번호 유효시간: 3분
+                    - 발송 한도: 시간당 5회 / 하루 10회, 초과 시 일정 시간 잠금 (회원가입 인증번호와는 별도로 집계된다)
+                    - 이미 PENDING 상태의 코드가 있으면 새 코드 발송 시 기존 코드는 즉시 무효화된다.
+                    - 소셜 로그인 전용 계정(비밀번호가 없는 계정)은 재설정 대상에서 제외된다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "발송 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 소셜 로그인 전용 계정 (`GlobalErrorCode.VALIDATION_ERROR`, `AuthErrorCode.SOCIAL_ONLY_ACCOUNT`)"),
+            @ApiResponse(responseCode = "404", description = "가입되지 않은 이메일 (`AuthErrorCode.MEMBER_NOT_FOUND`)"),
+            @ApiResponse(responseCode = "429", description = "발송 횟수 한도 초과 또는 잠금 상태 (`AuthErrorCode.EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED`)"),
+            @ApiResponse(responseCode = "502", description = "메일 발송 실패 (`GlobalErrorCode.EXTERNAL_API_ERROR`)"),
+    })
+    @PostMapping("/password-reset/email/verification")
+    public CommonResponse<Void> sendPasswordResetVerificationCode(@Valid @RequestBody PasswordResetSendRequest request) {
+        emailVerificationCommandService.sendPasswordResetVerificationCode(request.email());
+        return CommonResponse.success(null);
+    }
+
+    @Operation(
+            summary = "비밀번호 재설정 이메일 인증번호 확인",
+            description = """
+                    발송된 6자리 인증번호가 맞는지 확인한다.
+                    - 인증번호 불일치 시도는 최대 5회까지 허용되며, 초과 시 해당 인증번호는 실패 처리된다.
+                    - 만료된 인증번호로 확인을 시도하면 즉시 실패 처리된다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "인증 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 만료된 인증번호, 또는 인증번호 불일치 (`GlobalErrorCode.VALIDATION_ERROR`, `AuthErrorCode.EMAIL_VERIFICATION_EXPIRED`, `AuthErrorCode.EMAIL_VERIFICATION_CODE_MISMATCH`)"),
+            @ApiResponse(responseCode = "404", description = "유효한 인증번호 발송 내역 없음 (`AuthErrorCode.EMAIL_VERIFICATION_NOT_FOUND`)"),
+            @ApiResponse(responseCode = "429", description = "인증번호 확인 시도 횟수 초과 (`AuthErrorCode.EMAIL_VERIFICATION_ATTEMPT_EXCEEDED`)"),
+    })
+    @PostMapping("/password-reset/email/verification/confirm")
+    public CommonResponse<Void> confirmPasswordResetVerificationCode(@Valid @RequestBody EmailVerificationConfirmRequest request) {
+        emailVerificationCommandService.verifyPasswordResetCode(request.email(), request.code());
+        return CommonResponse.success(null);
+    }
+
+    @Operation(
+            summary = "비밀번호 재설정",
+            description = """
+                    이메일 인증이 완료된 로컬 계정의 비밀번호를 새 비밀번호로 변경한다.
+                    - 인증번호 확인(confirm) 이후 비밀번호 입력까지 시간이 걸릴 수 있으므로, 재설정 시점에 인증번호 일치/만료 여부를 다시 검증한다.
+                    - 비밀번호 변경에 성공하면 해당 인증번호는 즉시 만료 처리되어 재사용할 수 없다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "재설정 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 새 비밀번호 확인 불일치, 만료된 인증번호, 또는 인증번호 불일치 (`GlobalErrorCode.VALIDATION_ERROR`, `AuthErrorCode.PASSWORD_CONFIRMATION_MISMATCH`, `AuthErrorCode.EMAIL_VERIFICATION_EXPIRED`, `AuthErrorCode.EMAIL_VERIFICATION_CODE_MISMATCH`)"),
+            @ApiResponse(responseCode = "404", description = "인증 완료 내역 없음 또는 존재하지 않는 회원 (`AuthErrorCode.EMAIL_VERIFICATION_NOT_FOUND`, `AuthErrorCode.MEMBER_NOT_FOUND`)"),
+    })
+    @PostMapping("/password-reset")
+    public CommonResponse<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        passwordResetCommandService.resetPassword(
+                request.email(),
+                request.code(),
+                request.newPassword(),
+                request.newPasswordConfirm()
+        );
+        return CommonResponse.success(null);
     }
 }
