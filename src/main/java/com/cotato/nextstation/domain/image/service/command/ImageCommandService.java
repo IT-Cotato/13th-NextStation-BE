@@ -25,6 +25,7 @@ import java.util.UUID;
 public class ImageCommandService {
 
     private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(10);
+    private static final String ALLOWED_DELETE_PREFIX = "images/uploads/";
 
     private final JournalRepository journalRepository;
     private final S3Presigner s3Presigner;
@@ -90,7 +91,14 @@ public class ImageCommandService {
     // 이미지 삭제
     public void deleteImage(String imageUrl, Long memberId) {
         String key = extractKeyFromImageUrl(imageUrl);
+
         validateOwnership(key, memberId);
+
+        // 정적 장소 사진 등 uploads 외 경로 삭제 방지
+        if (!key.startsWith(ALLOWED_DELETE_PREFIX)) {
+            log.warn("삭제 불가 경로 요청: key={}", key);
+            throw new CustomException(ImageErrorCode.UNSUPPORTED_UPLOAD_FOLDER);
+        }
 
         DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
                 .bucket(bucketName)

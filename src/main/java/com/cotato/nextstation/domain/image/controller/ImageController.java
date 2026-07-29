@@ -65,7 +65,7 @@ public class ImageController {
                   이미지 URL이 필요한 다음 요청에 그대로 실어 보내면 된다.
                 - folder는 도메인에 맞추어서 요청한다. (JOURNAL: 여행일지 대표 사진 및 장소 리뷰 사진)
                     - PROFILE은 단일 업로드 API(/presigned-url)를 사용할 것
-                - fileNames 순서대로 응답이 반환되므로, 순서가 보장된다.
+                - fileNames(최대 15개) 순서대로 응답이 반환되므로, 순서가 보장된다.
                 """
     )
     @ApiResponses({
