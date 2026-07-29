@@ -114,4 +114,9 @@ public class StationQueryService {
                         Collectors.mapping(lineConverter::toSummaryResponse, Collectors.toList())
                 ));
     }
+
+    public Map<Long, String> getStationNames(Collection<Long> stationIds) {
+        return stationRepository.findAllById(stationIds).stream()
+                .collect(Collectors.toMap(Station::getId, Station::getStationName));
+    }
 }

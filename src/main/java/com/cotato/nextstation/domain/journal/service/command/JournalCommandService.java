@@ -1,6 +1,9 @@
 package com.cotato.nextstation.domain.journal.service.command;
 
+import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
+import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.dto.request.JournalCreateRequest;
+import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.entity.JournalImage;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
@@ -21,6 +24,8 @@ import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
+import com.cotato.nextstation.domain.station.entity.Station;
+import com.cotato.nextstation.domain.station.service.query.StationQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +33,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,14 +45,19 @@ import java.time.LocalDate;
 @Transactional
 public class JournalCommandService {
 
+    private static final int TAGS_PER_CARD = 2;
+
     private final JournalRepository journalRepository;
     private final MemberRepository memberRepository;
     private final MemberStampRepository memberStampRepository;
-    private final MemberStampQueryService memberStampQueryService;
     private final JournalImageRepository journalImageRepository;
     private final PlaceRepository placeRepository;
     private final PlaceReviewRepository placeReviewRepository;
     private final PlaceReviewImageRepository placeReviewImageRepository;
+
+    private final StationQueryService stationQueryService;
+    private final MemberStampQueryService memberStampQueryService;
+    private final CourseQueryService courseQueryService;
 
     // 여행일지 작성
     public Long createJournal(Long memberId, JournalCreateRequest request) {
@@ -136,4 +151,31 @@ public class JournalCommandService {
         }
         return journal;
     }
+
+    // 여행일지 미작성 코스 조회
+    public UncompletedJournalListResponse getUncompletedJournals(Long memberId) {
+        // 스탬프는 있는데 journalId가 없는 MemberStamp 목록 조회 (최신순)
+        List<MemberStamp> uncompletedStamps = memberStampQueryService.getUncompletedStamps(memberId);
+
+        if (uncompletedStamps.isEmpty()) {
+            return new UncompletedJournalListResponse(0, List.of());
+        }
+
+        List<Long> courseIds = uncompletedStamps.stream()
+                .map(MemberStamp::getCourseId)
+                .toList();
+
+        Map<Long, CourseInfoResponse> courseInfoMap = courseIds.stream()
+                .map(courseQueryService::getCourseInfo)
+                .collect(Collectors.toMap(CourseInfoResponse::courseId, Function.identity()));
+
+        // 4. stationId → stationName
+        Set<Long> stationIds = courseInfoMap.values().stream()
+                .map(CourseInfoResponse::stationId)
+                .collect(Collectors.toSet());
+        Map<Long, String> stationNameMap = stationQueryService.getStationNames(stationIds);
+
+
+    }
+
 }
