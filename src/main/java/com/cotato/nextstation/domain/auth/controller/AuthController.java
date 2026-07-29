@@ -225,6 +225,7 @@ public class AuthController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "발송 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 소셜 로그인 전용 계정 (`GlobalErrorCode.VALIDATION_ERROR`, `AuthErrorCode.SOCIAL_ONLY_ACCOUNT`)"),
+            @ApiResponse(responseCode = "403", description = "탈퇴/정지 등 ACTIVE 상태가 아닌 회원 (`AuthErrorCode.MEMBER_NOT_ACTIVE`)"),
             @ApiResponse(responseCode = "404", description = "가입되지 않은 이메일 (`AuthErrorCode.MEMBER_NOT_FOUND`)"),
             @ApiResponse(responseCode = "429", description = "발송 횟수 한도 초과 또는 잠금 상태 (`AuthErrorCode.EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED`)"),
             @ApiResponse(responseCode = "502", description = "메일 발송 실패 (`GlobalErrorCode.EXTERNAL_API_ERROR`)"),
@@ -260,13 +261,16 @@ public class AuthController {
             description = """
                     이메일 인증이 완료된 로컬 계정의 비밀번호를 새 비밀번호로 변경한다.
                     - 인증번호 확인(confirm) 이후 비밀번호 입력까지 시간이 걸릴 수 있으므로, 재설정 시점에 인증번호 일치/만료 여부를 다시 검증한다.
+                      이때의 불일치 시도도 confirm 단계와 동일한 인증번호 확인 시도 횟수(최대 5회)에 합산된다.
                     - 비밀번호 변경에 성공하면 해당 인증번호는 즉시 만료 처리되어 재사용할 수 없다.
                     """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "재설정 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 새 비밀번호 확인 불일치, 만료된 인증번호, 또는 인증번호 불일치 (`GlobalErrorCode.VALIDATION_ERROR`, `AuthErrorCode.PASSWORD_CONFIRMATION_MISMATCH`, `AuthErrorCode.EMAIL_VERIFICATION_EXPIRED`, `AuthErrorCode.EMAIL_VERIFICATION_CODE_MISMATCH`)"),
+            @ApiResponse(responseCode = "403", description = "탈퇴/정지 등 ACTIVE 상태가 아닌 회원 (`AuthErrorCode.MEMBER_NOT_ACTIVE`)"),
             @ApiResponse(responseCode = "404", description = "인증 완료 내역 없음 또는 존재하지 않는 회원 (`AuthErrorCode.EMAIL_VERIFICATION_NOT_FOUND`, `AuthErrorCode.MEMBER_NOT_FOUND`)"),
+            @ApiResponse(responseCode = "429", description = "인증번호 확인 시도 횟수 초과 (`AuthErrorCode.EMAIL_VERIFICATION_ATTEMPT_EXCEEDED`)"),
     })
     @PostMapping("/password-reset")
     public CommonResponse<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
