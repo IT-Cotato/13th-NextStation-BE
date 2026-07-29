@@ -29,8 +29,7 @@ public class Journal extends BaseTimeEntity {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_stamp_id")
+    @Column(name = "member_stamp_id")
     private MemberStamp memberStamp;
 
     @Column(nullable = false)
