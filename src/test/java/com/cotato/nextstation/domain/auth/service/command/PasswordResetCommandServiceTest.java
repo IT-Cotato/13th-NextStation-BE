@@ -6,6 +6,7 @@ import com.cotato.nextstation.domain.auth.entity.VerificationType;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.repository.EmailVerificationRepository;
 import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
@@ -66,6 +67,13 @@ class PasswordResetCommandServiceTest {
     private Member localMember() {
         Member member = Member.builder().email(EMAIL).password("oldEncoded").build();
         ReflectionTestUtils.setField(member, "id", 1L);
+        ReflectionTestUtils.setField(member, "status", MemberStatus.ACTIVE);
+        return member;
+    }
+
+    private Member withdrawnMember() {
+        Member member = localMember();
+        member.withdraw();
         return member;
     }
 
@@ -116,17 +124,38 @@ class PasswordResetCommandServiceTest {
     }
 
     @Test
-    @DisplayName("인증 완료 당시 코드와 요청 코드가 다르면 예외가 발생한다")
+    @DisplayName("인증 완료 당시 코드와 요청 코드가 다르면 예외가 발생하고 시도 횟수가 증가한다")
     void resetPassword_codeMismatch() {
         // given
+        EmailVerification verification = verifiedVerification();
         given(emailVerificationRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(
                 EMAIL, VerificationType.PASSWORD_RESET, VerificationStatus.VERIFIED))
-                .willReturn(Optional.of(verifiedVerification()));
+                .willReturn(Optional.of(verification));
 
         // when & then
         assertThatThrownBy(() -> passwordResetCommandService.resetPassword(EMAIL, "000000", NEW_PASSWORD, NEW_PASSWORD))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.EMAIL_VERIFICATION_CODE_MISMATCH.getMessage());
+        assertThat(verification.getAttemptCount()).isEqualTo(1);
+        verify(memberRepository, never()).findByEmail(anyString());
+    }
+
+    @Test
+    @DisplayName("confirm 단계에서 이미 여러 번 틀려 시도 횟수가 임계치 직전이면, 재설정 단계의 코드 불일치만으로도 한도 초과 처리된다")
+    void resetPassword_attemptExceeded() {
+        // given: confirm 단계에서 4회 이미 틀린 상태(브루트포스 우회 방지 확인용)
+        EmailVerification verification = verifiedVerification();
+        ReflectionTestUtils.setField(verification, "attemptCount", 4);
+        given(emailVerificationRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(
+                EMAIL, VerificationType.PASSWORD_RESET, VerificationStatus.VERIFIED))
+                .willReturn(Optional.of(verification));
+
+        // when & then
+        assertThatThrownBy(() -> passwordResetCommandService.resetPassword(EMAIL, "000000", NEW_PASSWORD, NEW_PASSWORD))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(AuthErrorCode.EMAIL_VERIFICATION_ATTEMPT_EXCEEDED.getMessage());
+        assertThat(verification.getAttemptCount()).isEqualTo(5);
+        assertThat(verification.getStatus()).isEqualTo(VerificationStatus.FAILED);
         verify(memberRepository, never()).findByEmail(anyString());
     }
 
@@ -160,5 +189,23 @@ class PasswordResetCommandServiceTest {
         assertThatThrownBy(() -> passwordResetCommandService.resetPassword(EMAIL, CODE, NEW_PASSWORD, NEW_PASSWORD))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.MEMBER_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("인증번호 발송 이후 탈퇴한 회원이면 예외가 발생하고 비밀번호가 변경되지 않는다")
+    void resetPassword_memberNotActive() {
+        // given
+        Member member = withdrawnMember();
+        given(emailVerificationRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(
+                EMAIL, VerificationType.PASSWORD_RESET, VerificationStatus.VERIFIED))
+                .willReturn(Optional.of(verifiedVerification()));
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(member));
+
+        // when & then
+        assertThatThrownBy(() -> passwordResetCommandService.resetPassword(EMAIL, CODE, NEW_PASSWORD, NEW_PASSWORD))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(AuthErrorCode.MEMBER_NOT_ACTIVE.getMessage());
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.WITHDRAWN);
+        assertThat(member.getPassword()).isEqualTo("oldEncoded");
     }
 }
