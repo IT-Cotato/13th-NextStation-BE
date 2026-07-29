@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +34,7 @@ public class JournalController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 스탬프"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @GetMapping("/write-info")
     public CommonResponse<JournalWriteInfoResponse> getWriteInfo(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
@@ -46,6 +48,7 @@ public class JournalController {
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 스탬프 또는 장소"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @PostMapping
     public CommonResponse<Long> createJournal(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
@@ -59,6 +62,7 @@ public class JournalController {
             @ApiResponse(responseCode = "403", description = "본인 일지가 아님"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 여행일지"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @PatchMapping("/{journalId}")
     public CommonResponse<Void> updateJournal(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
@@ -86,6 +90,7 @@ public class JournalController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @GetMapping("/uncompleted")
     public CommonResponse<UncompletedJournalListResponse> getUncompletedJournals(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal
@@ -99,6 +104,7 @@ public class JournalController {
             @ApiResponse(responseCode = "403", description = "본인 일지가 아님"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 여행일지"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @DeleteMapping("/{journalId}")
     public CommonResponse<Void> deleteJournal(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,

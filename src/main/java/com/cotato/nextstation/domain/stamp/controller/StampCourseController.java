@@ -3,7 +3,10 @@ package com.cotato.nextstation.domain.stamp.controller;
 import com.cotato.nextstation.domain.stamp.dto.response.CourseCompleteResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.StationPopularCoursesResponse;
 import com.cotato.nextstation.domain.stamp.service.command.StampCommandService;
+import com.cotato.nextstation.domain.stamp.service.query.StampCourseQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.security.AuthenticationPrincipal;
+import com.cotato.nextstation.global.security.JwtPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -15,10 +18,6 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1")
 public class StampCourseController {
-
-    // TODO: Auth 적용 시 X-Member-Id 헤더를 @AuthenticationPrincipal 로 교체한다.
-    private static final String MEMBER_ID_HEADER = "X-Member-Id";
-    private static final String MEMBER_ID_DESCRIPTION = "회원 ID (Auth 적용 전까지 사용하는 임시 헤더)";
 
     private final StampCommandService stampCommandService;
     private final StampCourseQueryService stampCourseQueryService;
@@ -40,11 +39,10 @@ public class StampCourseController {
     })
     @PostMapping("/courses/{courseId}/complete")
     public CommonResponse<CourseCompleteResponse> completeCourse(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId) {
-        return CommonResponse.success(stampCommandService.completeCourse(memberId, courseId));
+        return CommonResponse.success(stampCommandService.completeCourse(principal.memberId(), courseId));
     }
 
 
@@ -61,8 +59,7 @@ public class StampCourseController {
     })
     @GetMapping("/stamps/stations/{stationId}/courses")
     public CommonResponse<StationPopularCoursesResponse> getPopularCoursesByStation(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "역 ID", example = "12")
             @PathVariable Long stationId) {
         return CommonResponse.success(stampCourseQueryService.getPopularCoursesByStation(stationId));
