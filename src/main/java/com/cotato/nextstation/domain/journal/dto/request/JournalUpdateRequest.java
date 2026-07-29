@@ -29,7 +29,7 @@ public record JournalUpdateRequest(
 
         @Schema(
                 description = "여행 소요 시간", example = "HALF_DAY",
-                allowableValues = {"UNDER_1_HOUR", "HALF_DAY", "ONE_DAY"}
+                allowableValues = {"SHORT", "HALF_DAY", "FULL_DAY"}
         )
         TravelDuration travelDuration,
 

@@ -32,7 +32,7 @@ public record JournalCreateRequest(
 
         @Schema(
                 description = "여행 소요 시간", example = "HALF_DAY",
-                allowableValues = {"UNDER_1_HOUR", "HALF_DAY", "ONE_DAY"}
+                allowableValues = {"SHORT", "HALF_DAY", "FULL_DAY"}
         )
         @NotNull(message = "코스 시간은 필수입니다.")
         TravelDuration travelDuration,
