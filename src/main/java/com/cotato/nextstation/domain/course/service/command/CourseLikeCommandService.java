@@ -110,6 +110,23 @@ public class CourseLikeCommandService {
         course.delete();
     }
 
+    /**
+     * 코스 다중 삭제(저장 탭 선택 모드). 본인 코스만 대상이 되며, 남의 코스나 이미 삭제된 코스가
+     * 섞여 있어도 나머지는 정상 삭제되는 부분 성공을 허용한다. soft delete라 좋아요 다중 취소와
+     * 달리 카운터를 다루지 않으므로 동시 삭제에 대한 잠금이 필요 없다(재삭제는 @SQLRestriction으로
+     * 자동 제외되어 그저 대상에서 빠질 뿐이다).
+     */
+    public void deleteCourses(Long memberId, List<Long> courseIds) {
+        List<Long> targetCourseIds = courseIds.stream().distinct().toList();
+
+        List<Course> courses = courseRepository.findAllByMemberIdAndIdIn(memberId, targetCourseIds);
+        if (courses.isEmpty()) {
+            throw new CustomException(CourseErrorCode.COURSE_NOT_FOUND);
+        }
+
+        courses.forEach(Course::delete);
+    }
+
     private void validateLikeable(Long memberId, Long courseId) {
         // 삭제된 코스는 Course의 @SQLRestriction으로 조회에서 자동 제외된다.
         Course course = courseRepository.findById(courseId)
