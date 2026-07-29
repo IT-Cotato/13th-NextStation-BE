@@ -326,4 +326,64 @@ class CourseLikeCommandServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
     }
+
+    @Test
+    @DisplayName("선택한 코스를 다중 삭제하면 모두 soft delete 된다")
+    void deleteCourses_success() {
+        // given
+        Course course1 = course(1L, 1L);
+        Course course2 = course(2L, 1L);
+        given(courseRepository.findAllByMemberIdAndIdIn(1L, List.of(1L, 2L)))
+                .willReturn(List.of(course1, course2));
+
+        // when
+        courseLikeCommandService.deleteCourses(1L, List.of(1L, 2L));
+
+        // then
+        assertThat(course1.isDeleted()).isTrue();
+        assertThat(course2.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("다중 삭제 요청에 중복 id가 섞여 있으면 중복을 제거하고 조회한다")
+    void deleteCourses_distinctsDuplicateIds() {
+        // given
+        Course course1 = course(1L, 1L);
+        given(courseRepository.findAllByMemberIdAndIdIn(1L, List.of(1L)))
+                .willReturn(List.of(course1));
+
+        // when
+        courseLikeCommandService.deleteCourses(1L, List.of(1L, 1L));
+
+        // then
+        assertThat(course1.isDeleted()).isTrue();
+        verify(courseRepository).findAllByMemberIdAndIdIn(1L, List.of(1L));
+    }
+
+    @Test
+    @DisplayName("남의 코스나 존재하지 않는 코스가 섞여 있어도 본인 코스는 정상 삭제된다(부분 성공)")
+    void deleteCourses_partialSuccess() {
+        // given: 3개를 요청했는데 본인 소유는 1개뿐이라 그것만 조회된다
+        Course course1 = course(1L, 1L);
+        given(courseRepository.findAllByMemberIdAndIdIn(1L, List.of(1L, 2L, 3L)))
+                .willReturn(List.of(course1));
+
+        // when
+        courseLikeCommandService.deleteCourses(1L, List.of(1L, 2L, 3L));
+
+        // then
+        assertThat(course1.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("삭제 대상이 하나도 없으면 예외가 발생한다")
+    void deleteCourses_notFound() {
+        // given: 남의 코스거나 이미 삭제된 코스만 선택함
+        given(courseRepository.findAllByMemberIdAndIdIn(1L, List.of(1L, 2L))).willReturn(List.of());
+
+        // when & then
+        assertThatThrownBy(() -> courseLikeCommandService.deleteCourses(1L, List.of(1L, 2L)))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
 }
