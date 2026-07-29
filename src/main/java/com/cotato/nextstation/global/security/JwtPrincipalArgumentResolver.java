@@ -37,7 +37,7 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
                                    NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
         String authorizationHeader = webRequest.getHeader("Authorization");
 
-        if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
+        if (!hasBearerToken(authorizationHeader)) {
             // 비로그인도 허용하는 API는 토큰 없이 들어올 수 있다. 이때만 null로 넘긴다.
             if (!isRequired(parameter)) {
                 return null;
@@ -48,7 +48,7 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
 
         // 토큰을 보냈는데 만료·위조인 경우는 required와 무관하게 401이다.
         // 조용히 비로그인으로 넘기면 사용자는 로그인한 줄 아는데 좋아요 표시만 빠져 보인다.
-        String token = authorizationHeader.substring(BEARER_PREFIX.length()).trim();
+        String token = extractToken(authorizationHeader);
 
         Claims claims;
         try {
@@ -72,6 +72,14 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
             log.warn("subject가 memberId 형식이 아닌 access token: subject={}", claims.getSubject());
             throw new CustomException(GlobalErrorCode.INVALID_TOKEN);
         }
+    }
+
+    private boolean hasBearerToken(String authorizationHeader) {
+        return authorizationHeader != null && authorizationHeader.startsWith(BEARER_PREFIX);
+    }
+
+    private String extractToken(String authorizationHeader) {
+        return authorizationHeader.substring(BEARER_PREFIX.length()).trim();
     }
 
     private boolean isRequired(MethodParameter parameter) {
