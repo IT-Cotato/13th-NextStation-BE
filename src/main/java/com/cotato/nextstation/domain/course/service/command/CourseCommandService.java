@@ -34,6 +34,23 @@ public class CourseCommandService {
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
     private final CourseConverter courseConverter;
+    private final CourseViewCountUpdater courseViewCountUpdater;
+
+    /**
+     * 코스 상세를 열었을 때 조회수를 올린다. 다른 도메인이 코스 상세 화면을 그릴 때 호출한다.
+     * <p>
+     * 본인이 자기 코스를 연 경우는 올리지 않는다. {@code viewerMemberId}가 null이면 비로그인 조회다.
+     * <p>
+     * 증가에 실패해도 조회 응답은 그대로 나가야 하므로 예외를 삼킨다. 조회수는 부가 정보인데
+     * 잠금 경합 같은 이유로 실패했다고 화면 전체가 안 뜨면 손해가 크다.
+     */
+    public void increaseViewCount(Long courseId, Long viewerMemberId) {
+        try {
+            courseViewCountUpdater.increaseViewCount(courseId, viewerMemberId);
+        } catch (Exception e) {
+            log.warn("조회수 증가 실패: courseId={}, viewerMemberId={}", courseId, viewerMemberId, e);
+        }
+    }
 
     public CourseCreateResponse createCourse(Long memberId, CourseCreateRequest request) {
         validateDistinctPlaces(request.placeIds());
