@@ -138,6 +138,94 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC, c.id DESC")
     List<PlaceCourseView> findPopularPublicCoursesByPlaceId(@Param("placeId") Long placeId, Pageable pageable);
 
+    /**
+     * 둘러보기 코스 목록 - 최신순. 노선따라 둘러보기와 코스 검색이 같은 조회를 쓴다.
+     * <p>
+     * 공개 조건(journal_id가 있고 그 일지가 공개)·필터·검색이 모두 같아서 하나로 합쳤다.
+     * 화면마다 쿼리를 복붙하면 공개 조건이 바뀔 때 한 곳을 빠뜨려 비공개 코스가 새어 나간다.
+     * <p>
+     * 필터는 전부 선택 사항이라 파라미터가 null이면 조건을 건너뛴다.
+     * 호선 필터는 저장 탭과 같은 기준으로 역이 속한 호선 전체(StationLine)를 본다.
+     * 대표 호선으로 거르면 환승역 코스가 실제로 갈 수 있는 다른 호선 탭에서 사라진다.
+     * <p>
+     * 검색 대상은 코스 이름과 역명뿐이다("동네" 제외 확정). 역명은 역 검색과 같은 규칙으로
+     * 꼬리의 "역"을 떼고 비교하며, 검색어 쪽도 서비스에서 같은 규칙으로 다듬어 넘긴다.
+     * <p>
+     * 커서(createdAt·courseId)가 null이면 첫 페이지다.
+     */
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+            "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE j.isPublic = true " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:stationId IS NULL OR s.id = :stationId) " +
+            "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') " +
+            "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%')) " +
+                        "AND (:createdAt IS NULL OR c.createdAt < :createdAt " +
+            "     OR (c.createdAt = :createdAt AND c.id < :courseId)) " +
+            "ORDER BY c.createdAt DESC, c.id DESC")
+    List<ExploreCourseView> findExploreCoursesByLatest(@Param("lineId") Long lineId,
+                                                       @Param("stationId") Long stationId,
+                                                       @Param("keyword") String keyword,
+                                                       @Param("createdAt") LocalDateTime createdAt,
+                                                       @Param("courseId") Long courseId,
+                                                       Pageable pageable);
+
+    /**
+     * 둘러보기 코스 목록 - 인기순(view_count + like_count × 2), 동률이면 최신순.
+     * <p>
+     * 조건은 최신순과 같고 정렬과 커서만 다르다. 커서는 점수를 먼저 비교하고,
+     * 점수가 같으면 최신순과 같은 방식으로 시각·id를 비교한다.
+     * <p>
+     * 점수는 조회수·좋아요가 바뀌면 함께 변한다. 페이징 도중 순위가 흔들려 같은 코스가
+     * 두 번 나오거나 빠질 수 있지만, 목록이 실시간으로 요동치는 화면이 아니라 감수한다.
+     */
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+            "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE j.isPublic = true " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:stationId IS NULL OR s.id = :stationId) " +
+            "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') " +
+            "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%')) " +
+                        "AND (:score IS NULL OR (c.viewCount + c.likeCount * 2) < :score " +
+            "     OR ((c.viewCount + c.likeCount * 2) = :score " +
+            "         AND (c.createdAt < :createdAt OR (c.createdAt = :createdAt AND c.id < :courseId)))) " +
+            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC, c.id DESC")
+    List<ExploreCourseView> findExploreCoursesByPopular(@Param("lineId") Long lineId,
+                                                        @Param("stationId") Long stationId,
+                                                        @Param("keyword") String keyword,
+                                                        @Param("score") Long score,
+                                                        @Param("createdAt") LocalDateTime createdAt,
+                                                        @Param("courseId") Long courseId,
+                                                        Pageable pageable);
+
+    interface ExploreCourseView {
+        Long getCourseId();
+        Long getJournalId();
+        String getName();
+        LocalDateTime getCreatedAt();
+        int getViewCount();
+        int getLikeCount();
+        Long getStationId();
+        String getStationName();
+        Long getLineId();
+        String getLineName();
+        LineCode getLineCode();
+    }
+
     interface MyCourseView {
         Long getCourseId();
         String getName();
