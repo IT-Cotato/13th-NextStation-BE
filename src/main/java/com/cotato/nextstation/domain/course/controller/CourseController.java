@@ -91,6 +91,36 @@ public class CourseController {
     }
 
     @Operation(
+            summary = "사람들이 많이 찾는 코스 조회",
+            description = """
+                    둘러보기의 "사람들이 많이 찾는 코스"다. 좋아요 수가 많은 순으로, 동률이면 최신순이다.
+                    - **상위 30개까지만** 보여준다. 30번째를 넘어가면 `hasNext`가 false다.
+                    - 둘러보기 목록(`GET /api/v1/courses`)의 `sort=POPULAR`(조회수 + 좋아요×2)와는
+                      **다른 기준**이다. 여기는 담은 횟수(좋아요 수)만 본다.
+                    - 순위 번호는 내려주지 않는다. 정렬된 순서 그대로 프론트에서 매기면 된다.
+                    - `cursor`에는 다음 시작 위치가 담긴다. 그대로 다음 요청에 넣으면 된다.
+                    - 공개된 여행일지가 있는 코스만 나오며, 카드를 누르면 `journalId`로 여행일지 상세를 연다.
+                    """
+    )
+    @SecurityRequirement(name = "accessTokenAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공 (결과 없으면 빈 목록)"),
+            @ApiResponse(responseCode = "400", description = "size 범위를 벗어남 (`GlobalErrorCode.INVALID_PAGE_SIZE`) 또는 커서가 잘못됨 (`GlobalErrorCode.INVALID_CURSOR`)"),
+            @ApiResponse(responseCode = "401", description = "accessToken을 보냈으나 위변조 또는 만료 (`GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
+    })
+    @GetMapping("/popular")
+    public CommonResponse<ExploreCourseListResponse> getMostLikedCourses(
+            // 비로그인도 둘러볼 수 있어야 해서 required = false다.
+            @Parameter(hidden = true) @AuthenticationPrincipal(required = false) JwtPrincipal principal,
+            @Parameter(description = "다음 페이지 커서 (첫 페이지는 생략)")
+            @RequestParam(required = false) String cursor,
+            @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
+            @RequestParam(required = false) Integer size) {
+        Long memberId = (principal != null) ? principal.memberId() : null;
+        return CommonResponse.success(courseQueryService.getMostLikedCourses(memberId, cursor, size));
+    }
+
+    @Operation(
             summary = "코스 생성",
             description = """
                     선택한 장소들로 코스를 생성한다.
