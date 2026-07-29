@@ -12,6 +12,7 @@ import com.cotato.nextstation.domain.auth.service.EmailVerificationWriter;
 import com.cotato.nextstation.domain.auth.util.EmailMasker;
 import com.cotato.nextstation.domain.auth.util.VerificationMailSender;
 import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.extern.slf4j.Slf4j;
@@ -137,6 +138,12 @@ public class EmailVerificationCommandService {
         if (member.getPassword() == null) {
             log.warn("소셜 전용 계정으로 비밀번호 재설정 시도: memberId={}", member.getId());
             throw new CustomException(AuthErrorCode.SOCIAL_ONLY_ACCOUNT);
+        }
+
+        // 탈퇴/정지 회원은 재설정 대상이 아니다. 탈퇴 회원은 재가입을 통해 새 계정을 만드는 흐름을 유지한다.
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            log.warn("ACTIVE 상태가 아닌 회원의 비밀번호 재설정 시도: memberId={}, status={}", member.getId(), member.getStatus());
+            throw new CustomException(AuthErrorCode.MEMBER_NOT_ACTIVE);
         }
     }
 
