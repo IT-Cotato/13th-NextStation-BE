@@ -63,6 +63,9 @@ public class CourseQueryService {
     // 모든 역명이 이 접미사로 끝나 검색어로서 변별력이 없다. 역 검색과 같은 규칙으로 뗀다.
     private static final String STATION_NAME_SUFFIX = "역";
 
+    // "사람들이 많이 찾는 코스"는 상위 30개까지만 보여준다(무한스크롤도 여기서 끝난다).
+    private static final int MOST_LIKED_LIMIT = 30;
+
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
     private final CourseLikeRepository courseLikeRepository;
@@ -193,6 +196,48 @@ public class CourseQueryService {
             nextCursor = encodeExploreCursor(pageContent.get(pageContent.size() - 1), resolvedSort);
         }
         return courseConverter.toExploreListResponse(toExploreCards(memberId, pageContent), nextCursor, hasNext);
+    }
+
+    /**
+     * 사람들이 많이 찾는 코스. 좋아요 수 내림차순으로 상위 {@value #MOST_LIKED_LIMIT}개까지만 보여준다.
+     * <p>
+     * 둘러보기 목록의 "인기순"(조회수 + 좋아요 × 2)과는 다른 기준이다. 화면 부제가
+     * "가장 많이 담아둔 코스"라 담은 횟수만 본다.
+     * <p>
+     * 상한이 고정이라 커서에 정렬값 대신 다음 시작 위치를 담는다. 좋아요 수는 수시로 바뀌어서
+     * 값 기준 커서를 쓰면 순위가 흔들릴 때 같은 코스가 두 번 나오거나 빠진다.
+     * 30개짜리 고정 차트라 위치로 끊는 편이 단순하고 결과도 예측 가능하다.
+     */
+    public ExploreCourseListResponse getMostLikedCourses(Long memberId, String cursor, Integer size) {
+        int pageSize = resolvePageSize(size);
+        int offset = resolveOffsetCursor(cursor);
+
+        // 상한이 30개라 전부 가져와 잘라 쓴다. 페이지마다 다시 읽어도 30행이라 부담이 없다.
+        List<ExploreCourseView> topCourses =
+                courseRepository.findMostLikedCourses(PageRequest.of(0, MOST_LIKED_LIMIT));
+
+        if (offset >= topCourses.size()) {
+            return courseConverter.toExploreListResponse(List.of(), null, false);
+        }
+
+        int end = Math.min(offset + pageSize, topCourses.size());
+        List<ExploreCourseView> pageContent = topCourses.subList(offset, end);
+        boolean hasNext = end < topCourses.size();
+        String nextCursor = hasNext ? new CursorData(null, (long) end, null).encode() : null;
+
+        return courseConverter.toExploreListResponse(toExploreCards(memberId, pageContent), nextCursor, hasNext);
+    }
+
+    // 이 목록의 커서는 정렬값이 아니라 다음 시작 위치다.
+    private int resolveOffsetCursor(String cursor) {
+        CursorData cursorData = CursorData.decode(cursor);
+        if (cursorData == null) {
+            return 0;
+        }
+        if (cursorData.longValue() == null || cursorData.longValue() < 0) {
+            throw new CustomException(GlobalErrorCode.INVALID_CURSOR);
+        }
+        return cursorData.longValue().intValue();
     }
 
     private List<ExploreCourseView> fetchExploreCourses(Long lineId, Long stationId, String keyword,
