@@ -16,6 +16,7 @@ import com.cotato.nextstation.domain.station.repository.StationLineRepository.St
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,15 @@ public class StationQueryService {
     private static final List<String> CATEGORY_DISPLAY_ORDER = List.of("CULTURE", "FOOD", "CAFE", "WALK");
     private static final int PLACES_PER_CATEGORY = 3;
     private static final String COURSE_NAME_SUFFIX = " 환승여행 코스";
+
+    // 역 검색 결과 상한. 짧은 검색어에 수백 건이 쏟아지는 것을 막는다.
+    private static final int STATION_SEARCH_LIMIT = 20;
+
+    // 모든 역명이 이 접미사로 끝나 검색어로서 변별력이 없다. 검색 시 양쪽에서 뗀다.
+    private static final String STATION_NAME_SUFFIX = "역";
+
+    // LIKE 이스케이프 문자. 역명에 쓰이지 않고 Java·JPQL·MySQL에서 중복 이스케이프될 일도 없다.
+    private static final String LIKE_ESCAPE = "!";
 
     private final StationRepository stationRepository;
     private final StationLineRepository stationLineRepository;
@@ -96,14 +106,56 @@ public class StationQueryService {
         return placeInfoQueryService.getTopTagNames(placeIds);
     }
 
-    // 역 이름 검색 (현재 전체일치). 못 찾으면 빈 목록
+    /**
+     * 역 이름 검색(부분일치). "십리"로 검색하면 왕십리역·답십리역·상왕십리역이 모두 나온다.
+     * "왕십리"와 "왕십리역" 중 무엇을 입력해도 같은 결과가 나오도록 꼬리의 "역"은 떼고 비교한다.
+     * 결과가 없는 건 정상이므로 404가 아니라 빈 목록으로 응답한다.
+     * 결과는 {@value #STATION_SEARCH_LIMIT}개로 제한한다.
+     */
     public List<StationSummaryResponse> searchByName(String keyword) {
-        return stationRepository.findByStationName(keyword)
-                .map(station -> {
-                    Map<Long, List<LineSummaryResponse>> lines = groupLines(List.of(station.getId()));
-                    return List.of(stationConverter.toSummaryResponse(station, lines.getOrDefault(station.getId(), List.of())));
-                })
-                .orElseGet(List::of);
+        String normalized = normalizeKeyword(keyword);
+        if (normalized.isEmpty()) {
+            return List.of();
+        }
+
+        List<Station> stations = stationRepository.searchByNormalizedName(
+                normalized, escapeLikePattern(normalized), PageRequest.of(0, STATION_SEARCH_LIMIT));
+        if (stations.isEmpty()) {
+            return List.of();
+        }
+
+        // 역마다 노선을 따로 조회하면 N+1이라 한 번에 묶어서 가져온다.
+        List<Long> stationIds = stations.stream().map(Station::getId).toList();
+        Map<Long, List<LineSummaryResponse>> linesByStationId = groupLines(stationIds);
+
+        return stations.stream()
+                .map(station -> stationConverter.toSummaryResponse(
+                        station, linesByStationId.getOrDefault(station.getId(), List.of())))
+                .toList();
+    }
+
+    // 서울 내 역은 모두 "역"으로 끝나 꼬리의 "역"은 역을 구분하지 못한다.
+    // 떼고 비교해야 "왕십리"와 "왕십리역"이 같은 결과를 낸다.
+    // 역삼역·역촌역처럼 이름 안쪽의 "역"은 그대로 두어야 하므로 꼬리에서 한 번만 뗀다.
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return "";
+        }
+        String trimmed = keyword.trim();
+        // "역" 한 글자는 떼지 않는다. 떼면 빈 검색어가 되는데, 이건 역삼역·동대문역사문화공원역처럼
+        // 이름에 "역"이 든 역을 찾으려는 입력이다. 역명 쪽은 이미 꼬리를 뗐으므로 그 역들만 걸린다.
+        if (trimmed.length() > STATION_NAME_SUFFIX.length() && trimmed.endsWith(STATION_NAME_SUFFIX)) {
+            return trimmed.substring(0, trimmed.length() - STATION_NAME_SUFFIX.length());
+        }
+        return trimmed;
+    }
+
+    // 검색어에 든 LIKE 와일드카드를 문자 그대로 취급한다.
+    // 이스케이프하지 않으면 "%" 한 글자로 전체 역이 조회된다.
+    private String escapeLikePattern(String keyword) {
+        return keyword.replace(LIKE_ESCAPE, LIKE_ESCAPE + LIKE_ESCAPE)
+                .replace("%", LIKE_ESCAPE + "%")
+                .replace("_", LIKE_ESCAPE + "_");
     }
 
     // 여러 역의 소속 노선을 stationId 기준으로 묶는다.
