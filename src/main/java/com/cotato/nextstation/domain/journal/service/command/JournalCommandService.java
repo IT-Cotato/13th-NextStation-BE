@@ -12,6 +12,7 @@ import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.place.dto.request.PlaceReviewUpdateRequest;
 import com.cotato.nextstation.domain.place.service.command.PlaceReviewCommandService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
 
@@ -127,6 +128,12 @@ public class JournalCommandService {
                     }
                 }
             });
+        }
+
+        // 장소 리뷰 수정 (보내지 않은 장소는 KEEP으로 간주)
+        if (request.placeReviews() != null) {
+
+            placeReviewCommandService.updatePlaceReviews(journal, request.placeReviews());
         }
 
         log.info("여행일지 수정 완료: memberId={}, journalId={}", memberId, journalId);

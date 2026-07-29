@@ -4,6 +4,7 @@ import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.enums.ImageAction;
 import com.cotato.nextstation.domain.place.dto.request.PlaceReviewCreateRequest;
+import com.cotato.nextstation.domain.place.dto.request.PlaceReviewUpdateRequest;
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
@@ -69,20 +70,15 @@ public class PlaceReviewCommandService {
     }
 
     // 여행일지 수정 시 장소 리뷰 수정
-    public void updatePlaceReviews(Journal journal, List<JournalUpdateRequest.PlaceReviewUpdateRequest> requests) {
+    public void updatePlaceReviews(Journal journal, List<PlaceReviewUpdateRequest> requests) {
         // 보내지 않은 장소는 KEEP으로 간주 → 온 것만 처리
         requests.forEach(request -> {
             PlaceReview placeReview = placeReviewRepository
                     .findByJournalIdAndPlaceId(journal.getId(), request.placeId())
-                    .orElseGet(() -> {
-                        // 기존 리뷰 없으면 새로 생성
-                        Place place = placeRepository.findById(request.placeId())
-                                .orElseThrow(() -> new CustomException(PlaceErrorCode.PLACE_NOT_FOUND));
-                        return placeReviewRepository.save(PlaceReview.builder()
-                                .place(place)
-                                .journal(journal)
-                                .review(request.review())
-                                .build());
+                    .orElseThrow(() -> {
+                        log.warn("수정 요청한 장소 리뷰가 존재하지 않음: journalId={}, placeId={}",
+                                journal.getId(), request.placeId());
+                        return new CustomException(PlaceErrorCode.PLACE_REVIEW_NOT_FOUND);
                     });
 
             // 텍스트는 항상 반영

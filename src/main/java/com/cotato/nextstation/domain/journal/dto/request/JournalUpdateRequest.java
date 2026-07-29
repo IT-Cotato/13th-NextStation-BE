@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.journal.dto.request;
 
 import com.cotato.nextstation.domain.journal.enums.ImageAction;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
+import com.cotato.nextstation.domain.place.dto.request.PlaceReviewUpdateRequest;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -42,14 +43,6 @@ public record JournalUpdateRequest(
     public record JournalPhotoUpdateRequest(
             Long photoId,           // KEEP/DELETE 시 필요, UPDATE(새 추가) 시 null
             ImageAction imageAction,
-            String imageUrl         // UPDATE 시 새 imageUrl, 나머지는 null
-    ) {}
-
-    @Schema(description = "장소 리뷰 수정 요청")
-    public record PlaceReviewUpdateRequest(
-            Long placeId,           // 필수
-            String review,          // 텍스트
-            ImageAction imageAction,  // null이면 KEEP으로 간주
             String imageUrl         // UPDATE 시 새 imageUrl, 나머지는 null
     ) {}
 
