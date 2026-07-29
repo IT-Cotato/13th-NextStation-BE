@@ -31,6 +31,7 @@ public enum AuthErrorCode implements ErrorCode {
 
     // 403
     KAKAO_MEMBER_NOT_ACTIVE(HttpStatus.FORBIDDEN, "CLIENT_ERROR_403_KAKAO_MEMBER_NOT_ACTIVE", "이용이 제한된 계정입니다."),
+    MEMBER_NOT_ACTIVE(HttpStatus.FORBIDDEN, "CLIENT_ERROR_403_MEMBER_NOT_ACTIVE", "이용할 수 없는 계정입니다."),
 
     // 404
     EMAIL_VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CLIENT_ERROR_404_EMAIL_VERIFICATION_NOT_FOUND", "유효한 인증번호 발송 내역이 없습니다. 인증번호를 다시 요청해주세요."),
