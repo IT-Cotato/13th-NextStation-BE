@@ -10,4 +10,6 @@ public interface JournalImageRepository extends JpaRepository<JournalImage, Long
     List<JournalImage> findByJournalId(Long journalId);
 
     void deleteByJournalId(Long journalId);
+
+    void deleteByIdAndJournalId(Long id, Long journalId);
 }

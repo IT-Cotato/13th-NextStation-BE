@@ -7,14 +7,11 @@ import com.cotato.nextstation.domain.journal.enums.ImageAction;
 import com.cotato.nextstation.domain.place.dto.request.PlaceReviewCreateRequest;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.entity.JournalImage;
-import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.journal.exception.JournalErrorCode;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
-import com.cotato.nextstation.domain.place.dto.request.PlaceReviewUpdateRequest;
-import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.domain.place.service.command.PlaceReviewCommandService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
@@ -134,6 +131,9 @@ public class JournalCommandService {
                 switch (action) {
                     case KEEP -> { /* 유지 */ }
                     case DELETE -> {
+                        // journalId 스코프로 소유권 검증 (다른 일지의 사진 삭제 방지)
+                        journalImageRepository.deleteByIdAndJournalId(photo.photoId(), journal.getId());
+
                         // photoId로 DB에서 삭제 (S3는 배치 잡으로 정리)
                         journalImageRepository.deleteById(photo.photoId());
                     }
