@@ -23,11 +23,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.domain.Pageable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -70,7 +70,7 @@ class StationQueryServiceTest {
     }
 
     @Test
-    @DisplayName("역명이 일치하면 소속 노선을 모두 묶어 요약을 반환한다")
+    @DisplayName("검색된 역의 소속 노선을 모두 묶어 요약을 반환한다")
     void searchByName_found() {
         Station station = mock(Station.class);
         given(station.getId()).willReturn(42L);
