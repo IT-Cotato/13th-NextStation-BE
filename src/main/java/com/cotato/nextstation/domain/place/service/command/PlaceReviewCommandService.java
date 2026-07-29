@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.place.service.command;
 
 import com.cotato.nextstation.domain.journal.entity.Journal;
+import com.cotato.nextstation.domain.place.dto.request.PlaceReviewCreateRequest;
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
@@ -37,11 +38,6 @@ public class PlaceReviewCommandService {
     private final PlaceReviewRepository placeReviewRepository;
     private final PlaceReviewImageRepository placeReviewImageRepository;
 
-    public record PlaceReviewCreateRequest(
-            Long placeId,
-            String review,
-            String imageUrl
-    ) {}
 
     // 여행일지 작성 시 장소 리뷰 일괄 저장
     public void createPlaceReviews(Journal journal, List<PlaceReviewCreateRequest> requests) {
