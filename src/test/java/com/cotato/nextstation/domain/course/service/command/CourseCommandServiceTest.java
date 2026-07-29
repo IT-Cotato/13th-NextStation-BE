@@ -11,6 +11,7 @@ import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.global.exception.CustomException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,9 +23,11 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -42,6 +45,9 @@ class CourseCommandServiceTest {
 
     @Mock
     private CourseConverter courseConverter;
+
+    @Mock
+    private CourseViewCountUpdater courseViewCountUpdater;
 
     private Course course(String name) {
         return Course.builder().memberId(1L).stationId(100L).name(name).build();
@@ -260,5 +266,29 @@ class CourseCommandServiceTest {
                 1L, 1L, new CoursePlaceOrderUpdateRequest(List.of(10L, 20L, 99L))))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.INVALID_COURSE_PLACES.getMessage());
+    }
+
+    // ---------- 조회수 증가 ----------
+
+    @Test
+    @DisplayName("조회수 증가는 별도 트랜잭션을 여는 updater로 위임한다")
+    void increaseViewCount_delegates() {
+        // when
+        courseCommandService.increaseViewCount(1L, 2L);
+
+        // then: 코스 상세 조회가 읽기 전용 트랜잭션이라 같은 트랜잭션에서 UPDATE할 수 없다
+        verify(courseViewCountUpdater).increaseViewCount(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("조회수 증가가 실패해도 예외를 밖으로 던지지 않는다")
+    void increaseViewCount_swallowsFailure() {
+        // given: 조회수는 부가 정보라 잠금 경합 등으로 실패해도 코스 상세 화면은 떠야 한다
+        willThrow(new DataIntegrityViolationException("잠금 경합"))
+                .given(courseViewCountUpdater).increaseViewCount(1L, 2L);
+
+        // when & then
+        assertThatCode(() -> courseCommandService.increaseViewCount(1L, 2L))
+                .doesNotThrowAnyException();
     }
 }
