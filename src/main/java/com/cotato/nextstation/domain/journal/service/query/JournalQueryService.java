@@ -224,9 +224,14 @@ public class JournalQueryService {
                 })
                 .toList();
 
+        String profileImageUrl = journal.getMember().getProfileImageUrl();
+        String writerProfileImageUrl = (profileImageUrl == null || profileImageUrl.isBlank())
+                ? null
+                : profileImageUrl;
+
         return new JournalDetailResponse(
                 journal.getMember().getNickname(),
-                journal.getMember().getProfileImageUrl(),
+                writerProfileImageUrl,
                 journal.getTraveledAt(),
                 line,
                 stationName,
