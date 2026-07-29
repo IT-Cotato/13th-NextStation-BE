@@ -8,6 +8,7 @@ import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoRespon
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.entity.JournalImage;
+import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.journal.exception.JournalErrorCode;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
@@ -52,6 +53,7 @@ public class JournalQueryService {
     private final PlaceReviewRepository placeReviewRepository;
     private final PlaceReviewImageRepository placeReviewImageRepository;
 
+    // 여행일지 작성 초기 정보 조회
     public JournalWriteInfoResponse getWriteInfo(Long memberId, Long memberStampId) {
         // 1. memberStampId → courseId
         Long courseId = memberStampQueryService.getCourseId(memberId, memberStampId);
@@ -244,10 +246,13 @@ public class JournalQueryService {
                 journal.getOverallReview(),
                 visitedPlaces
         );
-
-
     }
-
+    // Course 도메인이 코스 카드의 소요시간(travel_duration) 표시를 위함
+    public TravelDuration getTravelDuration(Long journalId) {
+        return journalRepository.findById(journalId)
+                .map(Journal::getTravelDuration)
+                .orElse(null);  // 일지 없거나 미작성이면 null (장소 수로 추정)
+    }
 
 
 }
