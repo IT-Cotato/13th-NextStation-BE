@@ -11,6 +11,9 @@ import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(GlobalExceptionHandler.class)
 class RandomControllerTest {
 
-    private static final String MEMBER_ID_HEADER = "X-Member-Id";
+    private static final String TOKEN = "access-token";
 
     @Autowired
     MockMvc mockMvc;
@@ -46,6 +51,13 @@ class RandomControllerTest {
     // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
     @MockitoBean
     JwtProvider jwtProvider;
+
+    @BeforeEach
+    void authenticateAsMember1() {
+        // 리졸버가 토큰에서 memberId를 꺼내므로, 토큰을 실은 요청은 1번 회원으로 인증된 것처럼 둔다
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+    }
 
     private RandomRecommendationResponse sampleResponse() {
         return new RandomRecommendationResponse(
@@ -60,11 +72,11 @@ class RandomControllerTest {
     }
 
     @Test
-    @DisplayName("로그인 뽑기는 헤더의 memberId로 호출되고 200과 역/코스를 반환한다")
+    @DisplayName("로그인 뽑기는 토큰의 memberId로 호출되고 200과 역/코스를 반환한다")
     void drawRandom_withMember() throws Exception {
         given(recommendationCommandService.drawRandom(eq(1L))).willReturn(sampleResponse());
 
-        mockMvc.perform(post("/api/v1/random").header(MEMBER_ID_HEADER, 1L))
+        mockMvc.perform(post("/api/v1/random").header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data.station.stationName").value("보문역"))
@@ -87,7 +99,7 @@ class RandomControllerTest {
                 new CoursePreviewResponse("보문역 환승여행 코스", List.of()));
         given(recommendationCommandService.drawRandom(eq(1L))).willReturn(response);
 
-        mockMvc.perform(post("/api/v1/random").header(MEMBER_ID_HEADER, 1L))
+        mockMvc.perform(post("/api/v1/random").header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.station.lines").isArray())
                 .andExpect(jsonPath("$.data.station.lines").isEmpty())
@@ -96,7 +108,7 @@ class RandomControllerTest {
     }
 
     @Test
-    @DisplayName("헤더 없는 비로그인 뽑기는 memberId null로 호출되고 200을 반환한다")
+    @DisplayName("토큰 없는 비로그인 뽑기는 memberId null로 호출되고 200을 반환한다")
     void drawRandom_anonymous() throws Exception {
         given(recommendationCommandService.drawRandom(isNull())).willReturn(sampleResponse());
 
@@ -114,5 +126,19 @@ class RandomControllerTest {
         mockMvc.perform(post("/api/v1/random"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_NO_DRAWABLE_STATION"));
+    }
+
+    @Test
+    @DisplayName("만료·위조된 토큰을 보내면 비로그인으로 넘기지 않고 401을 반환한다")
+    void drawRandom_invalidToken() throws Exception {
+        // given: 토큰을 보냈다는 건 로그인한 줄 알고 있다는 뜻이라, 조용히 비로그인 처리하면 안 된다
+        given(jwtProvider.parseClaims("broken-token")).willThrow(new MalformedJwtException("broken"));
+
+        // when & then
+        mockMvc.perform(post("/api/v1/random")
+                        .header("Authorization", "Bearer broken-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_INVALID_TOKEN"));
+        verify(recommendationCommandService, never()).drawRandom(any());
     }
 }
