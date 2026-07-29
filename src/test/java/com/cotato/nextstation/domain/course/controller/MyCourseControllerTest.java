@@ -6,7 +6,9 @@ import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
+import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
@@ -157,6 +159,42 @@ class MyCourseControllerTest {
                         .header(MEMBER_ID_HEADER, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new MyCourseDeleteRequest(List.of(1L)))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("코스 확인은 역 이름과 장소를 순서대로 좌표까지 담아 반환한다")
+    void getMyCourseDetail_success() throws Exception {
+        given(courseQueryService.getMyCourseDetail(1L, 1L)).willReturn(new MyCourseDetailResponse(
+                1L, "민성이랑 떠나는 느좋투어", 6L, "신림역",
+                List.of(
+                        new MyCoursePlaceResponse(11L, "보문숲길도서관", "혼자 조용히 머물기 좋은 동네 도서관",
+                                "https://img/1.jpg", 127.0345, 37.5804, 1),
+                        new MyCoursePlaceResponse(12L, "보문사", "천년 고찰",
+                                "https://img/2.jpg", 127.0350, 37.5810, 2))));
+
+        mockMvc.perform(get("/api/v1/members/me/courses/{courseId}", 1L)
+                        .header(MEMBER_ID_HEADER, 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.courseId").value(1))
+                .andExpect(jsonPath("$.data.name").value("민성이랑 떠나는 느좋투어"))
+                .andExpect(jsonPath("$.data.stationName").value("신림역"))
+                // 지도 핀을 찍으려면 좌표가 반드시 실려야 한다
+                .andExpect(jsonPath("$.data.places[0].xCoordinate").value(127.0345))
+                .andExpect(jsonPath("$.data.places[0].yCoordinate").value(37.5804))
+                .andExpect(jsonPath("$.data.places[0].orderNum").value(1))
+                .andExpect(jsonPath("$.data.places[1].placeName").value("보문사"));
+    }
+
+    @Test
+    @DisplayName("본인 코스가 아니거나 없는 코스를 확인하면 404를 반환한다")
+    void getMyCourseDetail_notFound() throws Exception {
+        given(courseQueryService.getMyCourseDetail(1L, 1L))
+                .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/members/me/courses/{courseId}", 1L)
+                        .header(MEMBER_ID_HEADER, 1L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_NOT_FOUND"));
     }
