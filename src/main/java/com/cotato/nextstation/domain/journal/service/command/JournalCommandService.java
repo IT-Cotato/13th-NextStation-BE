@@ -3,6 +3,7 @@ package com.cotato.nextstation.domain.journal.service.command;
 
 import com.cotato.nextstation.domain.journal.dto.request.JournalCreateRequest;
 import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
+import com.cotato.nextstation.domain.journal.enums.ImageAction;
 import com.cotato.nextstation.domain.place.dto.request.PlaceReviewCreateRequest;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.entity.JournalImage;
@@ -116,11 +117,14 @@ public class JournalCommandService {
 
         // 여행일지 사진 수정
         if (request.journalPhotos() != null) {
+
             request.journalPhotos().forEach(photo -> {
-                switch (photo.imageAction()) {
-                    case KEEP -> {
-                        // 유지
-                    }
+                ImageAction action = photo.imageAction() != null
+                        ? photo.imageAction()
+                        : ImageAction.KEEP;
+
+                switch (action) {
+                    case KEEP -> { /* 유지 */ }
                     case DELETE -> {
                         // photoId로 DB에서 삭제 (S3는 배치 잡으로 정리)
                         journalImageRepository.deleteById(photo.photoId());
