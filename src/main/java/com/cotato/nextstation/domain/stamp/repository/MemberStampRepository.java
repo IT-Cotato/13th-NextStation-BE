@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> {
 
+    boolean existsByMemberIdAndId(Long memberId, Long id);
     boolean existsByMemberIdAndCourseId(Long memberId, Long courseId);
-
 }

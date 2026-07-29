@@ -4,7 +4,9 @@ import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.stamp.converter.StampCourseConverter;
 import com.cotato.nextstation.domain.stamp.dto.response.StationPopularCoursesResponse;
+import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
+import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
 import com.cotato.nextstation.domain.station.entity.Station;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
@@ -25,6 +27,7 @@ public class StampCourseQueryService {
     private final CourseQueryService courseQueryService;
     private final StationRepository stationRepository;
     private final StationLineRepository stationLineRepository;
+    private final MemberStampRepository memberStampRepository;
 
     public StationPopularCoursesResponse getPopularCoursesByStation(Long stationId) {
         Station station = stationRepository.findById(stationId)
@@ -38,4 +41,18 @@ public class StampCourseQueryService {
 
         return stampCourseConverter.toStationPopularCoursesResponse(station, lineName, courses);
     }
+
+    // 본인 스탬프인지 소유권 검증
+    public boolean existsByMemberIdAndId(Long memberId, Long memberStampId) {
+        return memberStampRepository.existsByMemberIdAndId(memberId, memberStampId);
+    }
+
+    // memberStampId → courseId 조회
+    public Long getCourseId(Long memberStampId) {
+        return memberStampRepository.findById(memberStampId)
+                .map(MemberStamp::getCourseId)
+                .orElseThrow(() -> new CustomException(StampErrorCode.MEMBER_STAMP_NOT_FOUND));
+    }
+
+
 }
