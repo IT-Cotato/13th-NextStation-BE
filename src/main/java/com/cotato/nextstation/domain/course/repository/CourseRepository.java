@@ -11,11 +11,24 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
     // 다중 삭제 대상 조회. memberId로 걸러서 남의 코스는 애초에 대상에서 빠진다(부분 성공 허용).
     List<Course> findAllByMemberIdAndIdIn(Long memberId, List<Long> ids);
+
+    // 코스 확인 화면. 헤더의 역 이름까지 한 번에 가져온다.
+    // memberId를 조건에 넣어 남의 코스는 애초에 조회되지 않는다(존재 여부도 알리지 않는다).
+    // 공개 조건은 걸지 않는다. 본인 코스는 일지를 안 썼거나 비공개여도 보여야 한다.
+    // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
+    @Query("SELECT c.id AS courseId, c.name AS name, " +
+            "s.id AS stationId, s.stationName AS stationName " +
+            "FROM Course c " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "WHERE c.id = :courseId AND c.memberId = :memberId")
+    Optional<MyCourseDetailView> findMyCourseDetail(@Param("memberId") Long memberId,
+                                                    @Param("courseId") Long courseId);
 
     // 좋아요 가능한 코스인지 확인한다.
     // Journal을 INNER JOIN 하므로 journalId가 NULL인 코스는 자동 제외되고,
@@ -137,6 +150,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "WHERE cp.placeId = :placeId AND j.isPublic = true " +
             "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC, c.id DESC")
     List<PlaceCourseView> findPopularPublicCoursesByPlaceId(@Param("placeId") Long placeId, Pageable pageable);
+
+    interface MyCourseDetailView {
+        Long getCourseId();
+        String getName();
+        Long getStationId();
+        String getStationName();
+    }
 
     interface MyCourseView {
         Long getCourseId();
