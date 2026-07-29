@@ -16,5 +16,8 @@ public interface PlaceReviewImageRepository extends JpaRepository<PlaceReviewIma
     List<PlaceReviewImage> findByPlaceReviewIdIn(@Param("reviewIds") List<Long> reviewIds);
 
     void deleteByPlaceReview_JournalId(Long journalId);
+    
+    void deleteByPlaceReviewId(Long placeReviewId);
+
 
 }

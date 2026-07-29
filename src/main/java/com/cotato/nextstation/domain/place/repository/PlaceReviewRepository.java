@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> {
 
@@ -81,4 +82,8 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
 
     // 여행일지에 연결된 장소 리뷰 리스트
     List<PlaceReview> findByJournalId(Long journalId);
+
+
+    Optional<PlaceReview> findByJournalIdAndPlaceId(Long journalId, Long placeId);
+
 }

@@ -49,7 +49,6 @@ public class PlaceReview extends BaseTimeEntity {
     @Column(name = "like_count", nullable = false)
     private long likeCount = 0;
 
-
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted = false;
 
@@ -63,6 +62,10 @@ public class PlaceReview extends BaseTimeEntity {
         this.review = review;
         this.isDeleted = false;
         this.likeCount = 0;
+    }
+
+    public void update(String review) {
+        this.review = review;
     }
 
     public void delete() {

@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.journal.service.command;
 
 
 import com.cotato.nextstation.domain.journal.dto.request.JournalCreateRequest;
+import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
 import com.cotato.nextstation.domain.place.dto.request.PlaceReviewCreateRequest;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.entity.JournalImage;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 
 @Slf4j
@@ -90,11 +92,43 @@ public class JournalCommandService {
         }
 
     // 여행일지 수정
-    public void updateJournal(Long memberId, Long journalId, String title,
-                              String overallReview, LocalDate traveledAt,
-                              TravelDuration travelDuration, boolean isPublic) {
+    public void updateJournal(Long memberId, Long journalId, JournalUpdateRequest request) {
         Journal journal = findOwnJournal(memberId, journalId);
-        journal.update(title, overallReview, traveledAt, travelDuration, isPublic);
+
+        // 기본 필드 수정 (null이면 기존값 유지)
+        journal.update(
+                Optional.ofNullable(request.title()).orElse(journal.getTitle()),
+                Optional.ofNullable(request.overallReview()).orElse(journal.getOverallReview()),
+                Optional.ofNullable(request.traveledAt()).orElse(journal.getTraveledAt()),
+                Optional.ofNullable(request.travelDuration()).orElse(journal.getTravelDuration()),
+                Optional.ofNullable(request.isPublic()).orElse(journal.isPublic())
+        );
+
+
+        // 여행일지 사진 수정
+        if (request.journalPhotos() != null) {
+            request.journalPhotos().forEach(photo -> {
+                switch (photo.imageAction()) {
+                    case KEEP -> {
+                        // 유지
+                    }
+                    case DELETE -> {
+                        // photoId로 DB에서 삭제 (S3는 배치 잡으로 정리)
+                        journalImageRepository.deleteById(photo.photoId());
+                    }
+                    case UPDATE -> {
+                        // 새 이미지 추가 (photoId 없음)
+                        journalImageRepository.save(
+                                JournalImage.builder()
+                                        .journal(journal)
+                                        .imageUrl(photo.imageUrl())
+                                        .build()
+                        );
+                    }
+                }
+            });
+        }
+
         log.info("여행일지 수정 완료: memberId={}, journalId={}", memberId, journalId);
     }
 
