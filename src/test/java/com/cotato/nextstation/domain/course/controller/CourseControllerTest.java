@@ -435,4 +435,30 @@ class CourseControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(GlobalErrorCode.INVALID_CURSOR.getCode()));
     }
+
+    @Test
+    @DisplayName("많이 찾는 코스는 토큰 없이도 200을 반환한다")
+    void getMostLikedCourses_withoutToken() throws Exception {
+        given(courseQueryService.getMostLikedCourses(isNull(), any(), any()))
+                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+
+        mockMvc.perform(get("/api/v1/courses/popular"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.courses").isArray());
+    }
+
+    @Test
+    @DisplayName("많이 찾는 코스는 커서와 size를 그대로 서비스에 넘긴다")
+    void getMostLikedCourses_passesParameters() throws Exception {
+        given(courseQueryService.getMostLikedCourses(eq(1L), eq("cursor-value"), eq(6)))
+                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+
+        mockMvc.perform(get("/api/v1/courses/popular")
+                        .header("Authorization", "Bearer " + TOKEN)
+                        .param("cursor", "cursor-value")
+                        .param("size", "6"))
+                .andExpect(status().isOk());
+
+        verify(courseQueryService).getMostLikedCourses(1L, "cursor-value", 6);
+    }
 }
