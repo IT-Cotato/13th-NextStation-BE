@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.course.controller;
 
 import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
+import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
@@ -86,8 +87,9 @@ public class CourseController {
             @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
             @RequestParam(required = false) Integer size) {
         Long memberId = (principal != null) ? principal.memberId() : null;
+        ExploreCourseCondition condition = new ExploreCourseCondition(lineId, stationId, keyword, null);
         return CommonResponse.success(
-                courseQueryService.getExploreCourses(memberId, lineId, stationId, keyword, sort, cursor, size));
+                courseQueryService.getExploreCourses(memberId, condition, sort, cursor, size));
     }
 
     @Operation(

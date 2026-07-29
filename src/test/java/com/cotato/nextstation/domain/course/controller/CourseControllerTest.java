@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.course.controller;
 
 import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
+import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
@@ -20,6 +21,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -33,6 +35,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
@@ -395,7 +398,7 @@ class CourseControllerTest {
     @Test
     @DisplayName("둘러보기 목록은 토큰 없이도 200을 반환한다")
     void getExploreCourses_withoutToken() throws Exception {
-        given(courseQueryService.getExploreCourses(isNull(), any(), any(), any(), any(), any(), any()))
+        given(courseQueryService.getExploreCourses(isNull(), any(), any(), any(), any()))
                 .willReturn(new ExploreCourseListResponse(List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/courses"))
@@ -407,8 +410,7 @@ class CourseControllerTest {
     @Test
     @DisplayName("둘러보기 목록은 필터·검색·정렬을 그대로 서비스에 넘긴다")
     void getExploreCourses_passesParameters() throws Exception {
-        given(courseQueryService.getExploreCourses(eq(1L), eq(2L), eq(123L), eq("신림"),
-                eq(CourseSort.POPULAR), eq("cursor-value"), eq(5)))
+        given(courseQueryService.getExploreCourses(eq(1L), any(), eq(CourseSort.POPULAR), eq("cursor-value"), eq(5)))
                 .willReturn(new ExploreCourseListResponse(List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/courses")
@@ -421,14 +423,18 @@ class CourseControllerTest {
                         .param("size", "5"))
                 .andExpect(status().isOk());
 
-        verify(courseQueryService).getExploreCourses(1L, 2L, 123L, "신림",
-                CourseSort.POPULAR, "cursor-value", 5);
+        ArgumentCaptor<ExploreCourseCondition> conditionCaptor =
+                ArgumentCaptor.forClass(ExploreCourseCondition.class);
+        verify(courseQueryService).getExploreCourses(
+                eq(1L), conditionCaptor.capture(), eq(CourseSort.POPULAR), eq("cursor-value"), eq(5));
+        assertThat(conditionCaptor.getValue())
+                .isEqualTo(new ExploreCourseCondition(2L, 123L, "신림", null));
     }
 
     @Test
     @DisplayName("커서가 정렬과 맞지 않으면 400을 반환한다")
     void getExploreCourses_invalidCursor() throws Exception {
-        given(courseQueryService.getExploreCourses(any(), any(), any(), any(), any(), any(), any()))
+        given(courseQueryService.getExploreCourses(any(), any(), any(), any(), any()))
                 .willThrow(new CustomException(GlobalErrorCode.INVALID_CURSOR));
 
         mockMvc.perform(get("/api/v1/courses").param("cursor", "broken"))

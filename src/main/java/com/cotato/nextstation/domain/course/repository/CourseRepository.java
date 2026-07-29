@@ -165,6 +165,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
             "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
+            "AND (:conceptTourId IS NULL OR c.conceptTourId = :conceptTourId) " +
             "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') " +
             "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%')) " +
                         "AND (:createdAt IS NULL OR c.createdAt < :createdAt " +
@@ -173,6 +174,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<ExploreCourseView> findExploreCoursesByLatest(@Param("lineId") Long lineId,
                                                        @Param("stationId") Long stationId,
                                                        @Param("keyword") String keyword,
+                                                       @Param("conceptTourId") Long conceptTourId,
                                                        @Param("createdAt") LocalDateTime createdAt,
                                                        @Param("courseId") Long courseId,
                                                        Pageable pageable);
@@ -198,6 +200,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
             "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
+            "AND (:conceptTourId IS NULL OR c.conceptTourId = :conceptTourId) " +
             "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') " +
             "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%')) " +
                         "AND (:score IS NULL OR (c.viewCount + c.likeCount * 2) < :score " +
@@ -207,6 +210,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<ExploreCourseView> findExploreCoursesByPopular(@Param("lineId") Long lineId,
                                                         @Param("stationId") Long stationId,
                                                         @Param("keyword") String keyword,
+                                                        @Param("conceptTourId") Long conceptTourId,
                                                         @Param("score") Long score,
                                                         @Param("createdAt") LocalDateTime createdAt,
                                                         @Param("courseId") Long courseId,

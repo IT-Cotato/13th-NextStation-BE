@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.course.service.query;
 
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
+import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
@@ -177,16 +178,14 @@ public class CourseQueryService {
      * 필터·검색어는 모두 선택 사항이고, 정렬은 최신순이 기본이다.
      * {@code memberId}는 하트를 채울지 판단하는 데만 쓰며 비로그인이면 null이다.
      */
-    public ExploreCourseListResponse getExploreCourses(Long memberId, Long lineId, Long stationId,
-                                                       String keyword, CourseSort sort,
-                                                       String cursor, Integer size) {
+    public ExploreCourseListResponse getExploreCourses(Long memberId, ExploreCourseCondition condition,
+                                                       CourseSort sort, String cursor, Integer size) {
         int pageSize = resolvePageSize(size);
         Pageable pageable = PageRequest.of(0, pageSize + 1); // hasNext 판단용 1개 더 조회
         CourseSort resolvedSort = (sort == null) ? CourseSort.LATEST : sort;
 
         CursorData cursorData = CursorData.decode(cursor);
-        List<ExploreCourseView> courses = fetchExploreCourses(
-                lineId, stationId, normalizeKeyword(keyword), resolvedSort, cursorData, pageable);
+        List<ExploreCourseView> courses = fetchExploreCourses(condition, resolvedSort, cursorData, pageable);
 
         boolean hasNext = courses.size() > pageSize;
         List<ExploreCourseView> pageContent = hasNext ? courses.subList(0, pageSize) : courses;
@@ -240,21 +239,22 @@ public class CourseQueryService {
         return cursorData.longValue().intValue();
     }
 
-    private List<ExploreCourseView> fetchExploreCourses(Long lineId, Long stationId, String keyword,
-                                                        CourseSort sort, CursorData cursorData, Pageable pageable) {
+    private List<ExploreCourseView> fetchExploreCourses(ExploreCourseCondition condition, CourseSort sort,
+                                                        CursorData cursorData, Pageable pageable) {
         if (cursorData != null) {
             validateExploreCursor(cursorData, sort);
         }
         Long courseId = (cursorData == null) ? null : cursorData.id();
         LocalDateTime createdAt = (cursorData == null) ? null : cursorData.dateTimeValue();
 
+        String keyword = normalizeKeyword(condition.keyword());
         if (sort == CourseSort.POPULAR) {
             Long score = (cursorData == null) ? null : cursorData.longValue();
-            return courseRepository.findExploreCoursesByPopular(
-                    lineId, stationId, keyword, score, createdAt, courseId, pageable);
+            return courseRepository.findExploreCoursesByPopular(condition.lineId(), condition.stationId(),
+                    keyword, condition.conceptTourId(), score, createdAt, courseId, pageable);
         }
-        return courseRepository.findExploreCoursesByLatest(
-                lineId, stationId, keyword, createdAt, courseId, pageable);
+        return courseRepository.findExploreCoursesByLatest(condition.lineId(), condition.stationId(),
+                keyword, condition.conceptTourId(), createdAt, courseId, pageable);
     }
 
     // 커서가 정렬과 맞는지 확인한다. 인기순 커서에는 점수가 들어 있고 최신순에는 없다.

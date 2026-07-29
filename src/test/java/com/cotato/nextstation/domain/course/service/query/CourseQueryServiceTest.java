@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.course.service.query;
 
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
+import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
@@ -539,46 +540,49 @@ class CourseQueryServiceTest {
     @DisplayName("정렬을 생략하면 최신순으로 조회한다")
     void getExploreCourses_defaultsToLatest() {
         // given
-        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(Pageable.class)))
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .willReturn(List.of());
 
         // when
-        courseQueryService.getExploreCourses(null, null, null, null, null, null, null);
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), null, null, null);
 
         // then: 정렬이 없으면 페이지마다 순서가 흔들려 커서 페이징이 성립하지 않는다
-        verify(courseRepository).findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(Pageable.class));
+        verify(courseRepository).findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class));
         verify(courseRepository, never())
-                .findExploreCoursesByPopular(any(), any(), any(), any(), any(), any(), any(Pageable.class));
+                .findExploreCoursesByPopular(any(), any(), any(), any(), any(), any(), any(), any(Pageable.class));
     }
 
     @Test
     @DisplayName("검색어의 꼬리 \"역\"은 떼고 조회한다")
     void getExploreCourses_normalizesKeyword() {
         // given: 역명은 쿼리에서 꼬리를 떼고 비교하므로 검색어도 같은 규칙으로 맞춰야 걸린다
-        given(courseRepository.findExploreCoursesByLatest(any(), any(), eq("왕십리"), any(), any(), any(Pageable.class)))
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), eq("왕십리"), any(), any(), any(), any(Pageable.class)))
                 .willReturn(List.of());
 
         // when
-        courseQueryService.getExploreCourses(null, null, null, "왕십리역", CourseSort.LATEST, null, null);
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "왕십리역", null), CourseSort.LATEST, null, null);
 
         // then
         verify(courseRepository)
-                .findExploreCoursesByLatest(any(), any(), eq("왕십리"), any(), any(), any(Pageable.class));
+                .findExploreCoursesByLatest(any(), any(), eq("왕십리"), any(), any(), any(), any(Pageable.class));
     }
 
     @Test
     @DisplayName("빈 검색어는 조건에서 빼고 전체를 조회한다")
     void getExploreCourses_blankKeyword() {
         // given
-        given(courseRepository.findExploreCoursesByLatest(any(), any(), isNull(), any(), any(), any(Pageable.class)))
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), isNull(), any(), any(), any(), any(Pageable.class)))
                 .willReturn(List.of());
 
         // when
-        courseQueryService.getExploreCourses(null, null, null, "  ", CourseSort.LATEST, null, null);
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "  ", null), CourseSort.LATEST, null, null);
 
         // then
         verify(courseRepository)
-                .findExploreCoursesByLatest(any(), any(), isNull(), any(), any(), any(Pageable.class));
+                .findExploreCoursesByLatest(any(), any(), isNull(), any(), any(), any(), any(Pageable.class));
     }
 
     @Test
@@ -589,13 +593,14 @@ class CourseQueryServiceTest {
         LocalDateTime now = LocalDateTime.now();
         List<ExploreCourseView> found =
                 List.of(exploreView(1L, now, 0, 0), exploreView(2L, now, 0, 0), exploreView(3L, now, 0, 0));
-        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(Pageable.class)))
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .willReturn(found);
         given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
         given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
 
         // when
-        courseQueryService.getExploreCourses(null, null, null, null, CourseSort.LATEST, null, 2);
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, null, 2);
 
         // then: 초과분 1개는 빼고 커서를 만든다
         ArgumentCaptor<List<ExploreCourseResponse>> coursesCaptor = ArgumentCaptor.forClass(List.class);
@@ -613,7 +618,7 @@ class CourseQueryServiceTest {
 
         // when & then
         assertThatThrownBy(() -> courseQueryService.getExploreCourses(
-                null, null, null, null, CourseSort.LATEST, popularCursor, null))
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, popularCursor, null))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(GlobalErrorCode.INVALID_CURSOR.getMessage());
     }
@@ -623,13 +628,14 @@ class CourseQueryServiceTest {
     void getExploreCourses_anonymousHasNoLikes() {
         // given
         List<ExploreCourseView> found = List.of(exploreView(1L, LocalDateTime.now(), 0, 0));
-        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(Pageable.class)))
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .willReturn(found);
         given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
         given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
 
         // when
-        courseQueryService.getExploreCourses(null, null, null, null, CourseSort.LATEST, null, null);
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, null, null);
 
         // then: 누를 사람이 없으므로 조회 자체를 하지 않는다
         verify(courseLikeRepository, never()).findLikedCourseIds(any(), any());
