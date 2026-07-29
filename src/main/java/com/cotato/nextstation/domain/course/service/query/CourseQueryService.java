@@ -3,7 +3,9 @@ package com.cotato.nextstation.domain.course.service.query;
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
@@ -13,6 +15,7 @@ import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
@@ -155,6 +158,43 @@ public class CourseQueryService {
             throw new CustomException(GlobalErrorCode.INVALID_PAGE_SIZE);
         }
         return size;
+    }
+
+    /**
+     * 저장 탭에서 "코스 확인"을 눌렀을 때의 화면. 지도와 코스 순서를 그린다.
+     * <p>
+     * 코스 상세({@code GET /courses/{courseId}})와는 다른 화면이라 응답도 다르다.
+     * 여기는 지도 핀을 찍을 좌표가 필요한 대신 조회수·좋아요·여행일지 내용이 필요 없다.
+     * 조회수도 올리지 않는다. 내 코스를 관리하는 화면이라 드나들 때마다 오르면 인기순이 왜곡된다.
+     * <p>
+     * 본인 코스만 볼 수 있고, 남의 코스는 존재 여부도 알리지 않도록 404로 응답한다.
+     * 공개 조건은 걸지 않는다. 일지를 아직 안 썼거나 비공개인 코스도 본인에게는 보여야 한다.
+     */
+    public MyCourseDetailResponse getMyCourseDetail(Long memberId, Long courseId) {
+        MyCourseDetailView course = courseRepository.findMyCourseDetail(memberId, courseId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        List<CoursePlace> coursePlaces = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId);
+        return courseConverter.toMyCourseDetailResponse(course, resolveCoursePlaces(coursePlaces));
+    }
+
+    // 코스에 담긴 장소를 순서대로 채운다.
+    // 장소 조회 결과는 요청 순서를 보장하지 않아 id로 묶은 뒤 order_num 순으로 다시 세운다.
+    private List<MyCoursePlaceResponse> resolveCoursePlaces(List<CoursePlace> coursePlaces) {
+        if (coursePlaces.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> placeIds = coursePlaces.stream().map(CoursePlace::getPlaceId).toList();
+        Map<Long, PlaceInfoResponse> placeById = placeInfoQueryService.getPlaceInfos(placeIds).stream()
+                .collect(Collectors.toMap(PlaceInfoResponse::placeId, place -> place));
+
+        // 조회되지 않은 장소는 지도 핀도 못 찍고 목록에도 채울 내용이 없어 제외한다.
+        return coursePlaces.stream()
+                .filter(coursePlace -> placeById.containsKey(coursePlace.getPlaceId()))
+                .map(coursePlace -> courseConverter.toMyCoursePlaceResponse(
+                        placeById.get(coursePlace.getPlaceId()), coursePlace.getOrderNum()))
+                .toList();
     }
 
     /**

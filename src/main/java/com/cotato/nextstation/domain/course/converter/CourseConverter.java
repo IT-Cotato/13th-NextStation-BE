@@ -7,16 +7,20 @@ import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseCardResponse;
+import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
+import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.springframework.stereotype.Component;
@@ -85,6 +89,28 @@ public class CourseConverter {
                 course.getViewCount(),
                 course.getLikeCount(),
                 course.getCreatedAt()
+        );
+    }
+
+    public MyCourseDetailResponse toMyCourseDetailResponse(MyCourseDetailView course, List<MyCoursePlaceResponse> places) {
+        return new MyCourseDetailResponse(
+                course.getCourseId(),
+                course.getName(),
+                course.getStationId(),
+                course.getStationName(),
+                places
+        );
+    }
+
+    public MyCoursePlaceResponse toMyCoursePlaceResponse(PlaceInfoResponse place, int orderNum) {
+        return new MyCoursePlaceResponse(
+                place.placeId(),
+                place.placeName(),
+                place.description(),
+                place.imageUrl(),
+                place.xCoordinate(),
+                place.yCoordinate(),
+                orderNum
         );
     }
 
