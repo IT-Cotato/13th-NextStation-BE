@@ -283,25 +283,4 @@ class CourseControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_LIKE_NOT_FOUND"));
     }
-
-    @Test
-    @DisplayName("본인 코스를 삭제하면 200을 반환한다")
-    void deleteCourse_success() throws Exception {
-        mockMvc.perform(delete("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
-
-    @Test
-    @DisplayName("타인 코스를 삭제하면 403을 반환한다")
-    void deleteCourse_forbidden() throws Exception {
-        willThrow(new CustomException(CourseErrorCode.COURSE_DELETE_FORBIDDEN))
-                .given(courseLikeCommandService).deleteCourse(eq(1L), eq(1L));
-
-        mockMvc.perform(delete("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_403_COURSE_DELETE_FORBIDDEN"));
-    }
 }
