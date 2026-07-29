@@ -163,10 +163,6 @@ public class JournalCommandService {
     public void deleteJournal(Long memberId, Long journalId) {
         Journal journal = findOwnJournal(memberId, journalId);
 
-        // PlaceReview soft delete 추가
-        placeReviewRepository.findByJournalId(journalId)
-                .forEach(PlaceReview::delete);
-
         // 여행일지 대표 사진만 DB에서 삭제 (PlaceReview/PlaceReviewImage는 유지)
         journalImageRepository.deleteByJournalId(journalId);
 
