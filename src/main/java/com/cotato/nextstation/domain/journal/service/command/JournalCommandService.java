@@ -47,6 +47,11 @@ public class JournalCommandService {
 
         Member member = memberRepository.getReferenceById(memberId);
 
+        // 2. 같은 스탬프로 이미 작성된 일지가 있는지 확인
+        if (journalRepository.existsByMemberStampId(request.memberStampId())) {
+            throw new CustomException(JournalErrorCode.JOURNAL_ALREADY_EXISTS);
+        }
+
 
         // 여행일지 생성
         Journal journal = Journal.builder()
