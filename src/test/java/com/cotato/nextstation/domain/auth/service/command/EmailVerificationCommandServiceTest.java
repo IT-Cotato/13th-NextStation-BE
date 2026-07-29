@@ -11,6 +11,7 @@ import com.cotato.nextstation.domain.auth.repository.TermsConsentRepository;
 import com.cotato.nextstation.domain.auth.service.EmailVerificationWriter;
 import com.cotato.nextstation.domain.auth.util.VerificationMailSender;
 import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
@@ -153,12 +154,19 @@ class EmailVerificationCommandServiceTest {
     private Member localMember() {
         Member member = Member.builder().email(EMAIL).password("encoded").build();
         ReflectionTestUtils.setField(member, "id", 1L);
+        ReflectionTestUtils.setField(member, "status", MemberStatus.ACTIVE);
         return member;
     }
 
     private Member socialOnlyMember() {
         Member member = Member.builder().email(EMAIL).build();
         ReflectionTestUtils.setField(member, "id", 1L);
+        return member;
+    }
+
+    private Member withdrawnMember() {
+        Member member = localMember();
+        member.withdraw();
         return member;
     }
 
@@ -212,6 +220,19 @@ class EmailVerificationCommandServiceTest {
         assertThatThrownBy(() -> emailVerificationCommandService.sendPasswordResetVerificationCode(EMAIL))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.SOCIAL_ONLY_ACCOUNT.getMessage());
+        verify(emailVerificationWriter, never()).issue(any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("탈퇴한 회원이면 예외가 발생하고 인증번호가 발급되지 않는다")
+    void sendPasswordResetVerificationCode_withdrawnMember() {
+        // given
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(withdrawnMember()));
+
+        // when & then
+        assertThatThrownBy(() -> emailVerificationCommandService.sendPasswordResetVerificationCode(EMAIL))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(AuthErrorCode.MEMBER_NOT_ACTIVE.getMessage());
         verify(emailVerificationWriter, never()).issue(any(), any(), anyLong());
     }
 
