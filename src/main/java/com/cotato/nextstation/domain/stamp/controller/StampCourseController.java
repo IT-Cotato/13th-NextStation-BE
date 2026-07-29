@@ -3,7 +3,6 @@ package com.cotato.nextstation.domain.stamp.controller;
 import com.cotato.nextstation.domain.stamp.dto.response.CourseCompleteResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.StationPopularCoursesResponse;
 import com.cotato.nextstation.domain.stamp.service.command.StampCommandService;
-import com.cotato.nextstation.domain.stamp.service.query.StampCourseQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
