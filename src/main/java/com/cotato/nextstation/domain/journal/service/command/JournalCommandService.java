@@ -116,11 +116,16 @@ public class JournalCommandService {
         log.info("여행일지 수정 완료: memberId={}, journalId={}", memberId, journalId);
     }
 
-    // 여행일지 삭제
+    // 여행일지 삭제 -> 리뷰는 삭제하되, 장소 데이터는 DB에 남겨두기
     public void deleteJournal(Long memberId, Long journalId) {
         Journal journal = findOwnJournal(memberId, journalId);
+
+
+        // 여행일지 대표 사진만 DB에서 삭제 (PlaceReview/PlaceReviewImage는 유지)
+        journalImageRepository.deleteByJournalId(journalId);
+
+        // 여행일지 soft delete
         journal.delete();
-        log.info("여행일지 삭제 완료: memberId={}, journalId={}", memberId, journalId);
     }
 
     private Journal findOwnJournal(Long memberId, Long journalId) {

@@ -78,4 +78,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "JOIN pr.journal j " +
             "WHERE pr.place.id = :placeId")
     long countByPlaceId(@Param("placeId") Long placeId);
+
+    // 여행일지에 연결된 장소 리뷰 리스트
+    List<PlaceReview> findByJournalId(Long journalId);
 }
