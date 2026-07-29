@@ -2,10 +2,9 @@ package com.cotato.nextstation.domain.course.controller;
 
 import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
-import com.cotato.nextstation.domain.course.dto.request.CourseNameUpdateRequest;
-import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRequest;
+import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
-import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
@@ -102,50 +101,32 @@ public class CourseController {
     }
 
     @Operation(
-            summary = "코스 이름 수정",
-            description = "본인이 만든 코스의 이름을 수정한다. (최대 20자)"
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "수정 성공"),
-            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 (`GlobalErrorCode.VALIDATION_ERROR`)"),
-            @ApiResponse(responseCode = "403", description = "본인 코스가 아님 (`CourseErrorCode.COURSE_FORBIDDEN`)"),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
-    })
-    @PatchMapping("/{courseId}/name")
-    public CommonResponse<CourseNameResponse> updateCourseName(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
-            @Parameter(description = "코스 ID", example = "1")
-            @PathVariable Long courseId,
-            @Valid @RequestBody CourseNameUpdateRequest request) {
-        return CommonResponse.success(courseCommandService.updateCourseName(memberId, courseId, request));
-    }
-
-    @Operation(
-            summary = "코스 내 장소 순서 수정",
+            summary = "코스 수정",
             description = """
-                    요청한 placeIds 배열 순서대로 코스 장소의 order_num을 재할당한다.
-                    - placeIds는 해당 코스의 장소 구성과 정확히 일치해야 한다 (개수·구성 모두)
-                    - 반환 데이터는 없다 (`CommonResponse<Void>`)
+                    본인이 만든 코스의 이름·장소 순서를 수정한다. name/placeIds는 각각 선택 사항이며,
+                    요청에 있는 필드만 반영한다(둘 다 생략하면 400).
+                    - name: 최대 20자, 공백 불가
+                    - placeIds: 코스의 기존 장소 구성과 정확히 일치해야 한다(개수·구성 모두). 배열 순서대로 order_num이 재할당된다.
+                    - 한 트랜잭션으로 처리되어, 장소 순서 검증에 실패하면 이름 변경도 함께 롤백된다.
                     """
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "수정 성공 (data 없음)"),
+            @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "400", description = """
-                    장소 목록이 기존 코스 구성과 불일치 (`CourseErrorCode.INVALID_COURSE_PLACES`)
-                    또는 같은 장소 중복 (`CourseErrorCode.DUPLICATE_COURSE_PLACES`)"""),
+                    이름·장소 순서 모두 생략, 이름이 공백이거나 20자 초과, 장소가 3개 미만/10개 초과
+                    (`GlobalErrorCode.VALIDATION_ERROR`), 장소 목록이 기존 코스 구성과 불일치
+                    (`CourseErrorCode.INVALID_COURSE_PLACES`) 또는 같은 장소 중복 (`CourseErrorCode.DUPLICATE_COURSE_PLACES`)"""),
             @ApiResponse(responseCode = "403", description = "본인 코스가 아님 (`CourseErrorCode.COURSE_FORBIDDEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
     })
-    @PatchMapping("/{courseId}/places/order")
-    public CommonResponse<Void> updateCoursePlaceOrder(
+    @PatchMapping("/{courseId}")
+    public CommonResponse<CourseUpdateResponse> updateCourse(
             @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
             @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId,
-            @Valid @RequestBody CoursePlaceOrderUpdateRequest request) {
-        courseCommandService.updateCoursePlaceOrder(memberId, courseId, request);
-        return CommonResponse.success(null);
+            @Valid @RequestBody CourseUpdateRequest request) {
+        return CommonResponse.success(courseCommandService.updateCourse(memberId, courseId, request));
     }
 
     @Operation(
