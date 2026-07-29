@@ -22,6 +22,7 @@ import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,7 +68,14 @@ public class JournalCommandService {
                 .travelDuration(request.travelDuration())
                 .isPublic(request.isPublic())
                 .build();
-        journalRepository.save(journal);
+
+        try {
+            journalRepository.save(journal);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("여행일지 중복 작성 시도(레이스 컨디션): memberId={}, memberStampId={}",
+                    memberId, request.memberStampId());
+            throw new CustomException(JournalErrorCode.JOURNAL_ALREADY_EXISTS);
+        }
 
         // 대표 사진 저장 (순서대로, 첫 번째가 대표)
         // 프론트가 보낸 imageUrls를 journal에 연결하는 부분
