@@ -27,6 +27,7 @@ import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,7 @@ import java.util.stream.Collectors;
 
 // 코스 조회 전용 서비스.
 // 저장 탭 목록 같은 화면 조회와, 다른 도메인이 코스를 참조할 때 쓰는 포트를 함께 제공한다.
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -188,6 +190,19 @@ public class CourseQueryService {
         List<Long> placeIds = coursePlaces.stream().map(CoursePlace::getPlaceId).toList();
         Map<Long, PlaceInfoResponse> placeById = placeInfoQueryService.getPlaceInfos(placeIds).stream()
                 .collect(Collectors.toMap(PlaceInfoResponse::placeId, place -> place));
+
+        // 코스에 담긴 장소가 조회되지 않는 건 데이터 정합성이 깨진 상태다(장소 재시딩 등).
+        // 조용히 빠지면 아무도 모르는 데다, 그 코스는 순서 변경 저장까지 막힌다.
+        // PATCH /courses/{courseId}가 기존 장소 구성과 정확히 일치할 것을 요구하는데,
+        // 프론트는 빠진 장소를 모른 채 남은 것만 보내서 INVALID_COURSE_PLACES가 된다.
+        // 실제로 찍히면 course_places를 정리해야 한다.
+        if (placeById.size() != coursePlaces.size()) {
+            List<Long> missingPlaceIds = placeIds.stream()
+                    .filter(placeId -> !placeById.containsKey(placeId))
+                    .toList();
+            log.warn("코스에 담긴 장소를 찾을 수 없어 응답에서 제외: courseId={}, missingPlaceIds={}",
+                    coursePlaces.get(0).getCourseId(), missingPlaceIds);
+        }
 
         // 조회되지 않은 장소는 지도 핀도 못 찍고 목록에도 채울 내용이 없어 제외한다.
         return coursePlaces.stream()
