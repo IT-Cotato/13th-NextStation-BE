@@ -6,6 +6,8 @@ import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
@@ -13,6 +15,7 @@ import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
@@ -132,6 +135,28 @@ public class CourseConverter {
             return null;
         }
         return new LineSummaryResponse(lineId, lineName, lineCode);
+    }
+
+    // 둘러보기 카드. 사진은 작성자가 여행일지에 올린 첫 사진인데 아직 데이터가 없어 null로 나간다.
+    public ExploreCourseResponse toExploreCourseResponse(ExploreCourseView course,
+                                                         List<String> tags, boolean isLiked, String imageUrl) {
+        return new ExploreCourseResponse(
+                course.getCourseId(),
+                course.getJournalId(),
+                course.getName(),
+                course.getStationId(),
+                course.getStationName(),
+                toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
+                tags,
+                course.getLikeCount(),
+                isLiked,
+                imageUrl
+        );
+    }
+
+    public ExploreCourseListResponse toExploreListResponse(List<ExploreCourseResponse> courses,
+                                                           String nextCursor, boolean hasNext) {
+        return new ExploreCourseListResponse(courses, nextCursor, hasNext);
     }
 
     public PlaceCourseResponse toPlaceCourseResponse(PlaceCourseView course, int placeCount,
