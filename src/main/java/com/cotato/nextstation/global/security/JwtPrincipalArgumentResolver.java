@@ -37,8 +37,8 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
                                    NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
         String authorizationHeader = webRequest.getHeader("Authorization");
 
-        if (!hasBearerToken(authorizationHeader)) {
-            // 비로그인도 허용하는 API는 토큰 없이 들어올 수 있다. 이때만 null로 넘긴다.
+        // 자격 증명을 아예 보내지 않은 경우만 비로그인으로 본다.
+        if (isBlank(authorizationHeader)) {
             if (!isRequired(parameter)) {
                 return null;
             }
@@ -46,8 +46,13 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
             throw new CustomException(GlobalErrorCode.UNAUTHORIZED);
         }
 
-        // 토큰을 보냈는데 만료·위조인 경우는 required와 무관하게 401이다.
-        // 조용히 비로그인으로 넘기면 사용자는 로그인한 줄 아는데 좋아요 표시만 빠져 보인다.
+        // 여기서부터는 required와 무관하게 401이다. 헤더를 보냈다는 건 로그인한 줄 알고 있다는 뜻이라,
+        // 조용히 비로그인으로 넘기면 사용자는 좋아요 표시만 빠진 화면을 보고 원인을 알 수 없다.
+        if (!authorizationHeader.startsWith(BEARER_PREFIX)) {
+            log.warn("Bearer 형식이 아닌 Authorization 헤더로 요청");
+            throw new CustomException(GlobalErrorCode.INVALID_TOKEN);
+        }
+
         String token = extractToken(authorizationHeader);
 
         Claims claims;
@@ -74,8 +79,10 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
         }
     }
 
-    private boolean hasBearerToken(String authorizationHeader) {
-        return authorizationHeader != null && authorizationHeader.startsWith(BEARER_PREFIX);
+    // 값이 빈 헤더는 보내지 않은 것과 같게 취급한다.
+    // 로그아웃 상태에서 빈 Authorization 헤더를 실어 보내는 클라이언트가 있어도 비로그인으로 동작해야 한다.
+    private boolean isBlank(String authorizationHeader) {
+        return authorizationHeader == null || authorizationHeader.isBlank();
     }
 
     private String extractToken(String authorizationHeader) {

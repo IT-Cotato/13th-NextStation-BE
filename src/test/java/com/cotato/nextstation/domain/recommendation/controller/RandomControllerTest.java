@@ -141,4 +141,29 @@ class RandomControllerTest {
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_INVALID_TOKEN"));
         verify(recommendationCommandService, never()).drawRandom(any());
     }
+
+    @Test
+    @DisplayName("Bearer 형식이 아닌 Authorization 헤더는 비로그인으로 넘기지 않고 401을 반환한다")
+    void drawRandom_nonBearerHeader() throws Exception {
+        // given: 자격 증명을 실어 보냈다는 뜻이라 익명 요청으로 취급하면 안 된다
+
+        // when & then
+        mockMvc.perform(post("/api/v1/random")
+                        .header("Authorization", "Basic dXNlcjpwYXNz"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_INVALID_TOKEN"));
+        verify(recommendationCommandService, never()).drawRandom(any());
+    }
+
+    @Test
+    @DisplayName("값이 빈 Authorization 헤더는 보내지 않은 것과 같게 보고 비로그인으로 처리한다")
+    void drawRandom_blankHeader() throws Exception {
+        // given: 로그아웃 상태에서 빈 헤더를 실어 보내는 클라이언트가 있어도 둘러보기가 막히면 안 된다
+        given(recommendationCommandService.drawRandom(isNull())).willReturn(sampleResponse());
+
+        // when & then
+        mockMvc.perform(post("/api/v1/random")
+                        .header("Authorization", "  "))
+                .andExpect(status().isOk());
+    }
 }
