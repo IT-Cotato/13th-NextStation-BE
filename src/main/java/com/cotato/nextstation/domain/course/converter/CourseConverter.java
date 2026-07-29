@@ -4,7 +4,7 @@ import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
-import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
@@ -75,8 +75,8 @@ public class CourseConverter {
         return new CourseCreateResponse(course.getId(), course.getName(), course.getCreatedAt());
     }
 
-    public CourseNameResponse toNameResponse(Course course) {
-        return new CourseNameResponse(course.getId(), course.getName());
+    public CourseUpdateResponse toUpdateResponse(Course course) {
+        return new CourseUpdateResponse(course.getId(), course.getName());
     }
 
     public CourseInfoResponse toInfoResponse(Course course) {

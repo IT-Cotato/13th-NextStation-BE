@@ -23,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -69,13 +70,14 @@ class StationQueryServiceTest {
     }
 
     @Test
-    @DisplayName("역명이 일치하면 소속 노선을 모두 묶어 요약을 반환한다")
+    @DisplayName("검색된 역의 소속 노선을 모두 묶어 요약을 반환한다")
     void searchByName_found() {
         Station station = mock(Station.class);
         given(station.getId()).willReturn(42L);
         StationLineView view2 = lineView(42L, LineCode.LINE_2);
         StationLineView view5 = lineView(42L, LineCode.LINE_5);
-        given(stationRepository.findByStationName("왕십리역")).willReturn(Optional.of(station));
+        given(stationRepository.searchByNormalizedName(eq("왕십리"), eq("왕십리"), any(Pageable.class)))
+                .willReturn(List.of(station));
         given(stationLineRepository.findLinesByStationIdIn(List.of(42L)))
                 .willReturn(List.of(view2, view5));
 
@@ -94,13 +96,137 @@ class StationQueryServiceTest {
     }
 
     @Test
+    @DisplayName("부분일치로 검색하면 해당 글자를 포함한 역이 모두 나온다")
+    void searchByName_partialMatch() {
+        // given: "십리"로 검색하면 왕십리역·답십리역이 모두 걸린다
+        Station wangsimni = mock(Station.class);
+        Station dapsimni = mock(Station.class);
+        given(wangsimni.getId()).willReturn(42L);
+        given(dapsimni.getId()).willReturn(43L);
+        given(stationRepository.searchByNormalizedName(eq("십리"), eq("십리"), any(Pageable.class)))
+                .willReturn(List.of(dapsimni, wangsimni));
+        given(stationLineRepository.findLinesByStationIdIn(List.of(43L, 42L))).willReturn(List.of());
+
+        StationSummaryResponse dap = new StationSummaryResponse(43L, "답십리역", List.of());
+        StationSummaryResponse wang = new StationSummaryResponse(42L, "왕십리역", List.of());
+        given(stationConverter.toSummaryResponse(eq(dapsimni), any())).willReturn(dap);
+        given(stationConverter.toSummaryResponse(eq(wangsimni), any())).willReturn(wang);
+
+        // when
+        List<StationSummaryResponse> result = stationQueryService.searchByName("십리");
+
+        // then: 리포지토리가 돌려준 순서(역명 오름차순)를 그대로 유지한다
+        assertThat(result).containsExactly(dap, wang);
+    }
+
+    @Test
+    @DisplayName("검색 결과는 20개로 제한한다")
+    void searchByName_limitedTo20() {
+        // given
+        given(stationRepository.searchByNormalizedName(eq("왕십리"), eq("왕십리"), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        stationQueryService.searchByName("왕십리");
+
+        // then: 짧은 검색어에 결과가 쏟아지지 않도록 상한을 넘긴다
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(stationRepository).searchByNormalizedName(eq("왕십리"), eq("왕십리"), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("검색어 앞뒤 공백은 제거하고 검색한다")
+    void searchByName_trimsKeyword() {
+        // given
+        given(stationRepository.searchByNormalizedName(eq("왕십리"), eq("왕십리"), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        stationQueryService.searchByName("  왕십리  ");
+
+        // then
+        verify(stationRepository).searchByNormalizedName(eq("왕십리"), eq("왕십리"), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("역명 끝의 \"역\"은 떼고 검색하므로 \"왕십리역\"과 \"왕십리\"가 같은 검색어가 된다")
+    void searchByName_stripsNameSuffix() {
+        // given
+        given(stationRepository.searchByNormalizedName(eq("왕십리"), eq("왕십리"), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        stationQueryService.searchByName("왕십리역");
+
+        // then
+        verify(stationRepository).searchByNormalizedName(eq("왕십리"), eq("왕십리"), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("이름 안쪽의 \"역\"은 남기므로 \"역삼역\"은 \"역삼\"으로 검색된다")
+    void searchByName_keepsInnerSuffixCharacter() {
+        // given: 꼬리의 "역"만 한 번 뗀다. 앞의 "역"까지 떼면 역삼역·역촌역을 못 찾는다
+        given(stationRepository.searchByNormalizedName(eq("역삼"), eq("역삼"), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        stationQueryService.searchByName("역삼역");
+
+        // then
+        verify(stationRepository).searchByNormalizedName(eq("역삼"), eq("역삼"), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("\"역\" 한 글자는 떼지 않고 그대로 검색해 이름 안쪽에 \"역\"이 든 역을 찾는다")
+    void searchByName_onlyNameSuffix() {
+        // given: 여기서 "역"을 떼면 빈 검색어가 되어 역삼역·동대문역사문화공원역을 못 찾는다.
+        // 역명은 이미 꼬리를 뗀 상태로 비교하므로 이름 안쪽에 "역"이 든 역만 걸린다
+        given(stationRepository.searchByNormalizedName(eq("역"), eq("역"), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        stationQueryService.searchByName("역");
+
+        // then
+        verify(stationRepository).searchByNormalizedName(eq("역"), eq("역"), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("검색어의 LIKE 와일드카드는 이스케이프해서 넘긴다")
+    void searchByName_escapesLikeWildcard() {
+        // given: 이스케이프하지 않으면 "%" 한 글자로 전체 역이 조회된다
+        given(stationRepository.searchByNormalizedName(eq("100%_"), eq("100!%!_"), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        stationQueryService.searchByName("100%_");
+
+        // then: 완전일치 비교에는 원본이, LIKE에는 이스케이프된 값이 넘어간다
+        verify(stationRepository).searchByNormalizedName(eq("100%_"), eq("100!%!_"), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("검색어가 비어 있으면 조회하지 않고 빈 목록을 반환한다")
+    void searchByName_blankKeyword() {
+        // when
+        List<StationSummaryResponse> result = stationQueryService.searchByName("   ");
+
+        // then: 전체 역을 훑는 낭비를 막는다
+        assertThat(result).isEmpty();
+        verify(stationRepository, never())
+                .searchByNormalizedName(any(), any(), any(Pageable.class));
+    }
+
+    @Test
     @DisplayName("일치하는 역이 없으면 빈 목록을 반환한다")
     void searchByName_notFound() {
         // given
-        given(stationRepository.findByStationName("없는역")).willReturn(Optional.empty());
+        given(stationRepository.searchByNormalizedName(eq("없는곳"), eq("없는곳"), any(Pageable.class)))
+                .willReturn(List.of());
 
         // when
-        List<StationSummaryResponse> result = stationQueryService.searchByName("없는역");
+        List<StationSummaryResponse> result = stationQueryService.searchByName("없는곳");
 
         // then
         assertThat(result).isEmpty();

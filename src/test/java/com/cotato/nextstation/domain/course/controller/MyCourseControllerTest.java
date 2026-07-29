@@ -15,6 +15,8 @@ import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(GlobalExceptionHandler.class)
 class MyCourseControllerTest {
 
-    private static final String MEMBER_ID_HEADER = "X-Member-Id";
+    private static final String TOKEN = "access-token";
 
     @Autowired
     MockMvc mockMvc;
@@ -60,6 +62,13 @@ class MyCourseControllerTest {
     @MockitoBean
     JwtProvider jwtProvider;
 
+    @BeforeEach
+    void authenticateAsMember1() {
+        // 리졸버가 토큰에서 memberId를 꺼내므로, 토큰을 실은 요청은 1번 회원으로 인증된 것처럼 둔다
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+    }
+
     @Test
     @DisplayName("내 코스 목록은 200과 선택 가능한 호선/코스 카드를 반환한다")
     void getMyCourses_success() throws Exception {
@@ -71,7 +80,7 @@ class MyCourseControllerTest {
                                 new LineSummaryResponse(6L, "6호선", LineCode.LINE_6), true)),
                         null, false));
 
-        mockMvc.perform(get("/api/v1/members/me/courses").header(MEMBER_ID_HEADER, 1L))
+        mockMvc.perform(get("/api/v1/members/me/courses").header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.availableLines[0].id").value(1))
                 .andExpect(jsonPath("$.data.availableLines[0].name").value("1호선"))
@@ -90,7 +99,7 @@ class MyCourseControllerTest {
                 .willReturn(new MyCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/members/me/courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .param("lineId", "6")
                         .param("stationId", "9"))
                 .andExpect(status().isOk());
@@ -104,7 +113,7 @@ class MyCourseControllerTest {
         given(courseQueryService.getMyCourses(1L, null, null, null, null))
                 .willReturn(new MyCourseListResponse(List.of(), List.of(), null, false));
 
-        mockMvc.perform(get("/api/v1/members/me/courses").header(MEMBER_ID_HEADER, 1L))
+        mockMvc.perform(get("/api/v1/members/me/courses").header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.availableLines").isEmpty())
                 .andExpect(jsonPath("$.data.courses").isEmpty());
@@ -117,7 +126,7 @@ class MyCourseControllerTest {
                 .willThrow(new CustomException(GlobalErrorCode.INVALID_CURSOR));
 
         mockMvc.perform(get("/api/v1/members/me/courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .param("cursor", "broken"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_INVALID_CURSOR"));
@@ -127,7 +136,7 @@ class MyCourseControllerTest {
     @DisplayName("선택한 코스를 다중 삭제하면 200을 반환한다")
     void deleteMyCourses_success() throws Exception {
         mockMvc.perform(delete("/api/v1/members/me/courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new MyCourseDeleteRequest(List.of(1L, 2L)))))
                 .andExpect(status().isOk())
@@ -141,7 +150,7 @@ class MyCourseControllerTest {
     @DisplayName("삭제할 코스를 선택하지 않으면 400을 반환한다")
     void deleteMyCourses_empty() throws Exception {
         mockMvc.perform(delete("/api/v1/members/me/courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new MyCourseDeleteRequest(List.of()))))
                 .andExpect(status().isBadRequest())
@@ -156,7 +165,7 @@ class MyCourseControllerTest {
                 .given(courseLikeCommandService).deleteCourses(eq(1L), any());
 
         mockMvc.perform(delete("/api/v1/members/me/courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new MyCourseDeleteRequest(List.of(1L)))))
                 .andExpect(status().isNotFound())
@@ -175,7 +184,7 @@ class MyCourseControllerTest {
                                 "https://img/2.jpg", 127.0350, 37.5810, 2))));
 
         mockMvc.perform(get("/api/v1/members/me/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.courseId").value(1))
                 .andExpect(jsonPath("$.data.name").value("민성이랑 떠나는 느좋투어"))
@@ -194,8 +203,16 @@ class MyCourseControllerTest {
                 .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
 
         mockMvc.perform(get("/api/v1/members/me/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("토큰 없이 내 코스 목록을 조회하면 401을 반환한다")
+    void getMyCourses_withoutToken() throws Exception {
+        mockMvc.perform(get("/api/v1/members/me/courses"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
     }
 }

@@ -6,10 +6,13 @@ import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.security.AuthenticationPrincipal;
+import com.cotato.nextstation.global.security.JwtPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +20,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,10 +30,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/members/me/courses")
 public class MyCourseController {
-
-    // TODO: Auth 적용 시 X-Member-Id 헤더를 @AuthenticationPrincipal 로 교체한다.
-    private static final String MEMBER_ID_HEADER = "X-Member-Id";
-    private static final String MEMBER_ID_DESCRIPTION = "회원 ID (Auth 적용 전까지 사용하는 임시 헤더)";
 
     private final CourseQueryService courseQueryService;
     private final CourseLikeCommandService courseLikeCommandService;
@@ -53,14 +51,15 @@ public class MyCourseController {
                     - `nextCursor`를 그대로 `cursor`에 넣어 다음 페이지를 요청한다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "size 범위를 벗어남 (`GlobalErrorCode.INVALID_PAGE_SIZE`) 또는 커서가 잘못됨 (`GlobalErrorCode.INVALID_CURSOR`)"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
     })
     @GetMapping
     public CommonResponse<MyCourseListResponse> getMyCourses(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "호선 필터 (생략하면 전체)", example = "6")
             @RequestParam(required = false) Long lineId,
             @Parameter(description = "역 필터 (생략하면 전체)", example = "6")
@@ -69,7 +68,7 @@ public class MyCourseController {
             @RequestParam(required = false) String cursor,
             @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
             @RequestParam(required = false) Integer size) {
-        return CommonResponse.success(courseQueryService.getMyCourses(memberId, lineId, stationId, cursor, size));
+        return CommonResponse.success(courseQueryService.getMyCourses(principal.memberId(), lineId, stationId, cursor, size));
     }
 
     @Operation(
@@ -86,17 +85,18 @@ public class MyCourseController {
                     - 타인 코스를 보는 코스 상세(`GET /api/v1/courses/{courseId}`)와는 다른 화면이라 응답도 다르다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않거나 본인 코스가 아님 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
     })
     @GetMapping("/{courseId}")
     public CommonResponse<MyCourseDetailResponse> getMyCourseDetail(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId) {
-        return CommonResponse.success(courseQueryService.getMyCourseDetail(memberId, courseId));
+        return CommonResponse.success(courseQueryService.getMyCourseDetail(principal.memberId(), courseId));
     }
 
     @Operation(
@@ -108,17 +108,18 @@ public class MyCourseController {
                     - 하나도 삭제 대상이 없을 때만 404로 응답한다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "삭제 성공 (data 없음)"),
             @ApiResponse(responseCode = "400", description = "삭제할 코스를 선택하지 않음 (`GlobalErrorCode.VALIDATION_ERROR`)"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "선택한 코스가 모두 없거나 본인 코스가 아님 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
     })
     @DeleteMapping
     public CommonResponse<Void> deleteMyCourses(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Valid @RequestBody MyCourseDeleteRequest request) {
-        courseLikeCommandService.deleteCourses(memberId, request.courseIds());
+        courseLikeCommandService.deleteCourses(principal.memberId(), request.courseIds());
         return CommonResponse.success(null);
     }
 }
