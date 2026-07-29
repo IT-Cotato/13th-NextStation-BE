@@ -25,6 +25,7 @@ import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.Like
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
@@ -195,6 +196,15 @@ public class CourseQueryService {
             nextCursor = encodeExploreCursor(pageContent.get(pageContent.size() - 1), resolvedSort);
         }
         return courseConverter.toExploreListResponse(toExploreCards(memberId, pageContent), nextCursor, hasNext);
+    }
+
+    /**
+     * 둘러보기 노선 칩 목록. 공개 코스가 하나라도 있는 노선만 내려준다.
+     */
+    public List<LineSummaryResponse> getExploreLines() {
+        return courseRepository.findExploreLines().stream()
+                .map(line -> new LineSummaryResponse(line.getLineId(), line.getLineName(), line.getLineCode()))
+                .toList();
     }
 
     /**
