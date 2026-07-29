@@ -634,4 +634,68 @@ class CourseQueryServiceTest {
         // then: 누를 사람이 없으므로 조회 자체를 하지 않는다
         verify(courseLikeRepository, never()).findLikedCourseIds(any(), any());
     }
+
+    // ---------- 사람들이 많이 찾는 코스 ----------
+
+    @Test
+    @DisplayName("많이 찾는 코스는 상위 30개까지만 조회한다")
+    void getMostLikedCourses_limitedTo30() {
+        // given
+        given(courseRepository.findMostLikedCourses(any(Pageable.class))).willReturn(List.of());
+
+        // when
+        courseQueryService.getMostLikedCourses(null, null, null);
+
+        // then: 무한스크롤도 30번째에서 끝난다
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(courseRepository).findMostLikedCourses(pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(30);
+    }
+
+    @Test
+    @DisplayName("많이 찾는 코스의 커서는 다음 시작 위치를 담는다")
+    void getMostLikedCourses_offsetCursor() {
+        // given: 좋아요 수는 수시로 바뀌어 값 기준 커서를 쓰면 순위가 흔들릴 때 결과가 어긋난다
+        LocalDateTime now = LocalDateTime.now();
+        List<ExploreCourseView> found =
+                List.of(exploreView(1L, now, 0, 9), exploreView(2L, now, 0, 6), exploreView(3L, now, 0, 3));
+        given(courseRepository.findMostLikedCourses(any(Pageable.class))).willReturn(found);
+        given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
+
+        // when
+        courseQueryService.getMostLikedCourses(null, null, 2);
+
+        // then
+        ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
+        verify(courseConverter).toExploreListResponse(any(), cursorCaptor.capture(), eq(true));
+        assertThat(CursorData.decode(cursorCaptor.getValue()).longValue()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("커서 위치가 목록 끝을 넘으면 빈 목록을 반환한다")
+    void getMostLikedCourses_cursorBeyondEnd() {
+        // given: 사이에 코스가 줄어 위치가 범위를 벗어나도 오류 없이 끝으로 처리한다
+        List<ExploreCourseView> found = List.of(exploreView(1L, LocalDateTime.now(), 0, 9));
+        given(courseRepository.findMostLikedCourses(any(Pageable.class))).willReturn(found);
+        String cursor = new CursorData(null, 10L, null).encode();
+
+        // when
+        courseQueryService.getMostLikedCourses(null, cursor, null);
+
+        // then
+        verify(courseConverter).toExploreListResponse(List.of(), null, false);
+    }
+
+    @Test
+    @DisplayName("위치가 없는 커서는 400이다")
+    void getMostLikedCourses_invalidCursor() {
+        // given: 이 목록의 커서에는 위치(longValue)가 반드시 들어 있어야 한다
+        String timeCursor = new CursorData(1L, null, LocalDateTime.now()).encode();
+
+        // when & then
+        assertThatThrownBy(() -> courseQueryService.getMostLikedCourses(null, timeCursor, null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(GlobalErrorCode.INVALID_CURSOR.getMessage());
+    }
 }
