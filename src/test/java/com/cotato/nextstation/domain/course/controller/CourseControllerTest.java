@@ -23,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -189,6 +190,22 @@ class CourseControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.reasons.anyFieldProvided").exists());
+    }
+
+    @Test
+    @DisplayName("장소 순서에 빈 값이 섞이면 400과 함께 몇 번째 값이 문제인지 알려준다")
+    void updateCourse_placeIdsWithNullElement() throws Exception {
+        // List.of는 null을 담지 못해 Arrays.asList로 만든다
+        CourseUpdateRequest request = new CourseUpdateRequest(null, Arrays.asList(3L, null, 2L));
+
+        mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
+                        .header(MEMBER_ID_HEADER, 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                // 다른 검증과 달리 키에 인덱스가 붙는다. 프론트가 이 형태를 기대해야 하므로 못박아 둔다
+                .andExpect(jsonPath("$.reasons['placeIds[1]']").value("장소 ID는 비어 있을 수 없습니다."));
     }
 
     @Test
