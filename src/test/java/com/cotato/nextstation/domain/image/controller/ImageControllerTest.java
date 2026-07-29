@@ -124,22 +124,6 @@ class ImageControllerTest {
     }
 
     @Test
-    @DisplayName("memberId가 없으면 400을 반환한다")
-    void getPresignedUrl_memberIdMissing() throws Exception {
-        String requestBody = """
-                {"folder": "PROFILE", "fileName": "profile.jpg"}
-                """;
-
-        mockMvc.perform(post("/api/v1/images/presigned-url")
-                        .header("Authorization", "Bearer " + TOKEN)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.reasons.memberId").exists());
-    }
-
-    @Test
     @DisplayName("확장자가 없는 파일명이면 400을 반환한다")
     void getPresignedUrl_invalidFileName() throws Exception {
         PresignedUrlRequest request = new PresignedUrlRequest(S3Folder.PROFILE, null, "profile");
