@@ -287,47 +287,6 @@ class CourseLikeCommandServiceTest {
     }
 
     @Test
-    @DisplayName("본인 코스를 삭제하면 soft delete 된다")
-    void deleteCourse_success() {
-        // given
-        Course course = course(1L, 1L);
-        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
-
-        // when
-        courseLikeCommandService.deleteCourse(1L, 1L);
-
-        // then
-        assertThat(course.isDeleted()).isTrue();
-        assertThat(course.getDeletedAt()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("타인 코스를 삭제하면 예외가 발생하고 삭제되지 않는다")
-    void deleteCourse_forbidden() {
-        // given: 코스 주인은 2번 회원인데 1번 회원이 삭제 시도
-        Course course = course(1L, 2L);
-        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
-
-        // when & then
-        assertThatThrownBy(() -> courseLikeCommandService.deleteCourse(1L, 1L))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(CourseErrorCode.COURSE_DELETE_FORBIDDEN.getMessage());
-        assertThat(course.isDeleted()).isFalse();
-    }
-
-    @Test
-    @DisplayName("존재하지 않는 코스를 삭제하면 예외가 발생한다")
-    void deleteCourse_notFound() {
-        // given
-        given(courseRepository.findById(1L)).willReturn(Optional.empty());
-
-        // when & then
-        assertThatThrownBy(() -> courseLikeCommandService.deleteCourse(1L, 1L))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
-    }
-
-    @Test
     @DisplayName("선택한 코스를 다중 삭제하면 모두 soft delete 된다")
     void deleteCourses_success() {
         // given

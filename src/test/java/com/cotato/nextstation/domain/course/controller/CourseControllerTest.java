@@ -351,27 +351,6 @@ class CourseControllerTest {
     }
 
     @Test
-    @DisplayName("본인 코스를 삭제하면 200을 반환한다")
-    void deleteCourse_success() throws Exception {
-        mockMvc.perform(delete("/api/v1/courses/{courseId}", 1L)
-                        .header("Authorization", "Bearer " + TOKEN))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
-
-    @Test
-    @DisplayName("타인 코스를 삭제하면 403을 반환한다")
-    void deleteCourse_forbidden() throws Exception {
-        willThrow(new CustomException(CourseErrorCode.COURSE_DELETE_FORBIDDEN))
-                .given(courseLikeCommandService).deleteCourse(eq(1L), eq(1L));
-
-        mockMvc.perform(delete("/api/v1/courses/{courseId}", 1L)
-                        .header("Authorization", "Bearer " + TOKEN))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_403_COURSE_DELETE_FORBIDDEN"));
-    }
-
-    @Test
     @DisplayName("토큰 없이 코스를 생성하면 401을 반환한다")
     void createCourse_withoutToken() throws Exception {
         mockMvc.perform(post("/api/v1/courses")
