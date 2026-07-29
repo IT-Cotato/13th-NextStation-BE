@@ -1,15 +1,25 @@
 package com.cotato.nextstation.domain.course.controller;
 
+import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.ConceptTourResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
+import com.cotato.nextstation.domain.course.entity.CourseSort;
 import com.cotato.nextstation.domain.course.service.query.ConceptTourQueryService;
+import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.security.AuthenticationPrincipal;
+import com.cotato.nextstation.global.security.JwtPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -22,6 +32,7 @@ import java.util.List;
 public class ConceptTourController {
 
     private final ConceptTourQueryService conceptTourQueryService;
+    private final CourseQueryService courseQueryService;
 
     @Operation(
             summary = "컨셉별 투어 목록 조회",
@@ -39,5 +50,40 @@ public class ConceptTourController {
     @GetMapping
     public CommonResponse<List<ConceptTourResponse>> getConceptTours() {
         return CommonResponse.success(conceptTourQueryService.getConceptTours());
+    }
+
+    @Operation(
+            summary = "컨셉별 코스 목록 조회",
+            description = """
+                    컨셉 상세 화면의 코스 목록이다. 정렬 토글(전체/최신순/인기순)에 대응한다.
+                    - `sort`는 `LATEST`(기본, 최신순) 또는 `POPULAR`(조회수 + 좋아요×2)다.
+                      화면의 "전체"는 `LATEST`로 보내면 된다.
+                    - 카드 구조와 커서 사용법은 둘러보기 목록(`GET /api/v1/courses`)과 같다.
+                    - **정렬을 바꾸면 커서를 버리고 첫 페이지부터 다시 요청해야 한다.**
+                    - 없는 컨셉이거나 속한 코스가 없으면 빈 목록이다.
+                    - 로그인 없이 조회할 수 있고, 로그인했을 때만 `isLiked`가 채워진다.
+                    """
+    )
+    @SecurityRequirement(name = "accessTokenAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공 (결과 없으면 빈 목록)"),
+            @ApiResponse(responseCode = "400", description = "size 범위를 벗어남 (`GlobalErrorCode.INVALID_PAGE_SIZE`) 또는 커서가 잘못됨/정렬과 맞지 않음 (`GlobalErrorCode.INVALID_CURSOR`)"),
+            @ApiResponse(responseCode = "401", description = "accessToken을 보냈으나 위변조 또는 만료 (`GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
+    })
+    @GetMapping("/{conceptTourId}/courses")
+    public CommonResponse<ExploreCourseListResponse> getConceptTourCourses(
+            // 비로그인도 둘러볼 수 있어야 해서 required = false다.
+            @Parameter(hidden = true) @AuthenticationPrincipal(required = false) JwtPrincipal principal,
+            @Parameter(description = "컨셉투어 ID", example = "1")
+            @PathVariable Long conceptTourId,
+            @Parameter(description = "정렬 기준 (기본 LATEST)", example = "LATEST")
+            @RequestParam(required = false) CourseSort sort,
+            @Parameter(description = "다음 페이지 커서 (첫 페이지는 생략)")
+            @RequestParam(required = false) String cursor,
+            @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
+            @RequestParam(required = false) Integer size) {
+        Long memberId = (principal != null) ? principal.memberId() : null;
+        return CommonResponse.success(courseQueryService.getExploreCourses(
+                memberId, ExploreCourseCondition.ofConceptTour(conceptTourId), sort, cursor, size));
     }
 }
