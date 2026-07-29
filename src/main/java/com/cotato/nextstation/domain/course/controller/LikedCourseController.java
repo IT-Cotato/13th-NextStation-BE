@@ -6,17 +6,19 @@ import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.security.AuthenticationPrincipal;
+import com.cotato.nextstation.global.security.JwtPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,10 +30,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/members/me/liked-courses")
 public class LikedCourseController {
-
-    // TODO: Auth 적용 시 X-Member-Id 헤더를 @AuthenticationPrincipal 로 교체한다.
-    private static final String MEMBER_ID_HEADER = "X-Member-Id";
-    private static final String MEMBER_ID_DESCRIPTION = "회원 ID (Auth 적용 전까지 사용하는 임시 헤더)";
 
     private final CourseLikeCommandService courseLikeCommandService;
     private final CourseQueryService courseQueryService;
@@ -45,19 +43,20 @@ public class LikedCourseController {
                     - `nextCursor`를 그대로 `cursor`에 넣어 다음 페이지를 요청한다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "size 범위를 벗어남 (`GlobalErrorCode.INVALID_PAGE_SIZE`) 또는 커서가 잘못됨 (`GlobalErrorCode.INVALID_CURSOR`)"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
     })
     @GetMapping
     public CommonResponse<LikedCourseListResponse> getLikedCourses(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "다음 페이지 커서 (첫 페이지는 생략)")
             @RequestParam(required = false) String cursor,
             @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
             @RequestParam(required = false) Integer size) {
-        return CommonResponse.success(courseQueryService.getLikedCourses(memberId, cursor, size));
+        return CommonResponse.success(courseQueryService.getLikedCourses(principal.memberId(), cursor, size));
     }
 
     @Operation(
@@ -70,16 +69,17 @@ public class LikedCourseController {
                     - 목록에 보이는 좋아요만 대상이다(원본이 비공개로 바뀐 좋아요는 취소되지 않는다).
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "취소 성공 (data 없음)"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "취소할 좋아요가 없음 (`CourseErrorCode.COURSE_LIKE_NOT_FOUND`)"),
     })
     @DeleteMapping("/all")
     public CommonResponse<Void> cancelAllCourseLikes(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @RequestBody(required = false) CourseLikeCancelAllRequest request) {
-        courseLikeCommandService.cancelAllLikes(memberId, request == null ? null : request.exceptCourseIds());
+        courseLikeCommandService.cancelAllLikes(principal.memberId(), request == null ? null : request.exceptCourseIds());
         return CommonResponse.success(null);
     }
 
@@ -92,17 +92,18 @@ public class LikedCourseController {
                     - 하나도 좋아요돼 있지 않을 때만 404로 응답한다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "취소 성공 (data 없음)"),
             @ApiResponse(responseCode = "400", description = "취소할 코스를 선택하지 않음 (`GlobalErrorCode.VALIDATION_ERROR`)"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "선택한 코스가 모두 좋아요돼 있지 않음 (`CourseErrorCode.COURSE_LIKE_NOT_FOUND`)"),
     })
     @DeleteMapping
     public CommonResponse<Void> cancelCourseLikes(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Valid @RequestBody CourseLikeCancelRequest request) {
-        courseLikeCommandService.cancelLikes(memberId, request.courseIds());
+        courseLikeCommandService.cancelLikes(principal.memberId(), request.courseIds());
         return CommonResponse.success(null);
     }
 }
