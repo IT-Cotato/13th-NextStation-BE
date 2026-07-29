@@ -3,10 +3,9 @@ package com.cotato.nextstation.domain.course.service.command;
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
 import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
-import com.cotato.nextstation.domain.course.dto.request.CourseNameUpdateRequest;
-import com.cotato.nextstation.domain.course.dto.request.CoursePlaceOrderUpdateRequest;
+import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
-import com.cotato.nextstation.domain.course.dto.response.CourseNameResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
@@ -58,17 +57,26 @@ public class CourseCommandService {
         return courseConverter.toCreateResponse(copied);
     }
 
-    public CourseNameResponse updateCourseName(Long memberId, Long courseId, CourseNameUpdateRequest request) {
+    /**
+     * 코스 이름·장소 순서를 수정한다. 둘 다 선택 사항이며 요청에 있는 필드만 반영한다
+     * (둘 다 없으면 컨트롤러의 Bean Validation에서 이미 400으로 막힌다).
+     * 한 트랜잭션으로 처리되므로 장소 순서 검증에 실패하면 이름 변경도 함께 롤백된다.
+     */
+    public CourseUpdateResponse updateCourse(Long memberId, Long courseId, CourseUpdateRequest request) {
+        if (request.placeIds() != null) {
+            validateDistinctPlaces(request.placeIds());
+        }
+
         Course course = findOwnedCourse(memberId, courseId);
-        course.updateName(request.name());
-        return courseConverter.toNameResponse(course);
-    }
 
-    public void updateCoursePlaceOrder(Long memberId, Long courseId, CoursePlaceOrderUpdateRequest request) {
-        validateDistinctPlaces(request.placeIds());
+        if (request.placeIds() != null) {
+            reorder(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId), request.placeIds());
+        }
+        if (request.name() != null) {
+            course.updateName(request.name());
+        }
 
-        findOwnedCourse(memberId, courseId);
-        reorder(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId), request.placeIds());
+        return courseConverter.toUpdateResponse(course);
     }
 
     // 같은 장소를 한 코스에 두 번 담을 수 없다.
