@@ -78,6 +78,7 @@ public class Journal extends BaseTimeEntity {
     public void delete() {
         this.isDeleted = true;
         this.deletedAt = LocalDateTime.now();
+        this.memberStampId = null; // 재작성 허용을 위한 null
     }
 
     public void update(String title, String overallReview,
