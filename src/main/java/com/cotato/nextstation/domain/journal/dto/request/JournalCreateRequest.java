@@ -39,7 +39,7 @@ public record JournalCreateRequest(
 
         @Schema(description = "공개 여부", example = "true")
         @NotNull(message = "공개 여부는 필수입니다.")
-        boolean isPublic,
+        Boolean isPublic,
 
         @Size(max = 3, message = "여행 대표 사진은 최대 3장입니다.")
         List<String> journalImageUrls,

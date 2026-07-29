@@ -19,7 +19,14 @@ import java.time.LocalDateTime;
  *
  */
 @Entity
-@Table(name = "journal")
+@Table(name = "journal",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_journal_member_stamp",
+                        columnNames = {"member_stamp_id"}
+                )
+        }
+)
 @SQLRestriction("is_deleted = false")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
