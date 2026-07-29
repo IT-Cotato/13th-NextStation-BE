@@ -13,6 +13,8 @@ import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.domain.place.dto.request.PlaceReviewUpdateRequest;
+import com.cotato.nextstation.domain.place.entity.PlaceReview;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.domain.place.service.command.PlaceReviewCommandService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
 
@@ -36,6 +38,7 @@ public class JournalCommandService {
     private final JournalRepository journalRepository;
     private final MemberRepository memberRepository;
     private final JournalImageRepository journalImageRepository;
+    private final PlaceReviewRepository placeReviewRepository;
 
     private final MemberStampQueryService memberStampQueryService;
     private final PlaceReviewCommandService placeReviewCommandService;
@@ -148,12 +151,16 @@ public class JournalCommandService {
     public void deleteJournal(Long memberId, Long journalId) {
         Journal journal = findOwnJournal(memberId, journalId);
 
+        // PlaceReview soft delete 추가
+        placeReviewRepository.findByJournalId(journalId)
+                .forEach(PlaceReview::delete);
 
         // 여행일지 대표 사진만 DB에서 삭제 (PlaceReview/PlaceReviewImage는 유지)
         journalImageRepository.deleteByJournalId(journalId);
 
         // 여행일지 soft delete
         journal.delete();
+        log.info("여행일지 삭제 완료: memberId={}, journalId={}", memberId, journalId);
     }
 
     private Journal findOwnJournal(Long memberId, Long journalId) {
