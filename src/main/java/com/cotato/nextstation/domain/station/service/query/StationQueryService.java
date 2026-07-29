@@ -119,4 +119,11 @@ public class StationQueryService {
         return stationRepository.findAllById(stationIds).stream()
                 .collect(Collectors.toMap(Station::getId, Station::getStationName));
     }
+
+    public LineSummaryResponse getLine(Long stationId) {
+        return stationLineRepository.findFirstByStationId(stationId)
+                .map(stationLine -> lineConverter.toSummaryResponse(stationLine.getLine()))
+                .orElse(null);
+    }
+
 }

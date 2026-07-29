@@ -3,15 +3,26 @@ package com.cotato.nextstation.domain.journal.service.query;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
+import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
+import com.cotato.nextstation.domain.journal.entity.Journal;
+import com.cotato.nextstation.domain.journal.entity.JournalImage;
+import com.cotato.nextstation.domain.journal.exception.JournalErrorCode;
+import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
+import com.cotato.nextstation.domain.place.entity.PlaceReview;
+import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.domain.station.service.query.StationQueryService;
+import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +48,9 @@ public class JournalQueryService {
 
     private final StationRepository stationRepository;
     private final JournalRepository journalRepository;
+    private final JournalImageRepository journalImageRepository;
+    private final PlaceReviewRepository placeReviewRepository;
+    private final PlaceReviewImageRepository placeReviewImageRepository;
 
     public JournalWriteInfoResponse getWriteInfo(Long memberId, Long memberStampId) {
         // 1. memberStampId → courseId
@@ -130,5 +144,105 @@ public class JournalQueryService {
 
         return new UncompletedJournalListResponse(courses.size(), courses);
     }
+
+
+    // 여행일지 상세 조회
+    public JournalDetailResponse getJournalDetail(Long memberId, Long journalId) {
+        // 1. 여행일지 조회
+        Journal journal = journalRepository.findById(journalId)
+                .orElseThrow(() -> new CustomException(JournalErrorCode.JOURNAL_NOT_FOUND));
+
+        // 2. 본인 여부 확인 → 타인이면 공개 일지만 조회 가능
+        boolean isOwner = journal.getMember().getId().equals(memberId);
+        if (!isOwner && !journal.isPublic()) {
+            throw new CustomException(JournalErrorCode.JOURNAL_FORBIDDEN);
+        }
+
+        // 3. memberStampId → courseId
+        Long courseId = memberStampQueryService.getCourseId(
+                journal.getMember().getId(), journal.getMemberStampId());
+
+        // 4. courseId → 코스 정보 (courseName, stationId, viewCount, saveCount)
+        CourseInfoResponse courseInfo = courseQueryService.getCourseInfo(courseId);
+
+        // 5. stationId → stationName, line
+        Map<Long, String> stationNameMap = stationQueryService
+                .getStationNames(Set.of(courseInfo.stationId()));
+        String stationName = stationNameMap.get(courseInfo.stationId());
+        LineSummaryResponse line = stationQueryService.getLine(courseInfo.stationId());
+
+        // 6. courseId → 장소 목록 (placeId + orderNum)
+        List<CoursePlaceInfoResponse> coursePlaces = courseQueryService.getCoursePlaces(courseId);
+        List<Long> placeIds = coursePlaces.stream()
+                .map(CoursePlaceInfoResponse::placeId)
+                .toList();
+
+        // 7. placeIds → 장소 이름
+        Map<Long, PlaceInfoResponse> placeInfoMap = placeInfoQueryService.getPlaceInfos(placeIds)
+                .stream()
+                .collect(Collectors.toMap(PlaceInfoResponse::placeId, Function.identity()));
+
+        // 8. placeIds → 태그 상위 3개
+        List<String> tags = placeInfoQueryService.getTopTagNames(placeIds);
+
+        // 9. journalId → 대표 사진 + 서브 사진
+        List<String> imageUrls = journalImageRepository.findByJournalId(journalId)
+                .stream()
+                .map(JournalImage::getImageUrl)
+                .toList();
+
+        // 10. journalId → 장소 리뷰 + 리뷰 이미지
+        List<PlaceReview> placeReviews = placeReviewRepository.findByJournalId(journalId);
+        Map<Long, PlaceReview> reviewByPlaceId = placeReviews.stream()
+                .collect(Collectors.toMap(pr -> pr.getPlace().getId(), Function.identity()));
+
+        List<Long> reviewIds = placeReviews.stream().map(PlaceReview::getId).toList();
+        Map<Long, String> imageUrlByReviewId = placeReviewImageRepository
+                .findByPlaceReviewIdIn(reviewIds).stream()
+                .collect(Collectors.toMap(
+                        pri -> pri.getPlaceReview().getId(),
+                        PlaceReviewImage::getImageUrl,
+                        (a, b) -> a  // 기획상 1개만이라 중복 시 첫 번째 사용
+                ));
+
+        // 11. 방문 장소 목록 조합 (orderNum 순서 유지)
+        List<JournalDetailResponse.VisitedPlaceResponse> visitedPlaces = coursePlaces.stream()
+                .map(cp -> {
+                    PlaceInfoResponse placeInfo = placeInfoMap.get(cp.placeId());
+                    PlaceReview review = reviewByPlaceId.get(cp.placeId());
+                    String reviewImageUrl = review != null
+                            ? imageUrlByReviewId.get(review.getId())
+                            : null;
+
+                    return new JournalDetailResponse.VisitedPlaceResponse(
+                            cp.orderNum(),
+                            cp.placeId(),
+                            placeInfo != null ? placeInfo.placeName() : null,
+                            review != null ? review.getReview() : null,
+                            reviewImageUrl
+                    );
+                })
+                .toList();
+
+        return new JournalDetailResponse(
+                journal.getMember().getNickname(),
+                journal.getMember().getProfileImageUrl(),
+                journal.getTraveledAt(),
+                line,
+                stationName,
+                courseInfo.name(),
+                tags,
+                journal.getTravelDuration(),
+                courseInfo.viewCount(),
+                courseInfo.likeCount(),
+                imageUrls,
+                journal.getOverallReview(),
+                visitedPlaces
+        );
+
+
+    }
+
+
 
 }

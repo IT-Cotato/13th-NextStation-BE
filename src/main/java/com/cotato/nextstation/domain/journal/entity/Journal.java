@@ -30,7 +30,7 @@ public class Journal extends BaseTimeEntity {
     private Member member;
 
     @Column(name = "member_stamp_id")
-    private MemberStamp memberStamp;
+    private Long memberStampId;
 
     @Column(nullable = false)
     private String title;
@@ -55,11 +55,11 @@ public class Journal extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    public Journal(Member member,MemberStamp memberStamp, String title,
+    public Journal(Member member, Long memberStampId, String title,
                    String overallReview, LocalDate traveledAt,
                    TravelDuration travelDuration, boolean isPublic) {
         this.member = member;
-        this.memberStamp = memberStamp;
+        this.memberStampId = memberStampId;
         this.title = title;
         this.overallReview = overallReview;
         this.traveledAt = traveledAt;

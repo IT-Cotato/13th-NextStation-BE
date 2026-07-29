@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.journal.controller;
 
 import com.cotato.nextstation.domain.journal.dto.request.JournalCreateRequest;
 import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
+import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.service.command.JournalCommandService;
