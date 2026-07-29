@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,6 +38,7 @@ public class StampCourseController {
             @ApiResponse(responseCode = "403", description = "본인 코스가 아님 (`StampErrorCode.COURSE_NOT_OWNED`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @PostMapping("/courses/{courseId}/complete")
     public CommonResponse<CourseCompleteResponse> completeCourse(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,

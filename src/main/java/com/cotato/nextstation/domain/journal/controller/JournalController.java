@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.journal.controller;
 
 import com.cotato.nextstation.domain.journal.dto.request.JournalCreateRequest;
 import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
+import com.cotato.nextstation.domain.journal.dto.response.JournalCreateResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
@@ -50,10 +51,12 @@ public class JournalController {
     })
     @SecurityRequirement(name = "accessTokenAuth")
     @PostMapping
-    public CommonResponse<Long> createJournal(
+    public CommonResponse<JournalCreateResponse> createJournal(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Valid @RequestBody JournalCreateRequest request) {
-        return CommonResponse.success(journalCommandService.createJournal(principal.memberId(), request));
+            Long journalId = journalCommandService.createJournal(principal.memberId(), request);
+
+        return CommonResponse.success(new JournalCreateResponse(journalId));
     }
 
     @Operation(summary = "여행일지 수정")
@@ -77,6 +80,7 @@ public class JournalController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 여행일지"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @GetMapping("/{journalId}")
     public CommonResponse<JournalDetailResponse> getJournalDetail(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
