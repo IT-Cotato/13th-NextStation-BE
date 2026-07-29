@@ -212,6 +212,26 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                                                         @Param("courseId") Long courseId,
                                                         Pageable pageable);
 
+    /**
+     * 사람들이 많이 찾는 코스 - 좋아요 수 내림차순, 동률이면 최신순.
+     * <p>
+     * 둘러보기 목록의 "인기순"(조회수 + 좋아요 × 2)과는 다른 기준이다. 화면 부제가
+     * "가장 많이 담아둔 코스"라 담은 횟수, 즉 좋아요 수만 본다.
+     * <p>
+     * 상위 몇 개까지 보여줄지는 서비스가 정한다. 이 쿼리는 정렬만 책임진다.
+     */
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+            "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE j.isPublic = true " +
+            "ORDER BY c.likeCount DESC, c.createdAt DESC, c.id DESC")
+    List<ExploreCourseView> findMostLikedCourses(Pageable pageable);
+
     interface ExploreCourseView {
         Long getCourseId();
         Long getJournalId();
