@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Set;
 
 public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> {
 
@@ -19,4 +20,20 @@ public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> 
             "WHERE ms.memberId = :memberId AND ms.courseId IN :courseIds")
     List<Long> findCompletedCourseIds(@Param("memberId") Long memberId,
                                       @Param("courseIds") List<Long> courseIds);
+
+    @Query("SELECT ms FROM MemberStamp ms " +
+            "WHERE ms.memberId = :memberId " +
+            "AND NOT EXISTS (" +
+            "    SELECT j FROM Journal j " +
+            "    WHERE j.memberStampId = ms.id" +
+            ") " +
+            "ORDER BY ms.createdAt DESC")
+    List<MemberStamp> findUncompletedByMemberId(@Param("memberId") Long memberId);
+
+    List<MemberStamp> findByMemberIdOrderByCreatedAtDesc(Long memberId);
+
+    // 완료된 스탬프 제외하고 미작성 스탬프만 조회 (최신순)
+    List<MemberStamp> findByMemberIdAndIdNotInOrderByCreatedAtDesc(
+            Long memberId, Set<Long> completedStampIds);
+
 }

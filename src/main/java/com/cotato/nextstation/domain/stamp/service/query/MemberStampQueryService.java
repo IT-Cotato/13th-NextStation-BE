@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.stamp.service.query;
 
+import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
@@ -22,6 +23,7 @@ import java.util.Set;
 public class MemberStampQueryService {
 
     private final MemberStampRepository memberStampRepository;
+    private final JournalRepository journalRepository;
 
     // 넘긴 코스들 중 회원이 완료한 코스 id 집합. 목록에서 카드별 완료 여부를 판단하는 데 쓴다.
     public Set<Long> getCompletedCourseIds(Long memberId, List<Long> courseIds) {
@@ -49,5 +51,13 @@ public class MemberStampQueryService {
         return memberStampRepository.existsByMemberIdAndId(memberId, memberStampId);
     }
 
+    // 여행일지 미작성 스탬프. completedStampIds를 파라미터로 받아서 처리
+    public List<MemberStamp> getUncompletedStamps(Long memberId, Set<Long> completedStampIds) {
+        if (completedStampIds.isEmpty()) {
+            return memberStampRepository.findByMemberIdOrderByCreatedAtDesc(memberId);
+        }
 
+        return memberStampRepository.findByMemberIdAndIdNotInOrderByCreatedAtDesc(
+                memberId, completedStampIds);
+    }
 }

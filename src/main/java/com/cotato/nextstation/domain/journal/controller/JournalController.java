@@ -1,7 +1,9 @@
 package com.cotato.nextstation.domain.journal.controller;
 
 import com.cotato.nextstation.domain.journal.dto.request.JournalCreateRequest;
+import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
+import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.service.command.JournalCommandService;
 import com.cotato.nextstation.domain.journal.service.query.JournalQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
@@ -74,7 +76,8 @@ public class JournalController {
     public CommonResponse<JournalDetailResponse> getJournalDetail(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long journalId) {
-        return CommonResponse.success(journalQueryService.getJournalDetail(principal.memberId(), journalId));
+        Long memberId = principal != null ? principal.memberId() : null;
+        return CommonResponse.success(journalQueryService.getJournalDetail(memberId, journalId));
     }
 
     @Operation(summary = "여행일지 미작성 목록 조회",
