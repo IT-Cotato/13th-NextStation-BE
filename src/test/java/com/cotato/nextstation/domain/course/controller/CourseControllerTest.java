@@ -4,11 +4,15 @@ import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
+import com.cotato.nextstation.domain.course.entity.CourseSort;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
+import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
+import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,9 +34,12 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -53,6 +60,9 @@ class CourseControllerTest {
 
     @MockitoBean
     CourseCommandService courseCommandService;
+
+    @MockitoBean
+    CourseQueryService courseQueryService;
 
     @MockitoBean
     CourseLikeCommandService courseLikeCommandService;
@@ -380,5 +390,49 @@ class CourseControllerTest {
                                 new CourseCreateRequest("보문역 코스", 1L, List.of(1L, 2L, 3L)))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("둘러보기 목록은 토큰 없이도 200을 반환한다")
+    void getExploreCourses_withoutToken() throws Exception {
+        given(courseQueryService.getExploreCourses(isNull(), any(), any(), any(), any(), any(), any()))
+                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+
+        mockMvc.perform(get("/api/v1/courses"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.courses").isArray())
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+    }
+
+    @Test
+    @DisplayName("둘러보기 목록은 필터·검색·정렬을 그대로 서비스에 넘긴다")
+    void getExploreCourses_passesParameters() throws Exception {
+        given(courseQueryService.getExploreCourses(eq(1L), eq(2L), eq(123L), eq("신림"),
+                eq(CourseSort.POPULAR), eq("cursor-value"), eq(5)))
+                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+
+        mockMvc.perform(get("/api/v1/courses")
+                        .header("Authorization", "Bearer " + TOKEN)
+                        .param("lineId", "2")
+                        .param("stationId", "123")
+                        .param("keyword", "신림")
+                        .param("sort", "POPULAR")
+                        .param("cursor", "cursor-value")
+                        .param("size", "5"))
+                .andExpect(status().isOk());
+
+        verify(courseQueryService).getExploreCourses(1L, 2L, 123L, "신림",
+                CourseSort.POPULAR, "cursor-value", 5);
+    }
+
+    @Test
+    @DisplayName("커서가 정렬과 맞지 않으면 400을 반환한다")
+    void getExploreCourses_invalidCursor() throws Exception {
+        given(courseQueryService.getExploreCourses(any(), any(), any(), any(), any(), any(), any()))
+                .willThrow(new CustomException(GlobalErrorCode.INVALID_CURSOR));
+
+        mockMvc.perform(get("/api/v1/courses").param("cursor", "broken"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.INVALID_CURSOR.getCode()));
     }
 }
