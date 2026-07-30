@@ -8,15 +8,15 @@ import java.util.List;
 @Schema(description = "둘러보기 메인 화면 응답. 화면에 필요한 세 섹션을 한 번에 담는다")
 public record ExploreResponse(
 
-        @Schema(description = "사람들이 많이 찾는 코스 (좋아요 수 순, 최대 6개). 더보기는 `GET /api/v1/courses/popular`")
+        @Schema(description = "사람들이 많이 찾는 코스 (좋아요 수 순, 최대 6개). 더보기는 `GET /api/v1/explore/courses/popular`")
         List<ExploreCourseResponse> popularCourses,
 
-        @Schema(description = "컨셉별 투어 (표시 순서대로 최대 3개). 더보기는 `GET /api/v1/concept-tours`")
+        @Schema(description = "컨셉별 투어 (표시 순서대로 최대 3개). 더보기는 `GET /api/v1/explore/concept-tours`")
         List<ConceptTourResponse> conceptTours,
 
         @Schema(description = """
                 노선 칩 목록. 공개 코스가 하나라도 있는 노선만 담는다.
-                칩을 바꾸면 `GET /api/v1/courses?lineId=`으로 다시 조회한다.
+                칩을 바꾸면 `GET /api/v1/explore/courses?lineId=`으로 다시 조회한다.
                 """)
         List<LineSummaryResponse> lines,
 
