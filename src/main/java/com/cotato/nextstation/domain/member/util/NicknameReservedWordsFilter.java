@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.member.util;
 
 import java.util.List;
+import java.util.Locale;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -21,12 +22,12 @@ public class NicknameReservedWordsFilter {
             return false;
         }
 
-        // 유저 입력값: 띄어쓰기 무시하고 소문자로 통일
-        String normalizedNickname = nickname.replaceAll("\\s+", "").toLowerCase();
+        // 유저 입력값: 띄어쓰기 무시하고 소문자로 통일 (Locale.ROOT 사용하여 OS/Locale 독립적 처리)
+        String normalizedNickname = nickname.replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
 
         // 1. 부분 일치 검사
         boolean containsBanned = CONTAINS_RESERVED_WORDS.stream()
-                .anyMatch(normalizedNickname::contains);
+                .anyMatch(word -> normalizedNickname.contains(word.toLowerCase(Locale.ROOT)));
 
         if (containsBanned) {
             return true;
@@ -34,6 +35,6 @@ public class NicknameReservedWordsFilter {
 
         // 2. 완전 일치 검사
         return EXACT_RESERVED_WORDS.stream()
-                .anyMatch(normalizedNickname::equals);
+                .anyMatch(word -> normalizedNickname.equals(word.toLowerCase(Locale.ROOT)));
     }
 }
