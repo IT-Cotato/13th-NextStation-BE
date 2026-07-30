@@ -351,9 +351,11 @@ public class CourseQueryService {
         }
     }
 
+    // 점수는 long으로 계산한다. 조회수·좋아요는 int라 int로 더하면 넘칠 수 있는데,
+    // 같은 공식을 쓰는 쿼리 쪽은 DB가 BIGINT로 계산해서 커서 값과 비교값이 갈라진다.
     private String encodeExploreCursor(ExploreCourseView last, CourseSort sort) {
         Long score = (sort == CourseSort.POPULAR)
-                ? (long) (last.getViewCount() + last.getLikeCount() * 2)
+                ? (long) last.getViewCount() + last.getLikeCount() * 2L
                 : null;
         return new CursorData(last.getCourseId(), score, last.getCreatedAt()).encode();
     }
