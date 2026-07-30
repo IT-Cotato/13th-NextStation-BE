@@ -24,11 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-// 컨셉투어는 코스를 묶는 분류라 Course 도메인이 소유한다. Swagger에서도 같은 섹션에 둔다.
-@Tag(name = "Course")
+// 컨셉투어는 코스를 묶는 분류라 Course 도메인이 소유하되, 화면은 둘러보기 안에만 있어 경로를 그 아래 둔다.
+@Tag(name = "Explore")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/concept-tours")
+@RequestMapping("/api/v1/explore/concept-tours")
 public class ConceptTourController {
 
     private final ConceptTourQueryService conceptTourQueryService;
@@ -58,7 +58,7 @@ public class ConceptTourController {
                     컨셉 상세 화면의 코스 목록이다. 정렬 토글(전체/최신순/인기순)에 대응한다.
                     - `sort`는 `LATEST`(기본, 최신순) 또는 `POPULAR`(조회수 + 좋아요×2)다.
                       화면의 "전체"는 `LATEST`로 보내면 된다.
-                    - 카드 구조와 커서 사용법은 둘러보기 목록(`GET /api/v1/courses`)과 같다.
+                    - 카드 구조와 커서 사용법은 둘러보기 목록(`GET /api/v1/explore/courses`)과 같다.
                     - **정렬을 바꾸면 커서를 버리고 첫 페이지부터 다시 요청해야 한다.**
                     - 없는 컨셉이거나 속한 코스가 없으면 빈 목록이다.
                     - 로그인 없이 조회할 수 있고, 로그인했을 때만 `isLiked`가 채워진다.
