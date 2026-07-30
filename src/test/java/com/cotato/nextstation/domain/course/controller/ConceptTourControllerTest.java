@@ -1,6 +1,5 @@
 package com.cotato.nextstation.domain.course.controller;
 
-import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.ConceptTourResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.CourseSort;
@@ -72,7 +71,7 @@ class ConceptTourControllerTest {
     @Test
     @DisplayName("컨셉별 코스는 컨셉 조건만 걸어 둘러보기 조회를 재사용한다")
     void getConceptTourCourses_usesConceptCondition() throws Exception {
-        given(courseQueryService.getExploreCourses(isNull(), any(), any(), any(), any()))
+        given(courseQueryService.getConceptTourCourses(isNull(), any(), any(), any(), any()))
                 .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/explore/concept-tours/{conceptTourId}/courses", 1L)
@@ -80,20 +79,18 @@ class ConceptTourControllerTest {
                         .param("size", "5"))
                 .andExpect(status().isOk());
 
-        verify(courseQueryService).getExploreCourses(
-                null, ExploreCourseCondition.ofConceptTour(1L), CourseSort.POPULAR, null, 5);
+        verify(courseQueryService).getConceptTourCourses(null, 1L, CourseSort.POPULAR, null, 5);
     }
 
     @Test
     @DisplayName("정렬을 생략하면 서비스가 기본값을 정하도록 null을 넘긴다")
     void getConceptTourCourses_defaultSort() throws Exception {
-        given(courseQueryService.getExploreCourses(any(), any(), any(), any(), any()))
+        given(courseQueryService.getConceptTourCourses(any(), any(), any(), any(), any()))
                 .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/explore/concept-tours/{conceptTourId}/courses", 1L))
                 .andExpect(status().isOk());
 
-        verify(courseQueryService).getExploreCourses(
-                isNull(), eq(ExploreCourseCondition.ofConceptTour(1L)), isNull(), isNull(), isNull());
+        verify(courseQueryService).getConceptTourCourses(isNull(), eq(1L), isNull(), isNull(), isNull());
     }
 }

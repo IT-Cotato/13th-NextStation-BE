@@ -1,11 +1,9 @@
 package com.cotato.nextstation.domain.course.service.query;
 
-import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.ConceptTourResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreResponse;
-import com.cotato.nextstation.domain.course.entity.CourseSort;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,8 +56,7 @@ class ExploreQueryServiceTest {
                 .willReturn(List.of(conceptTour(1), conceptTour(2), conceptTour(3), conceptTour(4)));
         given(courseQueryService.getExploreLines())
                 .willReturn(List.of(line(4L, "1호선", LineCode.LINE_1, true)));
-        given(courseQueryService.getExploreCourses(isNull(), any(), eq(CourseSort.LATEST), isNull(), eq(3)))
-                .willReturn(emptyList());
+        given(courseQueryService.getLineCourses(isNull(), any(), eq(3))).willReturn(List.of());
 
         // when
         ExploreResponse result = exploreQueryService.getExplore(null);
@@ -67,7 +64,7 @@ class ExploreQueryServiceTest {
         // then: 컨셉은 3개까지만 자른다
         assertThat(result.conceptTours()).hasSize(3);
         verify(courseQueryService).getMostLikedCourses(null, null, 6);
-        verify(courseQueryService).getExploreCourses(any(), any(), any(), any(), eq(3));
+        verify(courseQueryService).getLineCourses(any(), any(), eq(3));
     }
 
     @Test
@@ -79,7 +76,7 @@ class ExploreQueryServiceTest {
         given(courseQueryService.getExploreLines()).willReturn(List.of(
                 line(4L, "1호선", LineCode.LINE_1, false),
                 line(9L, "2호선", LineCode.LINE_2, true)));
-        given(courseQueryService.getExploreCourses(any(), any(), any(), any(), any())).willReturn(emptyList());
+        given(courseQueryService.getLineCourses(any(), any(), any())).willReturn(List.of());
 
         // when
         ExploreResponse result = exploreQueryService.getExplore(null);
@@ -87,8 +84,7 @@ class ExploreQueryServiceTest {
         // then: 비활성 노선은 목록에 남지만 선택되지는 않는다
         assertThat(result.lines()).hasSize(2);
         assertThat(result.selectedLineId()).isEqualTo(9L);
-        verify(courseQueryService).getExploreCourses(
-                null, new ExploreCourseCondition(9L, null, null, null), CourseSort.LATEST, null, 3);
+        verify(courseQueryService).getLineCourses(null, 9L, 3);
     }
 
     @Test
@@ -107,7 +103,7 @@ class ExploreQueryServiceTest {
         assertThat(result.lines()).hasSize(1);
         assertThat(result.selectedLineId()).isNull();
         assertThat(result.lineCourses()).isEmpty();
-        verify(courseQueryService, never()).getExploreCourses(any(), any(), any(), any(), any());
+        verify(courseQueryService, never()).getLineCourses(any(), any(), any());
     }
 
     @Test
@@ -124,6 +120,6 @@ class ExploreQueryServiceTest {
         // then
         assertThat(result.selectedLineId()).isNull();
         assertThat(result.lineCourses()).isEmpty();
-        verify(courseQueryService, never()).getExploreCourses(any(), any(), any(), any(), any());
+        verify(courseQueryService, never()).getLineCourses(any(), any(), any());
     }
 }
