@@ -9,6 +9,8 @@ import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +47,15 @@ class ImageControllerTest {
     @MockitoBean
     JwtProvider jwtProvider;
 
+    private static final String TOKEN = "access-token";
+
+    @BeforeEach
+    void authenticateAsMember1() {
+        // 이미지 API는 accessToken 인증이 적용돼 있어 토큰 없이 호출하면 401이다
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+    }
+
     @Test
     @DisplayName("정상 요청이면 200과 presignedUrl/imageUrl/contentType을 반환한다")
     void getPresignedUrl_success() throws Exception {
@@ -57,6 +68,7 @@ class ImageControllerTest {
         given(imageCommandService.getPresignedUrl(S3Folder.PROFILE, 1L, null, "profile.jpg")).willReturn(response);
 
         mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -74,6 +86,7 @@ class ImageControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -82,26 +95,12 @@ class ImageControllerTest {
     }
 
     @Test
-    @DisplayName("memberId가 없으면 400을 반환한다")
-    void getPresignedUrl_memberIdMissing() throws Exception {
-        String requestBody = """
-                {"folder": "PROFILE", "fileName": "profile.jpg"}
-                """;
-
-        mockMvc.perform(post("/api/v1/images/presigned-url")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.reasons.memberId").exists());
-    }
-
-    @Test
     @DisplayName("fileName이 비어있으면 400을 반환한다")
     void getPresignedUrl_fileNameBlank() throws Exception {
         PresignedUrlRequest request = new PresignedUrlRequest(S3Folder.PROFILE, null, "");
 
         mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -117,6 +116,7 @@ class ImageControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -131,6 +131,7 @@ class ImageControllerTest {
                 .given(imageCommandService).getPresignedUrl(any(S3Folder.class), anyLong(), any(), anyString());
 
         mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -145,6 +146,7 @@ class ImageControllerTest {
                 .given(imageCommandService).getPresignedUrl(any(S3Folder.class), anyLong(), any(), anyString());
 
         mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -159,6 +161,7 @@ class ImageControllerTest {
                 .given(imageCommandService).getPresignedUrl(any(S3Folder.class), anyLong(), any(), anyString());
 
         mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -173,6 +176,7 @@ class ImageControllerTest {
                 .given(imageCommandService).getPresignedUrl(any(S3Folder.class), anyLong(), any(), anyString());
 
         mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())

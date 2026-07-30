@@ -12,6 +12,8 @@ import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(GlobalExceptionHandler.class)
 class CourseControllerTest {
 
-    private static final String MEMBER_ID_HEADER = "X-Member-Id";
+    private static final String TOKEN = "access-token";
 
     @Autowired
     MockMvc mockMvc;
@@ -59,6 +61,13 @@ class CourseControllerTest {
     @MockitoBean
     JwtProvider jwtProvider;
 
+    @BeforeEach
+    void authenticateAsMember1() {
+        // 리졸버가 토큰에서 memberId를 꺼내므로, 토큰을 실은 요청은 1번 회원으로 인증된 것처럼 둔다
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+    }
+
     @Test
     @DisplayName("코스 생성은 201과 courseId/name/createdAt을 반환한다")
     void createCourse_created() throws Exception {
@@ -67,7 +76,7 @@ class CourseControllerTest {
                 .willReturn(new CourseCreateResponse(1L, "보문역 코스", LocalDateTime.now()));
 
         mockMvc.perform(post("/api/v1/courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -85,7 +94,7 @@ class CourseControllerTest {
                 .willReturn(new CourseCreateResponse(10L, "내 보문역 코스", LocalDateTime.now()));
 
         mockMvc.perform(post("/api/v1/courses/{courseId}/copy", 9L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -103,7 +112,7 @@ class CourseControllerTest {
                 .given(courseCommandService).copyCourse(eq(1L), eq(9L), any());
 
         mockMvc.perform(post("/api/v1/courses/{courseId}/copy", 9L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -116,7 +125,7 @@ class CourseControllerTest {
         CourseCopyRequest request = new CourseCopyRequest("가".repeat(21), null);
 
         mockMvc.perform(post("/api/v1/courses/{courseId}/copy", 9L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -128,7 +137,7 @@ class CourseControllerTest {
         CourseCreateRequest request = new CourseCreateRequest("성수 코스", 100L, List.of(10L, 20L));
 
         mockMvc.perform(post("/api/v1/courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -143,7 +152,7 @@ class CourseControllerTest {
                 .willReturn(new CourseUpdateResponse(1L, "나만의 보문역 코스"));
 
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new CourseUpdateRequest("나만의 보문역 코스", List.of(3L, 1L, 4L, 2L)))))
@@ -159,7 +168,7 @@ class CourseControllerTest {
                 .willReturn(new CourseUpdateResponse(1L, "나만의 보문역 코스"));
 
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseUpdateRequest("나만의 보문역 코스", null))))
                 .andExpect(status().isOk())
@@ -173,7 +182,7 @@ class CourseControllerTest {
                 .willReturn(new CourseUpdateResponse(1L, "보문역 코스"));
 
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseUpdateRequest(null, List.of(3L, 1L, 4L, 2L)))))
                 .andExpect(status().isOk())
@@ -184,7 +193,7 @@ class CourseControllerTest {
     @DisplayName("이름과 장소 순서를 모두 생략하면 400을 반환한다")
     void updateCourse_bothMissing() throws Exception {
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseUpdateRequest(null, null))))
                 .andExpect(status().isBadRequest())
@@ -199,7 +208,7 @@ class CourseControllerTest {
         CourseUpdateRequest request = new CourseUpdateRequest(null, Arrays.asList(3L, null, 2L));
 
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -215,7 +224,7 @@ class CourseControllerTest {
                 .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
 
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseUpdateRequest("새 이름", null))))
                 .andExpect(status().isNotFound())
@@ -229,7 +238,7 @@ class CourseControllerTest {
                 .willThrow(new CustomException(CourseErrorCode.COURSE_FORBIDDEN));
 
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseUpdateRequest("새 이름", null))))
                 .andExpect(status().isForbidden())
@@ -242,7 +251,7 @@ class CourseControllerTest {
         String tooLongName = "가".repeat(21);
 
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseUpdateRequest(tooLongName, null))))
                 .andExpect(status().isBadRequest())
@@ -254,7 +263,7 @@ class CourseControllerTest {
     @DisplayName("코스 이름이 공백이면 400을 반환한다")
     void updateCourse_nameBlank() throws Exception {
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseUpdateRequest("   ", null))))
                 .andExpect(status().isBadRequest())
@@ -265,7 +274,7 @@ class CourseControllerTest {
     @DisplayName("장소가 3개 미만이면 400을 반환한다")
     void updateCourse_tooFewPlaces() throws Exception {
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseUpdateRequest(null, List.of(3L, 1L)))))
                 .andExpect(status().isBadRequest())
@@ -280,7 +289,7 @@ class CourseControllerTest {
                 .given(courseCommandService).updateCourse(eq(1L), eq(1L), any());
 
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseUpdateRequest(null, List.of(3L, 1L, 99L)))))
                 .andExpect(status().isBadRequest())
@@ -291,7 +300,7 @@ class CourseControllerTest {
     @DisplayName("코스를 좋아요하면 201을 반환한다")
     void likeCourse_created() throws Exception {
         mockMvc.perform(post("/api/v1/courses/{courseId}/likes", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true));
     }
@@ -303,7 +312,7 @@ class CourseControllerTest {
                 .given(courseLikeCommandService).likeCourse(eq(1L), eq(1L));
 
         mockMvc.perform(post("/api/v1/courses/{courseId}/likes", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_409_DUPLICATE_COURSE_LIKE"));
     }
@@ -315,7 +324,7 @@ class CourseControllerTest {
                 .given(courseLikeCommandService).likeCourse(eq(1L), eq(1L));
 
         mockMvc.perform(post("/api/v1/courses/{courseId}/likes", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_CANNOT_LIKE_OWN_COURSE"));
     }
@@ -324,7 +333,7 @@ class CourseControllerTest {
     @DisplayName("좋아요를 취소하면 200을 반환한다")
     void cancelCourseLike_success() throws Exception {
         mockMvc.perform(delete("/api/v1/courses/{courseId}/likes", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
     }
@@ -336,29 +345,19 @@ class CourseControllerTest {
                 .given(courseLikeCommandService).cancelLike(eq(1L), eq(1L));
 
         mockMvc.perform(delete("/api/v1/courses/{courseId}/likes", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_LIKE_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("본인 코스를 삭제하면 200을 반환한다")
-    void deleteCourse_success() throws Exception {
-        mockMvc.perform(delete("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
-
-    @Test
-    @DisplayName("타인 코스를 삭제하면 403을 반환한다")
-    void deleteCourse_forbidden() throws Exception {
-        willThrow(new CustomException(CourseErrorCode.COURSE_DELETE_FORBIDDEN))
-                .given(courseLikeCommandService).deleteCourse(eq(1L), eq(1L));
-
-        mockMvc.perform(delete("/api/v1/courses/{courseId}", 1L)
-                        .header(MEMBER_ID_HEADER, 1L))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_403_COURSE_DELETE_FORBIDDEN"));
+    @DisplayName("토큰 없이 코스를 생성하면 401을 반환한다")
+    void createCourse_withoutToken() throws Exception {
+        mockMvc.perform(post("/api/v1/courses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CourseCreateRequest("보문역 코스", 1L, List.of(1L, 2L, 3L)))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
     }
 }

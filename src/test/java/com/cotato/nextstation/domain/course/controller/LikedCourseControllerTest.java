@@ -14,6 +14,8 @@ import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(GlobalExceptionHandler.class)
 class LikedCourseControllerTest {
 
-    private static final String MEMBER_ID_HEADER = "X-Member-Id";
+    private static final String TOKEN = "access-token";
 
     @Autowired
     MockMvc mockMvc;
@@ -59,6 +61,13 @@ class LikedCourseControllerTest {
     @MockitoBean
     JwtProvider jwtProvider;
 
+    @BeforeEach
+    void authenticateAsMember1() {
+        // 리졸버가 토큰에서 memberId를 꺼내므로, 토큰을 실은 요청은 1번 회원으로 인증된 것처럼 둔다
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+    }
+
     @Test
     @DisplayName("좋아요 목록은 200과 코스 카드/다음 커서를 반환한다")
     void getLikedCourses_success() throws Exception {
@@ -68,7 +77,7 @@ class LikedCourseControllerTest {
                                 new LineSummaryResponse(6L, "6호선", LineCode.LINE_6))),
                         "eyJpZCI6MjB9", true));
 
-        mockMvc.perform(get("/api/v1/members/me/liked-courses").header(MEMBER_ID_HEADER, 1L))
+        mockMvc.perform(get("/api/v1/members/me/liked-courses").header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.courses[0].courseId").value(7))
                 .andExpect(jsonPath("$.data.courses[0].name").value("보문역 환승여행 코스"))
@@ -86,7 +95,7 @@ class LikedCourseControllerTest {
         given(courseQueryService.getLikedCourses(1L, null, null))
                 .willReturn(new LikedCourseListResponse(List.of(), null, false));
 
-        mockMvc.perform(get("/api/v1/members/me/liked-courses").header(MEMBER_ID_HEADER, 1L))
+        mockMvc.perform(get("/api/v1/members/me/liked-courses").header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.courses").isEmpty())
                 .andExpect(jsonPath("$.data.hasNext").value(false));
@@ -99,7 +108,7 @@ class LikedCourseControllerTest {
                 .willReturn(new LikedCourseListResponse(List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/members/me/liked-courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .param("cursor", "abc")
                         .param("size", "5"))
                 .andExpect(status().isOk());
@@ -114,7 +123,7 @@ class LikedCourseControllerTest {
                 .willThrow(new CustomException(GlobalErrorCode.INVALID_PAGE_SIZE));
 
         mockMvc.perform(get("/api/v1/members/me/liked-courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .param("size", "100"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_INVALID_PAGE_SIZE"));
@@ -124,7 +133,7 @@ class LikedCourseControllerTest {
     @DisplayName("여러 좋아요를 한 번에 취소하면 200을 반환한다")
     void cancelCourseLikes_success() throws Exception {
         mockMvc.perform(delete("/api/v1/members/me/liked-courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseLikeCancelRequest(List.of(1L, 2L)))))
                 .andExpect(status().isOk())
@@ -136,7 +145,7 @@ class LikedCourseControllerTest {
     @DisplayName("취소할 코스를 선택하지 않으면 400을 반환한다")
     void cancelCourseLikes_empty() throws Exception {
         mockMvc.perform(delete("/api/v1/members/me/liked-courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseLikeCancelRequest(List.of()))))
                 .andExpect(status().isBadRequest())
@@ -148,7 +157,7 @@ class LikedCourseControllerTest {
     @DisplayName("전체 취소는 본문 없이 호출해도 200을 반환한다")
     void cancelAllCourseLikes_success() throws Exception {
         mockMvc.perform(delete("/api/v1/members/me/liked-courses/all")
-                        .header(MEMBER_ID_HEADER, 1L))
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
@@ -159,7 +168,7 @@ class LikedCourseControllerTest {
     @DisplayName("전체 취소에서 해제한 코스는 제외 목록으로 전달된다")
     void cancelAllCourseLikes_withExceptions() throws Exception {
         mockMvc.perform(delete("/api/v1/members/me/liked-courses/all")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseLikeCancelAllRequest(List.of(3L, 7L)))))
                 .andExpect(status().isOk());
@@ -174,7 +183,7 @@ class LikedCourseControllerTest {
                 .given(courseLikeCommandService).cancelAllLikes(eq(1L), any());
 
         mockMvc.perform(delete("/api/v1/members/me/liked-courses/all")
-                        .header(MEMBER_ID_HEADER, 1L))
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_LIKE_NOT_FOUND"));
     }
@@ -186,10 +195,18 @@ class LikedCourseControllerTest {
                 .given(courseLikeCommandService).cancelLikes(eq(1L), any());
 
         mockMvc.perform(delete("/api/v1/members/me/liked-courses")
-                        .header(MEMBER_ID_HEADER, 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CourseLikeCancelRequest(List.of(1L)))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_LIKE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("토큰 없이 좋아요 코스 목록을 조회하면 401을 반환한다")
+    void getLikedCourses_withoutToken() throws Exception {
+        mockMvc.perform(get("/api/v1/members/me/liked-courses"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
     }
 }

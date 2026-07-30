@@ -3,6 +3,8 @@ package com.cotato.nextstation.domain.course.service.query;
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
+import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
@@ -11,6 +13,7 @@ import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
@@ -38,6 +41,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -539,5 +543,92 @@ class CourseQueryServiceTest {
         // then
         assertThat(result).isFalse();
         verify(courseLikeRepository, never()).existsByMemberIdAndCourseId(any(), any());
+    }
+
+    // ---------- 코스 확인 (내가 만든 코스 단건) ----------
+
+    private PlaceInfoResponse placeInfo(Long placeId, Double x, Double y) {
+        return new PlaceInfoResponse(placeId, "장소" + placeId, "설명", "FOOD", "식당", "img" + placeId, x, y);
+    }
+
+    @Test
+    @DisplayName("코스 확인은 장소 조회 결과 순서와 무관하게 order_num 순으로 채운다")
+    void getMyCourseDetail_ordersPlacesByOrderNum() {
+        // given: 코스 순서는 20 -> 10 인데 장소 조회는 10 -> 20 으로 돌려준다
+        MyCourseDetailView view = mock(MyCourseDetailView.class);
+        given(courseRepository.findMyCourseDetail(1L, 1L)).willReturn(Optional.of(view));
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L))
+                .willReturn(List.of(coursePlace(1L, 20L, 1), coursePlace(1L, 10L, 2)));
+        given(placeInfoQueryService.getPlaceInfos(List.of(20L, 10L)))
+                .willReturn(List.of(placeInfo(10L, 127.1, 37.1), placeInfo(20L, 127.2, 37.2)));
+        given(courseConverter.toMyCoursePlaceResponse(any(), anyInt())).willAnswer(invocation -> {
+            PlaceInfoResponse place = invocation.getArgument(0);
+            return new MyCoursePlaceResponse(place.placeId(), place.placeName(), place.description(),
+                    place.imageUrl(), place.xCoordinate(), place.yCoordinate(), invocation.getArgument(1));
+        });
+
+        // when
+        courseQueryService.getMyCourseDetail(1L, 1L);
+
+        // then: 지도 핀 번호와 목록 순서가 어긋나지 않도록 코스 순서를 따른다
+        ArgumentCaptor<List<MyCoursePlaceResponse>> placesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(courseConverter).toMyCourseDetailResponse(eq(view), placesCaptor.capture());
+        assertThat(placesCaptor.getValue())
+                .extracting(MyCoursePlaceResponse::placeId, MyCoursePlaceResponse::orderNum)
+                .containsExactly(tuple(20L, 1), tuple(10L, 2));
+    }
+
+    @Test
+    @DisplayName("코스 확인에서 조회되지 않는 장소는 응답에서 빠진다")
+    void getMyCourseDetail_skipsMissingPlaces() {
+        // given: 코스에 담긴 장소 중 10번만 조회된다
+        MyCourseDetailView view = mock(MyCourseDetailView.class);
+        given(courseRepository.findMyCourseDetail(1L, 1L)).willReturn(Optional.of(view));
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L))
+                .willReturn(List.of(coursePlace(1L, 10L, 1), coursePlace(1L, 99L, 2)));
+        given(placeInfoQueryService.getPlaceInfos(List.of(10L, 99L)))
+                .willReturn(List.of(placeInfo(10L, 127.1, 37.1)));
+        given(courseConverter.toMyCoursePlaceResponse(any(), anyInt())).willAnswer(invocation -> {
+            PlaceInfoResponse place = invocation.getArgument(0);
+            return new MyCoursePlaceResponse(place.placeId(), place.placeName(), place.description(),
+                    place.imageUrl(), place.xCoordinate(), place.yCoordinate(), invocation.getArgument(1));
+        });
+
+        // when
+        courseQueryService.getMyCourseDetail(1L, 1L);
+
+        // then: 좌표가 없으면 지도 핀도 못 찍고 목록에 채울 내용도 없다
+        ArgumentCaptor<List<MyCoursePlaceResponse>> placesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(courseConverter).toMyCourseDetailResponse(eq(view), placesCaptor.capture());
+        assertThat(placesCaptor.getValue()).extracting(MyCoursePlaceResponse::placeId).containsExactly(10L);
+    }
+
+    @Test
+    @DisplayName("본인 코스가 아니면 코스 확인은 404다")
+    void getMyCourseDetail_notMine() {
+        // given: 조회 조건에 memberId가 들어가 남의 코스는 애초에 나오지 않는다
+        given(courseRepository.findMyCourseDetail(1L, 1L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> courseQueryService.getMyCourseDetail(1L, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
+        verify(placeInfoQueryService, never()).getPlaceInfos(any());
+    }
+
+    @Test
+    @DisplayName("장소가 없는 코스도 코스 확인은 빈 목록으로 응답한다")
+    void getMyCourseDetail_noPlaces() {
+        // given
+        MyCourseDetailView view = mock(MyCourseDetailView.class);
+        given(courseRepository.findMyCourseDetail(1L, 1L)).willReturn(Optional.of(view));
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(List.of());
+
+        // when
+        courseQueryService.getMyCourseDetail(1L, 1L);
+
+        // then: 빈 id 목록으로 장소를 조회하지 않는다
+        verify(placeInfoQueryService, never()).getPlaceInfos(any());
+        verify(courseConverter).toMyCourseDetailResponse(view, List.of());
     }
 }

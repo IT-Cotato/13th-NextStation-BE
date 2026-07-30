@@ -35,7 +35,25 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
     @Override
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
                                    NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
-        String token = extractToken(webRequest.getHeader("Authorization"));
+        String authorizationHeader = webRequest.getHeader("Authorization");
+
+        // 자격 증명을 아예 보내지 않은 경우만 비로그인으로 본다.
+        if (isBlank(authorizationHeader)) {
+            if (!isRequired(parameter)) {
+                return null;
+            }
+            log.warn("Authorization 헤더 없이 인증이 필요한 API 요청");
+            throw new CustomException(GlobalErrorCode.UNAUTHORIZED);
+        }
+
+        // 여기서부터는 required와 무관하게 401이다. 헤더를 보냈다는 건 로그인한 줄 알고 있다는 뜻이라,
+        // 조용히 비로그인으로 넘기면 사용자는 좋아요 표시만 빠진 화면을 보고 원인을 알 수 없다.
+        if (!authorizationHeader.startsWith(BEARER_PREFIX)) {
+            log.warn("Bearer 형식이 아닌 Authorization 헤더로 요청");
+            throw new CustomException(GlobalErrorCode.INVALID_TOKEN);
+        }
+
+        String token = extractToken(authorizationHeader);
 
         Claims claims;
         try {
@@ -61,11 +79,18 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
         }
     }
 
+    // 값이 빈 헤더는 보내지 않은 것과 같게 취급한다.
+    // 로그아웃 상태에서 빈 Authorization 헤더를 실어 보내는 클라이언트가 있어도 비로그인으로 동작해야 한다.
+    private boolean isBlank(String authorizationHeader) {
+        return authorizationHeader == null || authorizationHeader.isBlank();
+    }
+
     private String extractToken(String authorizationHeader) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
-            log.warn("Authorization 헤더 없이 인증이 필요한 API 요청");
-            throw new CustomException(GlobalErrorCode.UNAUTHORIZED);
-        }
         return authorizationHeader.substring(BEARER_PREFIX.length()).trim();
+    }
+
+    private boolean isRequired(MethodParameter parameter) {
+        AuthenticationPrincipal annotation = parameter.getParameterAnnotation(AuthenticationPrincipal.class);
+        return annotation == null || annotation.required();
     }
 }

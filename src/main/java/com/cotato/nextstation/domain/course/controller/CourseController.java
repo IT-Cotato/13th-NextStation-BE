@@ -8,10 +8,13 @@ import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.security.AuthenticationPrincipal;
+import com.cotato.nextstation.global.security.JwtPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +24,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,10 +35,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/courses")
 public class CourseController {
-
-    // TODO: Auth 적용 시 X-Member-Id 헤더를 @AuthenticationPrincipal 로 교체한다.
-    private static final String MEMBER_ID_HEADER = "X-Member-Id";
-    private static final String MEMBER_ID_DESCRIPTION = "회원 ID (Auth 적용 전까지 사용하는 임시 헤더)";
 
     private final CourseCommandService courseCommandService;
     private final CourseLikeCommandService courseLikeCommandService;
@@ -51,19 +49,20 @@ public class CourseController {
                     - journalId는 여행일지 작성 시, conceptTourId는 관리자 큐레이션으로 추후 채워진다
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "생성 성공"),
             @ApiResponse(responseCode = "400", description = """
                     요청 값 검증 실패 (`GlobalErrorCode.VALIDATION_ERROR`)
                     또는 같은 장소 중복 선택 (`CourseErrorCode.DUPLICATE_COURSE_PLACES`)"""),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<CourseCreateResponse> createCourse(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Valid @RequestBody CourseCreateRequest request) {
-        return CommonResponse.success(HttpStatus.CREATED, courseCommandService.createCourse(memberId, request));
+        return CommonResponse.success(HttpStatus.CREATED, courseCommandService.createCourse(principal.memberId(), request));
     }
 
     @Operation(
@@ -79,6 +78,7 @@ public class CourseController {
                     - 복제본의 조회수·좋아요 수는 0부터 시작하며, 여행일지·컨셉투어는 물려받지 않는다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "복제 성공"),
             @ApiResponse(responseCode = "400", description = """
@@ -86,18 +86,18 @@ public class CourseController {
                     본인이 만든 코스를 복사 (`CourseErrorCode.CANNOT_COPY_OWN_COURSE`),
                     장소 목록이 원본 구성과 불일치 (`CourseErrorCode.INVALID_COURSE_PLACES`)
                     또는 같은 장소 중복 (`CourseErrorCode.DUPLICATE_COURSE_PLACES`)"""),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않거나 공개되지 않은 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
     })
     @PostMapping("/{courseId}/copy")
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<CourseCreateResponse> copyCourse(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "복사할 원본 코스 ID", example = "1")
             @PathVariable Long courseId,
             @Valid @RequestBody CourseCopyRequest request) {
         return CommonResponse.success(HttpStatus.CREATED,
-                courseCommandService.copyCourse(memberId, courseId, request));
+                courseCommandService.copyCourse(principal.memberId(), courseId, request));
     }
 
     @Operation(
@@ -110,23 +110,24 @@ public class CourseController {
                     - 한 트랜잭션으로 처리되어, 장소 순서 검증에 실패하면 이름 변경도 함께 롤백된다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "400", description = """
                     이름·장소 순서 모두 생략, 이름이 공백이거나 20자 초과, 장소가 3개 미만/10개 초과
                     (`GlobalErrorCode.VALIDATION_ERROR`), 장소 목록이 기존 코스 구성과 불일치
                     (`CourseErrorCode.INVALID_COURSE_PLACES`) 또는 같은 장소 중복 (`CourseErrorCode.DUPLICATE_COURSE_PLACES`)"""),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "403", description = "본인 코스가 아님 (`CourseErrorCode.COURSE_FORBIDDEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
     })
     @PatchMapping("/{courseId}")
     public CommonResponse<CourseUpdateResponse> updateCourse(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId,
             @Valid @RequestBody CourseUpdateRequest request) {
-        return CommonResponse.success(courseCommandService.updateCourse(memberId, courseId, request));
+        return CommonResponse.success(courseCommandService.updateCourse(principal.memberId(), courseId, request));
     }
 
     @Operation(
@@ -138,20 +139,21 @@ public class CourseController {
                     - 좋아요하면 해당 코스의 좋아요 수가 1 증가한다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "좋아요 성공 (data 없음)"),
             @ApiResponse(responseCode = "400", description = "본인이 만든 코스에 좋아요 (`CourseErrorCode.CANNOT_LIKE_OWN_COURSE`)"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
             @ApiResponse(responseCode = "409", description = "이미 좋아요한 코스 (`CourseErrorCode.DUPLICATE_COURSE_LIKE`)"),
     })
     @PostMapping("/{courseId}/likes")
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<Void> likeCourse(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId) {
-        courseLikeCommandService.likeCourse(memberId, courseId);
+        courseLikeCommandService.likeCourse(principal.memberId(), courseId);
         return CommonResponse.success(HttpStatus.CREATED, null);
     }
 
@@ -163,42 +165,19 @@ public class CourseController {
                     - 취소하면 해당 코스의 좋아요 수가 1 감소한다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "취소 성공 (data 없음)"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "좋아요하지 않은 코스 (`CourseErrorCode.COURSE_LIKE_NOT_FOUND`)"),
     })
     @DeleteMapping("/{courseId}/likes")
     public CommonResponse<Void> cancelCourseLike(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId) {
-        courseLikeCommandService.cancelLike(memberId, courseId);
+        courseLikeCommandService.cancelLike(principal.memberId(), courseId);
         return CommonResponse.success(null);
     }
 
-    @Operation(
-            summary = "내가 만든 코스 단건 삭제",
-            description = """
-                    내가 만든 코스를 삭제한다.
-                    - soft delete이며, 삭제 후에는 목록·상세 조회에서 모두 제외된다.
-                    - 이 코스를 좋아요한 사람들의 보관함에서도 함께 사라진다.
-                    - 저장 탭 선택 모드에서 여러 코스를 한 번에 지울 때는
-                      `DELETE /api/v1/members/me/courses`(다중 삭제)를 사용한다.
-                    """
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "삭제 성공 (data 없음)"),
-            @ApiResponse(responseCode = "403", description = "본인 코스가 아님 (`CourseErrorCode.COURSE_DELETE_FORBIDDEN`)"),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
-    })
-    @DeleteMapping("/{courseId}")
-    public CommonResponse<Void> deleteCourse(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
-            @Parameter(description = "코스 ID", example = "1")
-            @PathVariable Long courseId) {
-        courseLikeCommandService.deleteCourse(memberId, courseId);
-        return CommonResponse.success(null);
-    }
 }
