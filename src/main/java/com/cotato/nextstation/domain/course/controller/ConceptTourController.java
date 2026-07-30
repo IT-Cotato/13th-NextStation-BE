@@ -40,14 +40,18 @@ public class ConceptTourController {
                     - 컨셉이 여덟 개 남짓이라 **페이징하지 않는다.**
                     - 화면의 검색창은 이 목록을 받아 프론트에서 걸러내면 된다. 서버는 검색어를 받지 않는다.
                     - `courseCount`는 목록에 실제로 보이는 것과 같도록 **공개된 코스만** 센다.
-                    - 로그인 없이 조회할 수 있다.
+                    - 둘러보기 탭은 로그인 필수라 토큰이 없으면 401이다.
                     """
     )
+    @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공 (컨셉이 없으면 빈 목록)"),
+            @ApiResponse(responseCode = "401", description = "accessToken이 없거나 위변조·만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
     })
     @GetMapping
-    public CommonResponse<List<ConceptTourResponse>> getConceptTours() {
+    public CommonResponse<List<ConceptTourResponse>> getConceptTours(
+            // 개인화 데이터는 없지만, 둘러보기 탭 전체가 로그인 필수라 다른 조회와 계약을 맞춘다.
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal) {
         return CommonResponse.success(conceptTourQueryService.getConceptTours());
     }
 
@@ -61,19 +65,18 @@ public class ConceptTourController {
                     - 이 화면에는 정렬 토글만 있고 노선·역 필터가 없어 `availableStations`는 항상 빈 배열이다.
                     - **정렬을 바꾸면 커서를 버리고 첫 페이지부터 다시 요청해야 한다.**
                     - 없는 컨셉이거나 속한 코스가 없으면 빈 목록이다.
-                    - 로그인 없이 조회할 수 있고, 로그인했을 때만 `isLiked`가 채워진다.
+                    - 둘러보기 탭은 로그인 필수다. `isLiked`는 요청한 회원 기준으로 항상 채워진다.
                     """
     )
     @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공 (결과 없으면 빈 목록)"),
             @ApiResponse(responseCode = "400", description = "size 범위를 벗어남 (`GlobalErrorCode.INVALID_PAGE_SIZE`) 또는 커서가 잘못됨/정렬과 맞지 않음 (`GlobalErrorCode.INVALID_CURSOR`)"),
-            @ApiResponse(responseCode = "401", description = "accessToken을 보냈으나 위변조 또는 만료 (`GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
+            @ApiResponse(responseCode = "401", description = "accessToken이 없거나 위변조·만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
     })
     @GetMapping("/{conceptTourId}/courses")
     public CommonResponse<ExploreCourseListResponse> getConceptTourCourses(
-            // 비로그인도 둘러볼 수 있어야 해서 required = false다.
-            @Parameter(hidden = true) @AuthenticationPrincipal(required = false) JwtPrincipal principal,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "컨셉투어 ID", example = "1")
             @PathVariable Long conceptTourId,
             @Parameter(description = "정렬 기준 (기본 LATEST)", example = "LATEST")
@@ -82,7 +85,7 @@ public class ConceptTourController {
             @RequestParam(required = false) String cursor,
             @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
             @RequestParam(required = false) Integer size) {
-        Long memberId = (principal != null) ? principal.memberId() : null;
+        Long memberId = principal.memberId();
         return CommonResponse.success(
                 courseQueryService.getConceptTourCourses(memberId, conceptTourId, sort, cursor, size));
     }
