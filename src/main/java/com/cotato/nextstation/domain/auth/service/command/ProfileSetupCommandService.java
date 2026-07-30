@@ -129,11 +129,11 @@ public class ProfileSetupCommandService {
         if (!NICKNAME_ALLOWED_PATTERN.matcher(nickname).matches()) {
             throw new CustomException(NicknameErrorCode.NICKNAME_INVALID_CHARACTER);
         }
-        if (nicknameProfanityFilter.containsBannedWord(nickname)) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD);
-        }
         if (nicknameReservedWordsFilter.isReservedWord(nickname)) {
             throw new CustomException(NicknameErrorCode.NICKNAME_CONTAINS_RESERVED_WORD);
+        }
+        if (nicknameProfanityFilter.containsBannedWord(nickname)) {
+            throw new CustomException(NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD);
         }
         if (memberRepository.existsByNickname(nickname)) {
             throw new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME);
