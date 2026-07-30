@@ -19,6 +19,7 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
@@ -181,6 +182,8 @@ public class CourseQueryService {
      * <p>
      * 필터·검색어는 모두 선택 사항이고, 정렬은 최신순이 기본이다.
      * {@code memberId}는 하트를 채울지 판단하는 데만 쓰며 비로그인이면 null이다.
+     * <p>
+     * "역 선택" 드롭다운에 쓸 availableStations는 최초 조회에서만 채운다(저장 탭 availableLines와 같은 방식).
      */
     public ExploreCourseListResponse getExploreCourses(Long memberId, ExploreCourseCondition condition,
                                                        CourseSort sort, String cursor, Integer size) {
@@ -198,7 +201,14 @@ public class CourseQueryService {
         if (hasNext) {
             nextCursor = encodeExploreCursor(pageContent.get(pageContent.size() - 1), resolvedSort);
         }
-        return courseConverter.toExploreListResponse(toExploreCards(memberId, pageContent), nextCursor, hasNext);
+
+        // 드롭다운은 화면에 한 번만 그리므로 최초 조회에서만 계산한다.
+        List<StationView> availableStations = (cursorData == null)
+                ? courseRepository.findExploreStations(condition.lineId())
+                : List.of();
+
+        return courseConverter.toExploreListResponse(
+                toExploreCards(memberId, pageContent), availableStations, nextCursor, hasNext);
     }
 
     /**
@@ -229,7 +239,7 @@ public class CourseQueryService {
                 courseRepository.findMostLikedCourses(PageRequest.of(0, MOST_LIKED_LIMIT));
 
         if (offset >= topCourses.size()) {
-            return courseConverter.toExploreListResponse(List.of(), null, false);
+            return courseConverter.toExploreListResponse(List.of(), List.of(), null, false);
         }
 
         int end = Math.min(offset + pageSize, topCourses.size());
@@ -237,7 +247,9 @@ public class CourseQueryService {
         boolean hasNext = end < topCourses.size();
         String nextCursor = hasNext ? new CursorData(null, (long) end, null).encode() : null;
 
-        return courseConverter.toExploreListResponse(toExploreCards(memberId, pageContent), nextCursor, hasNext);
+        // 이 화면에는 "역 선택" 드롭다운이 없어 역 목록을 계산하지 않는다.
+        return courseConverter.toExploreListResponse(
+                toExploreCards(memberId, pageContent), List.of(), nextCursor, hasNext);
     }
 
     // 이 목록의 커서는 정렬값이 아니라 다음 시작 위치다.

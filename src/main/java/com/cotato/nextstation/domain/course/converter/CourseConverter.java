@@ -7,6 +7,7 @@ import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreStationResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
@@ -17,6 +18,7 @@ import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
@@ -154,9 +156,14 @@ public class CourseConverter {
         );
     }
 
+    // availableStations는 "역 선택" 드롭다운이 있는 목록만 채운다. 없는 화면은 빈 목록을 넘긴다.
     public ExploreCourseListResponse toExploreListResponse(List<ExploreCourseResponse> courses,
+                                                           List<StationView> availableStations,
                                                            String nextCursor, boolean hasNext) {
-        return new ExploreCourseListResponse(courses, nextCursor, hasNext);
+        List<ExploreStationResponse> stationFilters = availableStations.stream()
+                .map(station -> new ExploreStationResponse(station.getStationId(), station.getStationName()))
+                .toList();
+        return new ExploreCourseListResponse(courses, stationFilters, nextCursor, hasNext);
     }
 
     public PlaceCourseResponse toPlaceCourseResponse(PlaceCourseView course, int placeCount,
