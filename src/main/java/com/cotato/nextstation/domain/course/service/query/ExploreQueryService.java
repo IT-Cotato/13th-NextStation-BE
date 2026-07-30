@@ -1,11 +1,9 @@
 package com.cotato.nextstation.domain.course.service.query;
 
-import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.ConceptTourResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreResponse;
-import com.cotato.nextstation.domain.course.entity.CourseSort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,9 +65,6 @@ public class ExploreQueryService {
         if (selectedLineId == null) {
             return List.of();
         }
-        ExploreCourseCondition condition = new ExploreCourseCondition(selectedLineId, null, null, null);
-        return courseQueryService
-                .getExploreCourses(memberId, condition, CourseSort.LATEST, null, LINE_COURSE_COUNT)
-                .courses();
+        return courseQueryService.getLineCourses(memberId, selectedLineId, LINE_COURSE_COUNT);
     }
 }
