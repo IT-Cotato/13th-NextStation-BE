@@ -26,7 +26,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -61,12 +60,22 @@ class ExploreControllerTest {
     }
 
     @Test
-    @DisplayName("둘러보기 목록은 토큰 없이도 200을 반환한다")
+    @DisplayName("둘러보기 목록은 토큰이 없으면 401이다")
     void getExploreCourses_withoutToken() throws Exception {
-        given(courseQueryService.getExploreCourses(isNull(), any(), any(), any(), any()))
+        // 둘러보기 탭 전체가 로그인 필수다
+        mockMvc.perform(get("/api/v1/explore/courses"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.UNAUTHORIZED.getCode()));
+    }
+
+    @Test
+    @DisplayName("둘러보기 목록은 토큰이 있으면 200을 반환한다")
+    void getExploreCourses_withToken() throws Exception {
+        given(courseQueryService.getExploreCourses(eq(1L), any(), any(), any(), any()))
                 .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
-        mockMvc.perform(get("/api/v1/explore/courses"))
+        mockMvc.perform(get("/api/v1/explore/courses")
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.courses").isArray())
                 .andExpect(jsonPath("$.data.hasNext").value(false));
@@ -102,20 +111,19 @@ class ExploreControllerTest {
         given(courseQueryService.getExploreCourses(any(), any(), any(), any(), any()))
                 .willThrow(new CustomException(GlobalErrorCode.INVALID_CURSOR));
 
-        mockMvc.perform(get("/api/v1/explore/courses").param("cursor", "broken"))
+        mockMvc.perform(get("/api/v1/explore/courses")
+                        .header("Authorization", "Bearer " + TOKEN)
+                        .param("cursor", "broken"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(GlobalErrorCode.INVALID_CURSOR.getCode()));
     }
 
     @Test
-    @DisplayName("많이 찾는 코스는 토큰 없이도 200을 반환한다")
+    @DisplayName("많이 찾는 코스는 토큰이 없으면 401이다")
     void getMostLikedCourses_withoutToken() throws Exception {
-        given(courseQueryService.getMostLikedCourses(isNull(), any(), any()))
-                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
-
         mockMvc.perform(get("/api/v1/explore/courses/popular"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.courses").isArray());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.UNAUTHORIZED.getCode()));
     }
 
     @Test
