@@ -6,7 +6,10 @@ import com.cotato.nextstation.domain.course.entity.CourseSort;
 import com.cotato.nextstation.domain.course.service.query.ConceptTourQueryService;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
+import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.jwt.JwtProvider;
+import io.jsonwebtoken.Jwts;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(GlobalExceptionHandler.class)
 class ConceptTourControllerTest {
 
+    private static final String TOKEN = "access-token";
+
     @Autowired
     MockMvc mockMvc;
 
@@ -45,13 +50,21 @@ class ConceptTourControllerTest {
     @MockitoBean
     JwtProvider jwtProvider;
 
+    @BeforeEach
+    void authenticateAsMember1() {
+        // 리졸버가 토큰에서 memberId를 꺼내므로, 토큰을 실은 요청은 1번 회원으로 인증된 것처럼 둔다
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+    }
+
     @Test
     @DisplayName("컨셉 목록은 코스 수와 함께 반환한다")
     void getConceptTours_success() throws Exception {
         given(conceptTourQueryService.getConceptTours()).willReturn(List.of(
                 new ConceptTourResponse(1L, "문구 투어", "작은 문구점과 책방을 찾아가는 코스", 18)));
 
-        mockMvc.perform(get("/api/v1/explore/concept-tours"))
+        mockMvc.perform(get("/api/v1/explore/concept-tours")
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].conceptTourId").value(1))
                 .andExpect(jsonPath("$.data[0].name").value("문구 투어"))
@@ -59,27 +72,27 @@ class ConceptTourControllerTest {
     }
 
     @Test
-    @DisplayName("컨셉 목록은 토큰 없이도 조회된다")
+    @DisplayName("컨셉 목록은 토큰이 없으면 401이다")
     void getConceptTours_withoutToken() throws Exception {
-        given(conceptTourQueryService.getConceptTours()).willReturn(List.of());
-
+        // 둘러보기 탭 전체가 로그인 필수라 개인화 데이터가 없는 목록도 막는다
         mockMvc.perform(get("/api/v1/explore/concept-tours"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.UNAUTHORIZED.getCode()));
     }
 
     @Test
     @DisplayName("컨셉별 코스는 컨셉 조건만 걸어 둘러보기 조회를 재사용한다")
     void getConceptTourCourses_usesConceptCondition() throws Exception {
-        given(courseQueryService.getConceptTourCourses(isNull(), any(), any(), any(), any()))
+        given(courseQueryService.getConceptTourCourses(eq(1L), any(), any(), any(), any()))
                 .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/explore/concept-tours/{conceptTourId}/courses", 1L)
+                        .header("Authorization", "Bearer " + TOKEN)
                         .param("sort", "POPULAR")
                         .param("size", "5"))
                 .andExpect(status().isOk());
 
-        verify(courseQueryService).getConceptTourCourses(null, 1L, CourseSort.POPULAR, null, 5);
+        verify(courseQueryService).getConceptTourCourses(1L, 1L, CourseSort.POPULAR, null, 5);
     }
 
     @Test
@@ -88,9 +101,10 @@ class ConceptTourControllerTest {
         given(courseQueryService.getConceptTourCourses(any(), any(), any(), any(), any()))
                 .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
-        mockMvc.perform(get("/api/v1/explore/concept-tours/{conceptTourId}/courses", 1L))
+        mockMvc.perform(get("/api/v1/explore/concept-tours/{conceptTourId}/courses", 1L)
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk());
 
-        verify(courseQueryService).getConceptTourCourses(isNull(), eq(1L), isNull(), isNull(), isNull());
+        verify(courseQueryService).getConceptTourCourses(eq(1L), eq(1L), isNull(), isNull(), isNull());
     }
 }
