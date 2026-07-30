@@ -789,6 +789,31 @@ class CourseQueryServiceTest {
     }
 
     @Test
+    @DisplayName("인기순 커서의 점수는 int 범위를 넘어도 그대로 담긴다")
+    void getExploreCourses_scoreDoesNotOverflow() {
+        // given: 조회수·좋아요는 int라 int로 더하면 넘친다. 쿼리 쪽은 DB가 BIGINT로 계산하므로
+        // 커서 값도 long이어야 비교값과 어긋나지 않는다.
+        LocalDateTime now = LocalDateTime.now();
+        List<ExploreCourseView> found = List.of(
+                exploreView(1L, now, 2_000_000_000, 1_000_000_000),
+                exploreView(2L, now, 0, 0));
+        given(courseRepository.findExploreCoursesByPopular(
+                any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(found);
+        given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
+
+        // when: size 1이라 첫 코스로 커서를 만든다
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.POPULAR, null, 1);
+
+        // then: 2,000,000,000 + 1,000,000,000 × 2 = 4,000,000,000
+        ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
+        verify(courseConverter).toExploreListResponse(any(), any(), any(), cursorCaptor.capture(), eq(true));
+        assertThat(CursorData.decode(cursorCaptor.getValue()).longValue()).isEqualTo(4_000_000_000L);
+    }
+
+    @Test
     @DisplayName("다음 페이지가 있으면 마지막 코스로 커서를 만들고 초과분은 잘라낸다")
     void getExploreCourses_paging() {
         // given: hasNext 판단용으로 size + 1개를 조회한다.
