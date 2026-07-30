@@ -570,6 +570,38 @@ class CourseQueryServiceTest {
     }
 
     @Test
+    @DisplayName("검색어의 LIKE 와일드카드는 이스케이프해서 문자 그대로 찾는다")
+    void getExploreCourses_escapesLikeWildcards() {
+        // given: 이스케이프하지 않으면 "%" 한 글자로 공개 코스 전체가 조회된다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), eq("!%50!_"), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "%50_", null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository)
+                .findExploreCoursesByLatest(any(), any(), eq("!%50!_"), any(), any(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("이스케이프 문자 자체가 검색어에 있으면 두 번 겹쳐 문자로 취급한다")
+    void getExploreCourses_escapesEscapeCharacter() {
+        // given
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), eq("!!느낌표"), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "!느낌표", null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository)
+                .findExploreCoursesByLatest(any(), any(), eq("!!느낌표"), any(), any(), any(), any(Pageable.class));
+    }
+
+    @Test
     @DisplayName("빈 검색어는 조건에서 빼고 전체를 조회한다")
     void getExploreCourses_blankKeyword() {
         // given
