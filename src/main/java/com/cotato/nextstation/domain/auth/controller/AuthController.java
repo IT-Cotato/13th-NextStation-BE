@@ -140,7 +140,7 @@ public class AuthController {
     @SecurityRequirement(name = "signupTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "프로필 설정 성공"),
-            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 닉네임 길이/문자/금칙어 위반 (`GlobalErrorCode.VALIDATION_ERROR`, `NicknameErrorCode.NICKNAME_TOO_SHORT`, `NicknameErrorCode.NICKNAME_TOO_LONG`, `NicknameErrorCode.NICKNAME_INVALID_CHARACTER`, `NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD`)"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 닉네임 길이/문자/금칙어/예약어 위반 (`GlobalErrorCode.VALIDATION_ERROR`, `NicknameErrorCode.NICKNAME_TOO_SHORT`, `NicknameErrorCode.NICKNAME_TOO_LONG`, `NicknameErrorCode.NICKNAME_INVALID_CHARACTER`, `NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD`, `NicknameErrorCode.NICKNAME_CONTAINS_RESERVED_WORD`)"),
             @ApiResponse(responseCode = "401", description = "signupToken 누락, 위변조, 또는 만료 (`AuthErrorCode.INVALID_SIGNUP_TOKEN`, `AuthErrorCode.SIGNUP_TOKEN_EXPIRED`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`AuthErrorCode.MEMBER_NOT_FOUND`)"),
             @ApiResponse(responseCode = "409", description = "이미 프로필 설정 완료됨 또는 닉네임 중복 (`AuthErrorCode.PROFILE_ALREADY_COMPLETED`, `NicknameErrorCode.DUPLICATE_NICKNAME`)"),
