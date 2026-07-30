@@ -65,6 +65,9 @@ public class CourseQueryService {
     // 모든 역명이 이 접미사로 끝나 검색어로서 변별력이 없다. 역 검색과 같은 규칙으로 뗀다.
     private static final String STATION_NAME_SUFFIX = "역";
 
+    // LIKE 이스케이프 문자. 코스 이름·역명에 쓰이지 않고 Java·JPQL·MySQL에서 중복 이스케이프될 일도 없다.
+    private static final String LIKE_ESCAPE = "!";
+
     // "사람들이 많이 찾는 코스"는 상위 30개까지만 보여준다(무한스크롤도 여기서 끝난다).
     private static final int MOST_LIKED_LIMIT = 30;
 
@@ -288,15 +291,24 @@ public class CourseQueryService {
 
     // 역 검색과 같은 규칙으로 다듬는다. 모든 역명이 "역"으로 끝나 꼬리의 "역"은 역을 구분하지 못한다.
     // "역" 한 글자는 떼지 않는다. 역삼역처럼 이름에 "역"이 든 역을 찾으려는 입력이다.
+    // 접미사를 뗀 뒤 이스케이프한다. 순서를 바꾸면 이스케이프 문자가 붙어 꼬리 판정이 어긋난다.
     private String normalizeKeyword(String keyword) {
         if (keyword == null || keyword.isBlank()) {
             return null;
         }
         String trimmed = keyword.trim();
         if (trimmed.length() > STATION_NAME_SUFFIX.length() && trimmed.endsWith(STATION_NAME_SUFFIX)) {
-            return trimmed.substring(0, trimmed.length() - STATION_NAME_SUFFIX.length());
+            trimmed = trimmed.substring(0, trimmed.length() - STATION_NAME_SUFFIX.length());
         }
-        return trimmed;
+        return escapeLikePattern(trimmed);
+    }
+
+    // 검색어에 든 LIKE 와일드카드를 문자 그대로 취급한다.
+    // 이스케이프하지 않으면 "%" 한 글자로 공개 코스 전체가 조회된다.
+    private String escapeLikePattern(String keyword) {
+        return keyword.replace(LIKE_ESCAPE, LIKE_ESCAPE + LIKE_ESCAPE)
+                .replace("%", LIKE_ESCAPE + "%")
+                .replace("_", LIKE_ESCAPE + "_");
     }
 
     // 카드에 필요한 태그와 좋아요 여부를 페이지 단위로 한 번에 채운다 (코스마다 조회하면 N+1).
