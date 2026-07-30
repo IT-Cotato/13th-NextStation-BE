@@ -602,8 +602,8 @@ class CourseQueryServiceTest {
     }
 
     @Test
-    @DisplayName("역 필터 목록은 노선만 반영하고 역·검색어 필터는 반영하지 않는다")
-    void getExploreCourses_availableStationsIgnoresOtherFilters() {
+    @DisplayName("역 필터 목록은 노선만 반영하고 역 필터는 반영하지 않는다")
+    void getExploreCourses_availableStationsIgnoresStationFilter() {
         // given: 고른 역으로 좁히면 드롭다운에 그 역만 남아 다른 역으로 바꿀 수 없다
         given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .willReturn(List.of());
@@ -612,11 +612,27 @@ class CourseQueryServiceTest {
 
         // when
         courseQueryService.getExploreCourses(
-                null, new ExploreCourseCondition(2L, 123L, "신림", null), CourseSort.LATEST, null, null);
+                null, new ExploreCourseCondition(2L, 123L, null, null), CourseSort.LATEST, null, null);
 
         // then
         verify(courseRepository).findDrawableStations(2L);
         verify(courseRepository).findStationsWithPublicCourses(2L);
+    }
+
+    @Test
+    @DisplayName("검색 요청에는 역 필터 목록을 계산하지 않는다")
+    void getExploreCourses_noStationsWhenSearching() {
+        // given: 검색 결과 화면에는 "역 선택"이 없어 후보 역 50개를 실어 보낼 이유가 없다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "신림", null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository, never()).findDrawableStations(any());
+        verify(courseRepository, never()).findStationsWithPublicCourses(any());
     }
 
     @Test
