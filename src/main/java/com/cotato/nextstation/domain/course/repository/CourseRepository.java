@@ -166,8 +166,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
             "AND (:conceptTourId IS NULL OR c.conceptTourId = :conceptTourId) " +
-            "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') " +
-            "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%')) " +
+            "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') ESCAPE '!' " +
+            "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%') ESCAPE '!') " +
                         "AND (:createdAt IS NULL OR c.createdAt < :createdAt " +
             "     OR (c.createdAt = :createdAt AND c.id < :courseId)) " +
             "ORDER BY c.createdAt DESC, c.id DESC")
@@ -201,8 +201,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
             "AND (:conceptTourId IS NULL OR c.conceptTourId = :conceptTourId) " +
-            "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') " +
-            "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%')) " +
+            "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') ESCAPE '!' " +
+            "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%') ESCAPE '!') " +
                         "AND (:score IS NULL OR (c.viewCount + c.likeCount * 2) < :score " +
             "     OR ((c.viewCount + c.likeCount * 2) = :score " +
             "         AND (c.createdAt < :createdAt OR (c.createdAt = :createdAt AND c.id < :courseId)))) " +
