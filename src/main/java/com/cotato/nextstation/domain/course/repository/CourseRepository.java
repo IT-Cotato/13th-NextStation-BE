@@ -254,6 +254,25 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "ORDER BY l.name")
     List<LineView> findExploreLines();
 
+    /**
+     * 노선따라 둘러보기의 "역 선택" 목록. 공개 코스가 있는 역만 내려준다.
+     * <p>
+     * 노선 칩으로 좁힌 범위에서 고르는 목록이라 {@code lineId}만 반영하고, 역·검색어 필터는 반영하지 않는다.
+     * 지금 고른 역으로 좁히면 드롭다운에 그 역 하나만 남아 다른 역으로 바꿀 수 없다.
+     * <p>
+     * 노선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
+     * "목록에 있는 역인데 고르면 결과가 없는" 불일치가 생긴다.
+     */
+    @Query("SELECT DISTINCT s.id AS stationId, s.stationName AS stationName " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "WHERE j.isPublic = true " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "ORDER BY s.stationName")
+    List<StationView> findExploreStations(@Param("lineId") Long lineId);
+
     interface ExploreCourseView {
         Long getCourseId();
         Long getJournalId();
@@ -293,5 +312,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         Long getLineId();
         String getLineName();
         LineCode getLineCode();
+    }
+
+    interface StationView {
+        Long getStationId();
+        String getStationName();
     }
 }
