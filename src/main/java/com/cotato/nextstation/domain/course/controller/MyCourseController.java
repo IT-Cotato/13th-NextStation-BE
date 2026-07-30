@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.course.controller;
 
 import com.cotato.nextstation.domain.course.dto.request.MyCourseDeleteRequest;
+import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
@@ -17,6 +18,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -67,6 +69,34 @@ public class MyCourseController {
             @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
             @RequestParam(required = false) Integer size) {
         return CommonResponse.success(courseQueryService.getMyCourses(principal.memberId(), lineId, stationId, cursor, size));
+    }
+
+    @Operation(
+            summary = "내가 만든 코스 확인",
+            description = """
+                    저장 탭에서 "코스 확인"을 눌렀을 때의 화면이다. 지도와 코스 순서를 그린다.
+                    - 장소마다 좌표(`xCoordinate`/`yCoordinate`)를 내려주며, 지도 핀 번호는 `orderNum`과 같다.
+                    - 장소는 `orderNum` 오름차순으로 정렬돼 있다.
+                    - **본인 코스만 조회할 수 있다.** 남의 코스는 존재 여부를 알리지 않도록 404로 응답한다.
+                    - 공개 여부는 따지지 않는다. 여행일지를 아직 쓰지 않았거나 비공개인 코스도 조회된다.
+                    - 조회수는 오르지 않는다. 내 코스를 관리하는 화면이라 드나들 때마다 오르면
+                      인기순 정렬이 왜곡되기 때문이다.
+                    - 이름 수정과 순서 변경은 `PATCH /api/v1/courses/{courseId}`로 저장한다.
+                    - 타인 코스를 보는 코스 상세(`GET /api/v1/courses/{courseId}`)와는 다른 화면이라 응답도 다르다.
+                    """
+    )
+    @SecurityRequirement(name = "accessTokenAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않거나 본인 코스가 아님 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
+    })
+    @GetMapping("/{courseId}")
+    public CommonResponse<MyCourseDetailResponse> getMyCourseDetail(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            @Parameter(description = "코스 ID", example = "1")
+            @PathVariable Long courseId) {
+        return CommonResponse.success(courseQueryService.getMyCourseDetail(principal.memberId(), courseId));
     }
 
     @Operation(

@@ -179,29 +179,4 @@ public class CourseController {
         return CommonResponse.success(null);
     }
 
-    @Operation(
-            summary = "내가 만든 코스 단건 삭제",
-            description = """
-                    내가 만든 코스를 삭제한다.
-                    - soft delete이며, 삭제 후에는 목록·상세 조회에서 모두 제외된다.
-                    - 이 코스를 좋아요한 사람들의 보관함에서도 함께 사라진다.
-                    - 저장 탭 선택 모드에서 여러 코스를 한 번에 지울 때는
-                      `DELETE /api/v1/members/me/courses`(다중 삭제)를 사용한다.
-                    """
-    )
-    @SecurityRequirement(name = "accessTokenAuth")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "삭제 성공 (data 없음)"),
-            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
-            @ApiResponse(responseCode = "403", description = "본인 코스가 아님 (`CourseErrorCode.COURSE_DELETE_FORBIDDEN`)"),
-            @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
-    })
-    @DeleteMapping("/{courseId}")
-    public CommonResponse<Void> deleteCourse(
-            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
-            @Parameter(description = "코스 ID", example = "1")
-            @PathVariable Long courseId) {
-        courseLikeCommandService.deleteCourse(principal.memberId(), courseId);
-        return CommonResponse.success(null);
-    }
 }
