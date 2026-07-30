@@ -64,7 +64,7 @@ class ExploreControllerTest {
     @DisplayName("둘러보기 목록은 토큰 없이도 200을 반환한다")
     void getExploreCourses_withoutToken() throws Exception {
         given(courseQueryService.getExploreCourses(isNull(), any(), any(), any(), any()))
-                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/explore/courses"))
                 .andExpect(status().isOk())
@@ -76,7 +76,7 @@ class ExploreControllerTest {
     @DisplayName("둘러보기 목록은 필터·검색·정렬을 그대로 서비스에 넘긴다")
     void getExploreCourses_passesParameters() throws Exception {
         given(courseQueryService.getExploreCourses(eq(1L), any(), eq(CourseSort.POPULAR), eq("cursor-value"), eq(5)))
-                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/explore/courses")
                         .header("Authorization", "Bearer " + TOKEN)
@@ -111,7 +111,7 @@ class ExploreControllerTest {
     @DisplayName("많이 찾는 코스는 토큰 없이도 200을 반환한다")
     void getMostLikedCourses_withoutToken() throws Exception {
         given(courseQueryService.getMostLikedCourses(isNull(), any(), any()))
-                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/explore/courses/popular"))
                 .andExpect(status().isOk())
@@ -122,7 +122,7 @@ class ExploreControllerTest {
     @DisplayName("많이 찾는 코스는 커서와 size를 그대로 서비스에 넘긴다")
     void getMostLikedCourses_passesParameters() throws Exception {
         given(courseQueryService.getMostLikedCourses(eq(1L), eq("cursor-value"), eq(6)))
-                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/explore/courses/popular")
                         .header("Authorization", "Bearer " + TOKEN)

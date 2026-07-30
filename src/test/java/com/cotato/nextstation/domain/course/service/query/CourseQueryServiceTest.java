@@ -537,6 +537,51 @@ class CourseQueryServiceTest {
     }
 
     @Test
+    @DisplayName("역 필터 목록은 노선만 반영하고 역·검색어 필터는 반영하지 않는다")
+    void getExploreCourses_availableStationsIgnoresOtherFilters() {
+        // given: 고른 역으로 좁히면 드롭다운에 그 역만 남아 다른 역으로 바꿀 수 없다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+        given(courseRepository.findExploreStations(2L)).willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(2L, 123L, "신림", null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository).findExploreStations(2L);
+    }
+
+    @Test
+    @DisplayName("역 필터 목록은 최초 조회에서만 계산한다")
+    void getExploreCourses_availableStationsOnlyOnFirstPage() {
+        // given: 드롭다운은 화면에 한 번만 그리므로 다음 페이지에서는 조회하지 않는다
+        String cursor = new CursorData(1L, null, LocalDateTime.now()).encode();
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(2L, null, null, null), CourseSort.LATEST, cursor, null);
+
+        // then
+        verify(courseRepository, never()).findExploreStations(any());
+    }
+
+    @Test
+    @DisplayName("많이 찾는 코스는 역 선택 드롭다운이 없어 역 목록을 조회하지 않는다")
+    void getMostLikedCourses_noAvailableStations() {
+        // given
+        given(courseRepository.findMostLikedCourses(any(Pageable.class))).willReturn(List.of());
+
+        // when
+        courseQueryService.getMostLikedCourses(null, null, null);
+
+        // then
+        verify(courseRepository, never()).findExploreStations(any());
+    }
+
+    @Test
     @DisplayName("정렬을 생략하면 최신순으로 조회한다")
     void getExploreCourses_defaultsToLatest() {
         // given
@@ -637,7 +682,8 @@ class CourseQueryServiceTest {
         // then: 초과분 1개는 빼고 커서를 만든다
         ArgumentCaptor<List<ExploreCourseResponse>> coursesCaptor = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toExploreListResponse(coursesCaptor.capture(), cursorCaptor.capture(), eq(true));
+        verify(courseConverter).toExploreListResponse(
+                coursesCaptor.capture(), any(), cursorCaptor.capture(), eq(true));
         assertThat(coursesCaptor.getValue()).hasSize(2);
         assertThat(cursorCaptor.getValue()).isNotNull();
     }
@@ -706,7 +752,7 @@ class CourseQueryServiceTest {
 
         // then
         ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toExploreListResponse(any(), cursorCaptor.capture(), eq(true));
+        verify(courseConverter).toExploreListResponse(any(), any(), cursorCaptor.capture(), eq(true));
         assertThat(CursorData.decode(cursorCaptor.getValue()).longValue()).isEqualTo(2L);
     }
 
@@ -722,7 +768,7 @@ class CourseQueryServiceTest {
         courseQueryService.getMostLikedCourses(null, cursor, null);
 
         // then
-        verify(courseConverter).toExploreListResponse(List.of(), null, false);
+        verify(courseConverter).toExploreListResponse(List.of(), List.of(), null, false);
     }
 
     @Test

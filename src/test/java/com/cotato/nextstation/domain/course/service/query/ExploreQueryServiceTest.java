@@ -38,7 +38,7 @@ class ExploreQueryServiceTest {
     private ConceptTourQueryService conceptTourQueryService;
 
     private ExploreCourseListResponse emptyList() {
-        return new ExploreCourseListResponse(List.of(), null, false);
+        return new ExploreCourseListResponse(List.of(), List.of(), null, false);
     }
 
     private ConceptTourResponse conceptTour(long id) {

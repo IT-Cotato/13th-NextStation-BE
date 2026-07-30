@@ -73,7 +73,7 @@ class ConceptTourControllerTest {
     @DisplayName("컨셉별 코스는 컨셉 조건만 걸어 둘러보기 조회를 재사용한다")
     void getConceptTourCourses_usesConceptCondition() throws Exception {
         given(courseQueryService.getExploreCourses(isNull(), any(), any(), any(), any()))
-                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/explore/concept-tours/{conceptTourId}/courses", 1L)
                         .param("sort", "POPULAR")
@@ -88,7 +88,7 @@ class ConceptTourControllerTest {
     @DisplayName("정렬을 생략하면 서비스가 기본값을 정하도록 null을 넘긴다")
     void getConceptTourCourses_defaultSort() throws Exception {
         given(courseQueryService.getExploreCourses(any(), any(), any(), any(), any()))
-                .willReturn(new ExploreCourseListResponse(List.of(), null, false));
+                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/explore/concept-tours/{conceptTourId}/courses", 1L))
                 .andExpect(status().isOk());
