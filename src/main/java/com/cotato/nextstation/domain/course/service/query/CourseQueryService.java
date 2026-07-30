@@ -187,6 +187,35 @@ public class CourseQueryService {
      */
     public ExploreCourseListResponse getExploreCourses(Long memberId, ExploreCourseCondition condition,
                                                        CourseSort sort, String cursor, Integer size) {
+        return findExploreCourses(memberId, condition, sort, cursor, size, true);
+    }
+
+    /**
+     * 컨셉 상세의 코스 목록. 조회 조건과 카드 모양은 둘러보기 목록과 같고 컨셉으로만 좁힌다.
+     * <p>
+     * 이 화면에는 정렬 토글만 있고 노선·역 필터가 없어 {@code availableStations}를 채우지 않는다.
+     * 쓰지도 않는 후보 역 50개를 매번 실어 보내면 응답만 커지고, 프론트는 그릴 곳이 없는 목록을 받는다.
+     */
+    public ExploreCourseListResponse getConceptTourCourses(Long memberId, Long conceptTourId,
+                                                           CourseSort sort, String cursor, Integer size) {
+        return findExploreCourses(memberId, ExploreCourseCondition.ofConceptTour(conceptTourId),
+                sort, cursor, size, false);
+    }
+
+    /**
+     * 둘러보기 메인의 노선 섹션에 넣을 코스(최신순). 더보기부터는 목록 API가 이어받으므로 커서를 받지 않는다.
+     * <p>
+     * 메인 화면에는 "역 선택"이 없어 {@code availableStations}를 계산하지 않는다.
+     * 계산해도 메인 응답에 담기지 않아 조회만 두 번 더 나간다.
+     */
+    public List<ExploreCourseResponse> getLineCourses(Long memberId, Long lineId, Integer size) {
+        ExploreCourseCondition condition = new ExploreCourseCondition(lineId, null, null, null);
+        return findExploreCourses(memberId, condition, CourseSort.LATEST, null, size, false).courses();
+    }
+
+    private ExploreCourseListResponse findExploreCourses(Long memberId, ExploreCourseCondition condition,
+                                                         CourseSort sort, String cursor, Integer size,
+                                                         boolean withStationFilter) {
         int pageSize = resolvePageSize(size);
         Pageable pageable = PageRequest.of(0, pageSize + 1); // hasNext 판단용 1개 더 조회
         CourseSort resolvedSort = (sort == null) ? CourseSort.LATEST : sort;
@@ -203,11 +232,11 @@ public class CourseQueryService {
         }
 
         // 드롭다운은 화면에 한 번만 그리므로 최초 조회에서만 계산한다.
-        boolean firstPage = (cursorData == null);
-        List<StationView> availableStations = firstPage
+        boolean needsStations = withStationFilter && cursorData == null;
+        List<StationView> availableStations = needsStations
                 ? courseRepository.findDrawableStations(condition.lineId())
                 : List.of();
-        Set<Long> stationIdsWithCourses = firstPage
+        Set<Long> stationIdsWithCourses = needsStations
                 ? toStationIds(courseRepository.findStationsWithPublicCourses(condition.lineId()))
                 : Set.of();
 
@@ -270,12 +299,18 @@ public class CourseQueryService {
     }
 
     // 이 목록의 커서는 정렬값이 아니라 다음 시작 위치다.
+    // 위치 외에 id·시각이 실려 있으면 다른 목록의 커서를 넣은 것이다. 인기순 커서를 그대로 넣으면
+    // 점수(예: 322)를 위치로 읽어 조용히 빈 목록이 되므로, 모양이 다르면 400으로 막는다.
     private int resolveOffsetCursor(String cursor) {
         CursorData cursorData = CursorData.decode(cursor);
         if (cursorData == null) {
             return 0;
         }
-        if (cursorData.longValue() == null || cursorData.longValue() < 0) {
+        boolean malformed = cursorData.longValue() == null
+                || cursorData.longValue() < 0
+                || cursorData.id() != null
+                || cursorData.dateTimeValue() != null;
+        if (malformed) {
             throw new CustomException(GlobalErrorCode.INVALID_CURSOR);
         }
         return cursorData.longValue().intValue();
