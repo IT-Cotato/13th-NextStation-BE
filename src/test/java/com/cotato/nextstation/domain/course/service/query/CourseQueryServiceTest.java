@@ -49,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -629,6 +630,65 @@ class CourseQueryServiceTest {
 
         // then
         verify(courseRepository, never()).findDrawableStations(any());
+    }
+
+    @Test
+    @DisplayName("다른 목록의 커서를 많이 찾는 코스에 넣으면 400이다")
+    void getMostLikedCourses_rejectsForeignCursor() {
+        // given: 인기순 커서의 점수를 시작 위치로 읽으면 조용히 빈 목록이 된다
+        String popularCursor = new CursorData(1L, 322L, LocalDateTime.now()).encode();
+
+        // when & then
+        assertThatThrownBy(() -> courseQueryService.getMostLikedCourses(null, popularCursor, null))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", GlobalErrorCode.INVALID_CURSOR);
+    }
+
+    @Test
+    @DisplayName("둘러보기 메인의 노선 코스는 역 목록을 조회하지 않는다")
+    void getLineCourses_noAvailableStations() {
+        // given: 메인 화면에는 역 선택이 없어 계산해도 응답에 담기지 않는다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+        given(courseConverter.toExploreListResponse(any(), any(), any(), any(), anyBoolean()))
+                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
+
+        // when
+        courseQueryService.getLineCourses(null, 6L, 3);
+
+        // then
+        verify(courseRepository, never()).findDrawableStations(any());
+        verify(courseRepository, never()).findStationsWithPublicCourses(any());
+    }
+
+    @Test
+    @DisplayName("컨셉별 코스 목록은 역 선택 드롭다운이 없어 역 목록을 조회하지 않는다")
+    void getConceptTourCourses_noAvailableStations() {
+        // given: 컨셉 상세에는 정렬 토글만 있어 후보 역 50개를 실어 보낼 이유가 없다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getConceptTourCourses(null, 1L, CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository, never()).findDrawableStations(any());
+        verify(courseRepository, never()).findStationsWithPublicCourses(any());
+    }
+
+    @Test
+    @DisplayName("컨셉별 코스 목록은 컨셉 id를 조회 조건으로 넘긴다")
+    void getConceptTourCourses_passesConceptTourId() {
+        // given
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), eq(7L), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getConceptTourCourses(null, 7L, CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository)
+                .findExploreCoursesByLatest(isNull(), isNull(), isNull(), eq(7L), any(), any(), any(Pageable.class));
     }
 
     @Test
