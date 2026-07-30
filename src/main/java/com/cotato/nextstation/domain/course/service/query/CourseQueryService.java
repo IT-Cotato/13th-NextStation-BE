@@ -237,7 +237,9 @@ public class CourseQueryService {
         }
 
         // 드롭다운은 화면에 한 번만 그리므로 최초 조회에서만 계산한다.
-        boolean needsStations = withStationFilter && cursorData == null;
+        // 검색어가 있으면 검색 결과 화면이고, 그 화면에는 "역 선택"이 없어 후보 역을 싣지 않는다.
+        // 노선따라 화면엔 검색바가 없고 검색 화면엔 노선 칩이 없어 두 값이 함께 오는 화면은 없다.
+        boolean needsStations = withStationFilter && cursorData == null && condition.keyword() == null;
         List<StationView> availableStations = needsStations
                 ? courseRepository.findDrawableStations(condition.lineId())
                 : List.of();
