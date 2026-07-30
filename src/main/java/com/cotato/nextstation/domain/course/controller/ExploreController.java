@@ -66,7 +66,7 @@ public class ExploreController {
     }
 
     @Operation(
-            summary = "둘러보기 코스 목록 조회",
+            summary = "노선따라 둘러보기 + 코스 검색",
             description = """
                     둘러보기의 노선따라 둘러보기와 코스 검색이 이 API를 함께 쓴다.
                     - 공개된 여행일지가 있는 코스만 나온다.
