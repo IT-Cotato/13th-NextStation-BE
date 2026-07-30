@@ -1,6 +1,5 @@
 package com.cotato.nextstation.domain.course.controller;
 
-import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.ConceptTourResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.CourseSort;
@@ -59,6 +58,7 @@ public class ConceptTourController {
                     - `sort`는 `LATEST`(기본, 최신순) 또는 `POPULAR`(조회수 + 좋아요×2)다.
                       화면의 "전체"는 `LATEST`로 보내면 된다.
                     - 카드 구조와 커서 사용법은 둘러보기 목록(`GET /api/v1/explore/courses`)과 같다.
+                    - 이 화면에는 정렬 토글만 있고 노선·역 필터가 없어 `availableStations`는 항상 빈 배열이다.
                     - **정렬을 바꾸면 커서를 버리고 첫 페이지부터 다시 요청해야 한다.**
                     - 없는 컨셉이거나 속한 코스가 없으면 빈 목록이다.
                     - 로그인 없이 조회할 수 있고, 로그인했을 때만 `isLiked`가 채워진다.
@@ -83,7 +83,7 @@ public class ConceptTourController {
             @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
             @RequestParam(required = false) Integer size) {
         Long memberId = (principal != null) ? principal.memberId() : null;
-        return CommonResponse.success(courseQueryService.getExploreCourses(
-                memberId, ExploreCourseCondition.ofConceptTour(conceptTourId), sort, cursor, size));
+        return CommonResponse.success(
+                courseQueryService.getConceptTourCourses(memberId, conceptTourId, sort, cursor, size));
     }
 }
