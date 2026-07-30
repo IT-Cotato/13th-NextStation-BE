@@ -11,7 +11,8 @@ public record ExploreCourseListResponse(
         List<ExploreCourseResponse> courses,
 
         @Schema(description = """
-                "역 선택" 드롭다운에 그릴 역 목록. 공개 코스가 있는 역만 담긴다.
+                "역 선택" 드롭다운에 그릴 역 목록. 코스가 붙을 수 있는 역(뽑기 역)을 **전부** 담는다.
+                공개 코스가 없는 역은 빼지 않고 `hasCourses = false`로 내려가므로 **비활성으로 그린다**(노선 칩과 같은 방식).
                 `lineId`를 준 경우 그 노선의 역만 담기며, 역·검색어 필터는 반영하지 않는다.
                 드롭다운은 화면에 한 번만 그리므로 **첫 페이지에서만** 채워지고 다음 페이지부터는 빈 배열이다.
                 """)

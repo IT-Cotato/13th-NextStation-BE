@@ -44,8 +44,10 @@ public class ExploreController {
                     - 컨셉별 투어 더보기 → `GET /api/v1/explore/concept-tours`
                     - 노선 칩 전환 → `GET /api/v1/explore/courses?lineId=`
 
-                    `lines`에는 **공개 코스가 하나라도 있는 노선만** 담긴다. 칩을 눌렀는데 빈 목록이
-                    나오지 않도록 한 것이며, `selectedLineId`는 그 목록의 첫 번째다.
+                    `lines`에는 **코스가 붙을 수 있는 노선을 전부** 담는다(뽑기 역이 속한 노선 기준).
+                    공개 코스가 없는 노선은 목록에서 빼지 않고 `hasCourses = false`로 내려주므로,
+                    프론트는 **비활성 칩으로 그린다**. 코스가 쌓일 때마다 칩이 늘어나 노선도가 흔들리는 것을 막기 위한 것이다.
+                    `selectedLineId`는 `hasCourses = true`인 첫 노선이라 진입 화면이 비지 않는다.
 
                     로그인 없이 조회할 수 있고, 로그인했을 때만 카드의 `isLiked`가 채워진다.
                     """
@@ -71,7 +73,8 @@ public class ExploreController {
                     - 카드를 누르면 `journalId`로 여행일지 상세를 연다. 목록에 그 값이 함께 내려간다.
                     - `lineId`/`stationId`/`keyword`는 모두 선택 사항이며, 함께 주면 전부 만족하는 코스만 나온다.
                     - `lineId` 필터는 역이 **속한 호선 전체**를 기준으로 한다. 환승역 코스는 소속된 모든 호선에서 조회된다.
-                    - `availableStations`는 "역 선택" 드롭다운을 그리는 데 쓴다. 공개 코스가 있는 역만 담기며,
+                    - `availableStations`는 "역 선택" 드롭다운을 그리는 데 쓴다. 코스가 붙을 수 있는 역을 전부 담고,
+                      공개 코스가 없는 역은 `hasCourses = false`로 내려주므로 **비활성으로 그린다**(노선 칩과 같은 방식).
                       `lineId`만 반영하고 `stationId`·`keyword`는 반영하지 않는다(고른 역으로 좁히면 그 역만 남는다).
                       **첫 페이지에서만** 채워지고 다음 페이지부터는 빈 배열이다.
                     - `keyword`는 **코스 이름과 역명**만 검색한다. 역명은 꼬리의 `역`을 떼고 비교하므로

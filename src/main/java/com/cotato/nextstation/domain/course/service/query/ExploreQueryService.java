@@ -3,9 +3,9 @@ package com.cotato.nextstation.domain.course.service.query;
 import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.ConceptTourResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreResponse;
 import com.cotato.nextstation.domain.course.entity.CourseSort;
-import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,18 +39,29 @@ public class ExploreQueryService {
                 .limit(CONCEPT_TOUR_COUNT)
                 .toList();
 
-        List<LineSummaryResponse> lines = courseQueryService.getExploreLines();
-        Long selectedLineId = lines.isEmpty() ? null : lines.get(0).id();
+        List<ExploreLineResponse> lines = courseQueryService.getExploreLines();
+        Long selectedLineId = resolveSelectedLineId(lines);
         List<ExploreCourseResponse> lineCourses = resolveLineCourses(memberId, selectedLineId);
 
         return new ExploreResponse(popularCourses, conceptTours, lines, selectedLineId, lineCourses);
     }
 
     /**
-     * 처음 보여줄 노선의 코스.
+     * 처음 선택해 둘 노선.
      * <p>
-     * 선택 노선은 목록의 첫 번째로 둔다. 특정 호선을 고정하면 그 노선에 코스가 없을 때 빈 화면이 되는데,
-     * 노선 목록 자체가 공개 코스가 있는 노선만 담고 있어 첫 번째는 항상 코스가 있다.
+     * 코스가 있는 첫 노선을 고른다. 목록의 첫 번째를 그냥 쓰면 그 노선이 비활성일 때
+     * 진입 화면이 빈 목록이 된다. 특정 호선을 고정하지 않는 것도 같은 이유다.
+     */
+    private Long resolveSelectedLineId(List<ExploreLineResponse> lines) {
+        return lines.stream()
+                .filter(ExploreLineResponse::hasCourses)
+                .map(ExploreLineResponse::id)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 처음 보여줄 노선의 코스. 공개 코스가 있는 노선이 하나도 없으면 빈 목록이다.
      */
     private List<ExploreCourseResponse> resolveLineCourses(Long memberId, Long selectedLineId) {
         if (selectedLineId == null) {

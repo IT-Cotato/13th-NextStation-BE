@@ -237,12 +237,28 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<ExploreCourseView> findMostLikedCourses(Pageable pageable);
 
     /**
-     * 둘러보기에 노출할 노선 목록. 노선 칩을 그리는 데 쓴다.
+     * 노선 칩으로 그릴 후보 노선. 뽑기 역이 속한 노선 전체를 내려준다.
      * <p>
-     * 공개 코스가 하나라도 있는 노선만 내려준다. 칩을 눌렀는데 빈 목록이 나오면 안 되기 때문이다.
-     * 저장 탭 필터와 같은 기준으로 역이 속한 호선 전체를 본다.
+     * 코스는 뽑기 역에만 붙으므로 이 집합이 곧 "코스가 존재할 수 있는 노선"이다.
+     * {@code line} 테이블 전체를 쓰면 코스가 생길 수 없는 노선까지 칩으로 뜨고,
+     * 공개 코스가 있는 노선만 쓰면 데이터가 쌓일 때마다 칩이 늘어나 노선도가 흔들려 보인다.
      * <p>
      * 뽑기 역이 늘어나면 노선도 자연히 늘어나므로 목록을 하드코딩하지 않고 데이터에서 유도한다.
+     * 환승역이 있어 1~9호선 외 노선(경의중앙선 등)도 포함될 수 있다.
+     */
+    @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Station s " +
+            "JOIN StationLine sl ON sl.station.id = s.id " +
+            "JOIN sl.line l " +
+            "WHERE s.isDrawable = true " +
+            "ORDER BY l.name")
+    List<LineView> findDrawableLines();
+
+    /**
+     * 공개 코스가 하나라도 있는 노선. 칩의 활성/비활성을 가르는 데 쓴다.
+     * <p>
+     * 노선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
+     * "칩은 비활성인데 필터를 걸면 결과가 나오는" 불일치가 생긴다.
      */
     @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
@@ -252,16 +268,30 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN sl.line l " +
             "WHERE j.isPublic = true " +
             "ORDER BY l.name")
-    List<LineView> findExploreLines();
+    List<LineView> findLinesWithPublicCourses();
 
     /**
-     * 노선따라 둘러보기의 "역 선택" 목록. 공개 코스가 있는 역만 내려준다.
+     * "역 선택" 드롭다운으로 그릴 후보 역. 뽑기 역만 내려준다.
+     * <p>
+     * 코스는 뽑기 역에만 붙으므로 이 집합이 곧 "코스가 존재할 수 있는 역"이다.
+     * 노선 칩과 같은 이유로, 공개 코스가 있는 역만 내려주면 데이터가 쌓일 때마다 항목이 늘어난다.
      * <p>
      * 노선 칩으로 좁힌 범위에서 고르는 목록이라 {@code lineId}만 반영하고, 역·검색어 필터는 반영하지 않는다.
      * 지금 고른 역으로 좁히면 드롭다운에 그 역 하나만 남아 다른 역으로 바꿀 수 없다.
+     */
+    @Query("SELECT s.id AS stationId, s.stationName AS stationName " +
+            "FROM Station s " +
+            "WHERE s.isDrawable = true " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "ORDER BY s.stationName")
+    List<StationView> findDrawableStations(@Param("lineId") Long lineId);
+
+    /**
+     * 공개 코스가 하나라도 있는 역. "역 선택" 항목의 활성/비활성을 가르는 데 쓴다.
      * <p>
      * 노선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
-     * "목록에 있는 역인데 고르면 결과가 없는" 불일치가 생긴다.
+     * "목록에서 고를 수 있는 역인데 고르면 결과가 없는" 불일치가 생긴다.
      */
     @Query("SELECT DISTINCT s.id AS stationId, s.stationName AS stationName " +
             "FROM Course c " +
@@ -271,7 +301,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
             "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
             "ORDER BY s.stationName")
-    List<StationView> findExploreStations(@Param("lineId") Long lineId);
+    List<StationView> findStationsWithPublicCourses(@Param("lineId") Long lineId);
 
     interface ExploreCourseView {
         Long getCourseId();

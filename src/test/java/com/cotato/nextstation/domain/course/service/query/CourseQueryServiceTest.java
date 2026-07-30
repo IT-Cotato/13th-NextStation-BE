@@ -6,6 +6,7 @@ import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
@@ -18,11 +19,13 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
@@ -44,6 +47,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -536,20 +540,79 @@ class CourseQueryServiceTest {
         return view;
     }
 
+    private LineView lineView(Long id, String name, LineCode code) {
+        LineView view = mock(LineView.class);
+        lenient().when(view.getLineId()).thenReturn(id);
+        lenient().when(view.getLineName()).thenReturn(name);
+        lenient().when(view.getLineCode()).thenReturn(code);
+        return view;
+    }
+
+    private StationView stationView(Long id, String name) {
+        StationView view = mock(StationView.class);
+        lenient().when(view.getStationId()).thenReturn(id);
+        lenient().when(view.getStationName()).thenReturn(name);
+        return view;
+    }
+
+    @Test
+    @DisplayName("노선 칩은 코스가 없는 노선도 담고 hasCourses로 구분한다")
+    void getExploreLines_marksLinesWithoutCourses() {
+        // given: 코스 없는 노선을 빼면 데이터가 쌓일 때마다 칩이 늘어나 노선도가 흔들려 보인다
+        // 프로젝션 mock에 스터빙이 들어 있어 given(...) 밖에서 미리 만든다
+        LineView line1 = lineView(4L, "1호선", LineCode.LINE_1);
+        LineView line2 = lineView(9L, "2호선", LineCode.LINE_2);
+        given(courseRepository.findDrawableLines()).willReturn(List.of(line1, line2));
+        given(courseRepository.findLinesWithPublicCourses()).willReturn(List.of(line2));
+
+        // when
+        List<ExploreLineResponse> result = courseQueryService.getExploreLines();
+
+        // then
+        assertThat(result).extracting(ExploreLineResponse::id, ExploreLineResponse::hasCourses)
+                .containsExactly(tuple(4L, false), tuple(9L, true));
+    }
+
+    @Test
+    @DisplayName("역 필터 목록은 코스가 없는 역도 담고 hasCourses로 구분한다")
+    void getExploreCourses_marksStationsWithoutCourses() {
+        // given
+        StationView bomun = stationView(123L, "보문역");
+        StationView oksu = stationView(232L, "옥수역");
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+        given(courseRepository.findDrawableStations(any())).willReturn(List.of(bomun, oksu));
+        given(courseRepository.findStationsWithPublicCourses(any())).willReturn(List.of(oksu));
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, null, null);
+
+        // then: 후보 역은 둘 다 넘기고, 코스가 있는 역만 표시하도록 id 집합을 함께 넘긴다
+        ArgumentCaptor<List<StationView>> stationsCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<Set<Long>> withCoursesCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(courseConverter).toExploreListResponse(
+                any(), stationsCaptor.capture(), withCoursesCaptor.capture(), any(), eq(false));
+        assertThat(stationsCaptor.getValue()).hasSize(2);
+        assertThat(withCoursesCaptor.getValue()).containsExactly(232L);
+    }
+
     @Test
     @DisplayName("역 필터 목록은 노선만 반영하고 역·검색어 필터는 반영하지 않는다")
     void getExploreCourses_availableStationsIgnoresOtherFilters() {
         // given: 고른 역으로 좁히면 드롭다운에 그 역만 남아 다른 역으로 바꿀 수 없다
         given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .willReturn(List.of());
-        given(courseRepository.findExploreStations(2L)).willReturn(List.of());
+        given(courseRepository.findDrawableStations(2L)).willReturn(List.of());
+        given(courseRepository.findStationsWithPublicCourses(2L)).willReturn(List.of());
 
         // when
         courseQueryService.getExploreCourses(
                 null, new ExploreCourseCondition(2L, 123L, "신림", null), CourseSort.LATEST, null, null);
 
         // then
-        verify(courseRepository).findExploreStations(2L);
+        verify(courseRepository).findDrawableStations(2L);
+        verify(courseRepository).findStationsWithPublicCourses(2L);
     }
 
     @Test
@@ -565,7 +628,7 @@ class CourseQueryServiceTest {
                 null, new ExploreCourseCondition(2L, null, null, null), CourseSort.LATEST, cursor, null);
 
         // then
-        verify(courseRepository, never()).findExploreStations(any());
+        verify(courseRepository, never()).findDrawableStations(any());
     }
 
     @Test
@@ -578,7 +641,7 @@ class CourseQueryServiceTest {
         courseQueryService.getMostLikedCourses(null, null, null);
 
         // then
-        verify(courseRepository, never()).findExploreStations(any());
+        verify(courseRepository, never()).findDrawableStations(any());
     }
 
     @Test
@@ -683,7 +746,7 @@ class CourseQueryServiceTest {
         ArgumentCaptor<List<ExploreCourseResponse>> coursesCaptor = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
         verify(courseConverter).toExploreListResponse(
-                coursesCaptor.capture(), any(), cursorCaptor.capture(), eq(true));
+                coursesCaptor.capture(), any(), any(), cursorCaptor.capture(), eq(true));
         assertThat(coursesCaptor.getValue()).hasSize(2);
         assertThat(cursorCaptor.getValue()).isNotNull();
     }
@@ -752,7 +815,7 @@ class CourseQueryServiceTest {
 
         // then
         ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toExploreListResponse(any(), any(), cursorCaptor.capture(), eq(true));
+        verify(courseConverter).toExploreListResponse(any(), any(), any(), cursorCaptor.capture(), eq(true));
         assertThat(CursorData.decode(cursorCaptor.getValue()).longValue()).isEqualTo(2L);
     }
 
@@ -768,7 +831,7 @@ class CourseQueryServiceTest {
         courseQueryService.getMostLikedCourses(null, cursor, null);
 
         // then
-        verify(courseConverter).toExploreListResponse(List.of(), List.of(), null, false);
+        verify(courseConverter).toExploreListResponse(List.of(), List.of(), Set.of(), null, false);
     }
 
     @Test

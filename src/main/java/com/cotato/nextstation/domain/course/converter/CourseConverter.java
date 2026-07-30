@@ -157,11 +157,14 @@ public class CourseConverter {
     }
 
     // availableStations는 "역 선택" 드롭다운이 있는 목록만 채운다. 없는 화면은 빈 목록을 넘긴다.
+    // 후보 역을 모두 담고, 공개 코스가 있는 역만 hasCourses = true로 표시한다.
     public ExploreCourseListResponse toExploreListResponse(List<ExploreCourseResponse> courses,
                                                            List<StationView> availableStations,
+                                                           Set<Long> stationIdsWithCourses,
                                                            String nextCursor, boolean hasNext) {
         List<ExploreStationResponse> stationFilters = availableStations.stream()
-                .map(station -> new ExploreStationResponse(station.getStationId(), station.getStationName()))
+                .map(station -> new ExploreStationResponse(station.getStationId(), station.getStationName(),
+                        stationIdsWithCourses.contains(station.getStationId())))
                 .toList();
         return new ExploreCourseListResponse(courses, stationFilters, nextCursor, hasNext);
     }

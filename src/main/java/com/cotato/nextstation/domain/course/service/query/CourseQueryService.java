@@ -6,6 +6,7 @@ import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
@@ -26,7 +27,6 @@ import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.Like
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
-import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
@@ -203,20 +203,37 @@ public class CourseQueryService {
         }
 
         // 드롭다운은 화면에 한 번만 그리므로 최초 조회에서만 계산한다.
-        List<StationView> availableStations = (cursorData == null)
-                ? courseRepository.findExploreStations(condition.lineId())
+        boolean firstPage = (cursorData == null);
+        List<StationView> availableStations = firstPage
+                ? courseRepository.findDrawableStations(condition.lineId())
                 : List.of();
+        Set<Long> stationIdsWithCourses = firstPage
+                ? toStationIds(courseRepository.findStationsWithPublicCourses(condition.lineId()))
+                : Set.of();
 
-        return courseConverter.toExploreListResponse(
-                toExploreCards(memberId, pageContent), availableStations, nextCursor, hasNext);
+        return courseConverter.toExploreListResponse(toExploreCards(memberId, pageContent),
+                availableStations, stationIdsWithCourses, nextCursor, hasNext);
+    }
+
+    private Set<Long> toStationIds(List<StationView> stations) {
+        return stations.stream().map(StationView::getStationId).collect(Collectors.toSet());
     }
 
     /**
-     * 둘러보기 노선 칩 목록. 공개 코스가 하나라도 있는 노선만 내려준다.
+     * 둘러보기 노선 칩 목록. 코스가 붙을 수 있는 노선을 전부 내려주고, 코스가 없는 노선은
+     * {@code hasCourses = false}로 표시한다.
+     * <p>
+     * 코스 없는 노선을 아예 빼면 데이터가 쌓일 때마다 칩이 늘어나 노선도가 흔들려 보인다.
+     * 저장 탭의 호선 필터와 같은 방식으로, 칩은 고정해 두고 비활성 여부만 서버가 알려준다.
      */
-    public List<LineSummaryResponse> getExploreLines() {
-        return courseRepository.findExploreLines().stream()
-                .map(line -> new LineSummaryResponse(line.getLineId(), line.getLineName(), line.getLineCode()))
+    public List<ExploreLineResponse> getExploreLines() {
+        Set<Long> lineIdsWithCourses = courseRepository.findLinesWithPublicCourses().stream()
+                .map(LineView::getLineId)
+                .collect(Collectors.toSet());
+
+        return courseRepository.findDrawableLines().stream()
+                .map(line -> new ExploreLineResponse(line.getLineId(), line.getLineName(), line.getLineCode(),
+                        lineIdsWithCourses.contains(line.getLineId())))
                 .toList();
     }
 
@@ -239,7 +256,7 @@ public class CourseQueryService {
                 courseRepository.findMostLikedCourses(PageRequest.of(0, MOST_LIKED_LIMIT));
 
         if (offset >= topCourses.size()) {
-            return courseConverter.toExploreListResponse(List.of(), List.of(), null, false);
+            return courseConverter.toExploreListResponse(List.of(), List.of(), Set.of(), null, false);
         }
 
         int end = Math.min(offset + pageSize, topCourses.size());
@@ -249,7 +266,7 @@ public class CourseQueryService {
 
         // 이 화면에는 "역 선택" 드롭다운이 없어 역 목록을 계산하지 않는다.
         return courseConverter.toExploreListResponse(
-                toExploreCards(memberId, pageContent), List.of(), nextCursor, hasNext);
+                toExploreCards(memberId, pageContent), List.of(), Set.of(), nextCursor, hasNext);
     }
 
     // 이 목록의 커서는 정렬값이 아니라 다음 시작 위치다.

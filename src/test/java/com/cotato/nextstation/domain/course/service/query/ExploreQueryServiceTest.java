@@ -3,9 +3,9 @@ package com.cotato.nextstation.domain.course.service.query;
 import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.ConceptTourResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreResponse;
 import com.cotato.nextstation.domain.course.entity.CourseSort;
-import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +41,10 @@ class ExploreQueryServiceTest {
         return new ExploreCourseListResponse(List.of(), List.of(), null, false);
     }
 
+    private ExploreLineResponse line(long id, String name, LineCode code, boolean hasCourses) {
+        return new ExploreLineResponse(id, name, code, hasCourses);
+    }
+
     private ConceptTourResponse conceptTour(long id) {
         return new ConceptTourResponse(id, "컨셉" + id, "설명", 0);
     }
@@ -53,7 +57,7 @@ class ExploreQueryServiceTest {
         given(conceptTourQueryService.getConceptTours())
                 .willReturn(List.of(conceptTour(1), conceptTour(2), conceptTour(3), conceptTour(4)));
         given(courseQueryService.getExploreLines())
-                .willReturn(List.of(new LineSummaryResponse(4L, "1호선", LineCode.LINE_1)));
+                .willReturn(List.of(line(4L, "1호선", LineCode.LINE_1, true)));
         given(courseQueryService.getExploreCourses(isNull(), any(), eq(CourseSort.LATEST), isNull(), eq(3)))
                 .willReturn(emptyList());
 
@@ -67,29 +71,49 @@ class ExploreQueryServiceTest {
     }
 
     @Test
-    @DisplayName("노선 목록의 첫 번째를 처음 선택된 노선으로 둔다")
-    void getExplore_selectsFirstLine() {
-        // given: 특정 호선을 고정하면 그 노선에 코스가 없을 때 빈 화면이 된다
+    @DisplayName("코스가 없는 노선도 목록에 남기고 코스가 있는 첫 노선을 선택한다")
+    void getExplore_selectsFirstLineWithCourses() {
+        // given: 코스 없는 노선을 빼면 데이터가 쌓일 때마다 칩이 늘어나 노선도가 흔들려 보인다
         lenient().when(courseQueryService.getMostLikedCourses(any(), any(), any())).thenReturn(emptyList());
         lenient().when(conceptTourQueryService.getConceptTours()).thenReturn(List.of());
         given(courseQueryService.getExploreLines()).willReturn(List.of(
-                new LineSummaryResponse(4L, "1호선", LineCode.LINE_1),
-                new LineSummaryResponse(9L, "2호선", LineCode.LINE_2)));
+                line(4L, "1호선", LineCode.LINE_1, false),
+                line(9L, "2호선", LineCode.LINE_2, true)));
         given(courseQueryService.getExploreCourses(any(), any(), any(), any(), any())).willReturn(emptyList());
 
         // when
         ExploreResponse result = exploreQueryService.getExplore(null);
 
-        // then
-        assertThat(result.selectedLineId()).isEqualTo(4L);
+        // then: 비활성 노선은 목록에 남지만 선택되지는 않는다
+        assertThat(result.lines()).hasSize(2);
+        assertThat(result.selectedLineId()).isEqualTo(9L);
         verify(courseQueryService).getExploreCourses(
-                null, new ExploreCourseCondition(4L, null, null, null), CourseSort.LATEST, null, 3);
+                null, new ExploreCourseCondition(9L, null, null, null), CourseSort.LATEST, null, 3);
     }
 
     @Test
-    @DisplayName("노출할 노선이 없으면 선택 노선과 코스를 비운다")
+    @DisplayName("코스가 있는 노선이 하나도 없으면 선택 노선과 코스를 비운다")
+    void getExplore_noLineHasCourses() {
+        // given: 노선 칩은 뜨지만 전부 비활성인 초기 상태
+        lenient().when(courseQueryService.getMostLikedCourses(any(), any(), any())).thenReturn(emptyList());
+        lenient().when(conceptTourQueryService.getConceptTours()).thenReturn(List.of());
+        given(courseQueryService.getExploreLines()).willReturn(List.of(
+                line(4L, "1호선", LineCode.LINE_1, false)));
+
+        // when
+        ExploreResponse result = exploreQueryService.getExplore(null);
+
+        // then: 선택할 노선이 없으면 코스 조회 자체를 하지 않는다
+        assertThat(result.lines()).hasSize(1);
+        assertThat(result.selectedLineId()).isNull();
+        assertThat(result.lineCourses()).isEmpty();
+        verify(courseQueryService, never()).getExploreCourses(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("노출할 노선이 아예 없으면 선택 노선과 코스를 비운다")
     void getExplore_noLines() {
-        // given: 공개 코스가 하나도 없는 초기 상태
+        // given
         lenient().when(courseQueryService.getMostLikedCourses(any(), any(), any())).thenReturn(emptyList());
         lenient().when(conceptTourQueryService.getConceptTours()).thenReturn(List.of());
         given(courseQueryService.getExploreLines()).willReturn(List.of());
@@ -97,7 +121,7 @@ class ExploreQueryServiceTest {
         // when
         ExploreResponse result = exploreQueryService.getExplore(null);
 
-        // then: 노선이 없으면 코스 조회 자체를 하지 않는다
+        // then
         assertThat(result.selectedLineId()).isNull();
         assertThat(result.lineCourses()).isEmpty();
         verify(courseQueryService, never()).getExploreCourses(any(), any(), any(), any(), any());
