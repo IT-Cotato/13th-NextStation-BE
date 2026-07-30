@@ -52,7 +52,7 @@ class ConceptTourControllerTest {
         given(conceptTourQueryService.getConceptTours()).willReturn(List.of(
                 new ConceptTourResponse(1L, "문구 투어", "작은 문구점과 책방을 찾아가는 코스", 18)));
 
-        mockMvc.perform(get("/api/v1/concept-tours"))
+        mockMvc.perform(get("/api/v1/explore/concept-tours"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].conceptTourId").value(1))
                 .andExpect(jsonPath("$.data[0].name").value("문구 투어"))
@@ -64,7 +64,7 @@ class ConceptTourControllerTest {
     void getConceptTours_withoutToken() throws Exception {
         given(conceptTourQueryService.getConceptTours()).willReturn(List.of());
 
-        mockMvc.perform(get("/api/v1/concept-tours"))
+        mockMvc.perform(get("/api/v1/explore/concept-tours"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray());
     }
@@ -75,7 +75,7 @@ class ConceptTourControllerTest {
         given(courseQueryService.getExploreCourses(isNull(), any(), any(), any(), any()))
                 .willReturn(new ExploreCourseListResponse(List.of(), null, false));
 
-        mockMvc.perform(get("/api/v1/concept-tours/{conceptTourId}/courses", 1L)
+        mockMvc.perform(get("/api/v1/explore/concept-tours/{conceptTourId}/courses", 1L)
                         .param("sort", "POPULAR")
                         .param("size", "5"))
                 .andExpect(status().isOk());
@@ -90,7 +90,7 @@ class ConceptTourControllerTest {
         given(courseQueryService.getExploreCourses(any(), any(), any(), any(), any()))
                 .willReturn(new ExploreCourseListResponse(List.of(), null, false));
 
-        mockMvc.perform(get("/api/v1/concept-tours/{conceptTourId}/courses", 1L))
+        mockMvc.perform(get("/api/v1/explore/concept-tours/{conceptTourId}/courses", 1L))
                 .andExpect(status().isOk());
 
         verify(courseQueryService).getExploreCourses(
