@@ -173,9 +173,16 @@ public class StationQueryService {
     }
 
     public LineSummaryResponse getLine(Long stationId) {
-        return stationLineRepository.findFirstByStationId(stationId)
-                .map(stationLine -> lineConverter.toSummaryResponse(stationLine.getLine()))
+        return stationRepository.findById(stationId)
+                .map(station -> {
+                    // draw_line 우선, 없으면 StationLine에서 첫 번째
+                    if (station.getDrawLine() != null) {
+                        return lineConverter.toSummaryResponse(station.getDrawLine());
+                    }
+                    return stationLineRepository.findFirstByStationId(stationId)
+                            .map(stationLine -> lineConverter.toSummaryResponse(stationLine.getLine()))
+                            .orElse(null);
+                })
                 .orElse(null);
     }
-
 }
