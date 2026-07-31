@@ -9,7 +9,7 @@ public class NicknameReservedWordsFilter {
 
     // 부분 일치시 차단
     private static final List<String> CONTAINS_RESERVED_WORDS = List.of(
-            "운영자", "관리자", "admin", "administrator", "system", "official"
+            "운영자", "관리자", "admin", "system", "official"
     );
 
     // 완전 일치시 차단
