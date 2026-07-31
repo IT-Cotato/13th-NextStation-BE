@@ -37,7 +37,7 @@ public record JournalDetailResponse(
         int viewCount,
 
         @Schema(description = "저장 수")
-        int saveCount,
+        int likeCount,
 
         @Schema(description = "여행 사진 URL 목록 (첫 번째가 대표 사진)")
         List<String> imageUrls,
