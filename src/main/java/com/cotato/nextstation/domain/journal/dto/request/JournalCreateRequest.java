@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.journal.dto.request;
 
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -43,10 +44,14 @@ public record JournalCreateRequest(
         @NotNull(message = "공개 여부는 필수입니다.")
         Boolean isPublic,
 
+        @Schema(description = "여행 대표 사진 URL 목록 (최대 3장, 첫 번째가 대표 사진)")
         @Size(max = 3, message = "여행 대표 사진은 최대 3장입니다.")
         List<String> journalImageUrls,
 
-
+        @ArraySchema(
+                schema = @Schema(implementation = PlaceReviewRequest.class),
+                arraySchema = @Schema(description = "장소 리뷰 목록 (리뷰를 남길 장소만 포함, 없으면 생략 가능)")
+        )
         List<@Valid PlaceReviewRequest> placeReviews
 ) {
     @Schema(description = "장소 리뷰 요청")
