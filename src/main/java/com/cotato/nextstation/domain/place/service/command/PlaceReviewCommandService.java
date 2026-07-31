@@ -19,6 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 
 /**
@@ -46,27 +50,49 @@ public class PlaceReviewCommandService {
         if (requests == null || requests.isEmpty()) {
             return;
         }
+        // findById + save 조합은 N+1 쿼리 문제가 발생함.
+        // findAllById로 배치 조회하고 saveAll로 배치 저장하도록 함
 
-        requests.forEach(request -> {
-            Place place = placeRepository.findById(request.placeId())
-                    .orElseThrow(() -> new CustomException(PlaceErrorCode.PLACE_NOT_FOUND));
+        // placeId 목록 한 번에 조회
+        List<Long> placeIds = requests.stream()
+                .map(PlaceReviewCreateRequest::placeId)
+                .toList();
 
-            PlaceReview placeReview = PlaceReview.builder()
-                    .place(place)
-                    .journal(journal)
-                    .review(request.review())
-                    .build();
-            placeReviewRepository.save(placeReview);
+        Map<Long, Place> placeMap = placeRepository.findAllById(placeIds).stream()
+                        .collect(Collectors.toMap(Place::getId, Function.identity()));
 
-            if (request.imageUrl() != null) {
-                placeReviewImageRepository.save(
-                        PlaceReviewImage.builder()
-                                .placeReview(placeReview)
-                                .imageUrl(request.imageUrl())
-                                .build()
-                );
-            }
-        });
+
+        List<PlaceReview> placeReviews = requests.stream()
+                .map(request -> {
+                    Place place = placeMap.get(request.placeId());
+                    if (place == null) {
+                        throw new CustomException(PlaceErrorCode.PLACE_NOT_FOUND);
+                    }
+                    return PlaceReview.builder()
+                            .place(place)
+                            .journal(journal)
+                            .review(request.review())
+                            .build();
+                })
+                .toList();
+
+
+        // 리뷰 일괄 저장
+        List<PlaceReview> savedReviews = placeReviewRepository.saveAll(placeReviews);
+
+        // 리뷰 이미지 일괄 저장
+        List<PlaceReviewImage> reviewImages = IntStream.range(0, requests.size())
+                .filter(i -> requests.get(i).imageUrl() != null)
+                .mapToObj(i -> PlaceReviewImage.builder()
+                .placeReview(savedReviews.get(i))
+                .imageUrl(requests.get(i).imageUrl())
+                        .build())
+                .toList();
+
+            if (!reviewImages.isEmpty()) {
+                placeReviewImageRepository.saveAll(reviewImages);
+            };
+
     }
 
     // 여행일지 수정 시 장소 리뷰 수정
