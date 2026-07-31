@@ -18,6 +18,7 @@ import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.service.query.StationQueryService;
+import com.cotato.nextstation.global.exception.CustomException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +37,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
@@ -171,6 +174,28 @@ class JournalQueryServiceTest {
 
             // then
             verify(courseCommandService).increaseViewCount(COURSE_ID, null);
+        }
+
+        @Test
+        @DisplayName("타인이 비공개 일지를 조회하면 JOURNAL_FORBIDDEN 예외를 던지고 조회수 증가 호출은 나가지 않는다")
+        void otherMemberViewsPrivateJournal_throwsForbiddenAndNeverIncreasesViewCount() {
+            // given: setUp의 journal은 공개 상태라, 이 테스트만 비공개로 재정의한다
+            Journal privateJournal = Journal.builder()
+                    .member(journal.getMember())
+                    .memberStampId(MEMBER_STAMP_ID)
+                    .title("보문 골목 산책")
+                    .traveledAt(LocalDate.of(2026, 7, 8))
+                    .travelDuration(TravelDuration.HALF_DAY)
+                    .isPublic(false)
+                    .build();
+            ReflectionTestUtils.setField(privateJournal, "id", JOURNAL_ID);
+            given(journalRepository.findById(JOURNAL_ID)).willReturn(Optional.of(privateJournal));
+
+            // when & then: 권한 검증에서 막혀야 하고, 그 뒤에 있는 조회수 증가 호출까지 가면 안 된다
+            assertThatThrownBy(() -> journalQueryService.getJournalDetail(OTHER_MEMBER_ID, JOURNAL_ID))
+                    .isInstanceOf(CustomException.class);
+
+            verify(courseCommandService, never()).increaseViewCount(anyLong(), any());
         }
     }
 
