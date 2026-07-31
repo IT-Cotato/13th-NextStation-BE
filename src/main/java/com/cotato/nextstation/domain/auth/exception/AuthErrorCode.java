@@ -17,6 +17,7 @@ public enum AuthErrorCode implements ErrorCode {
     INVALID_PROFILE_IMAGE_URL(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_INVALID_PROFILE_IMAGE_URL", "허용되지 않은 프로필 이미지 URL입니다."),
     INVALID_KAKAO_CODE(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_INVALID_KAKAO_CODE", "유효하지 않거나 만료된 카카오 인가코드입니다."),
     KAKAO_OAUTH_MISCONFIGURED(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_KAKAO_OAUTH_MISCONFIGURED", "카카오 로그인 연동에 문제가 있습니다. 잠시 후 다시 시도해주세요."),
+    SOCIAL_ONLY_ACCOUNT(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_SOCIAL_ONLY_ACCOUNT", "소셜 로그인 전용 계정은 비밀번호를 재설정할 수 없습니다."),
 
     // 401
     INVALID_SIGNUP_TOKEN(HttpStatus.UNAUTHORIZED, "CLIENT_ERROR_401_INVALID_SIGNUP_TOKEN", "유효하지 않은 토큰입니다."),
@@ -30,6 +31,7 @@ public enum AuthErrorCode implements ErrorCode {
 
     // 403
     KAKAO_MEMBER_NOT_ACTIVE(HttpStatus.FORBIDDEN, "CLIENT_ERROR_403_KAKAO_MEMBER_NOT_ACTIVE", "이용이 제한된 계정입니다."),
+    MEMBER_NOT_ACTIVE(HttpStatus.FORBIDDEN, "CLIENT_ERROR_403_MEMBER_NOT_ACTIVE", "이용할 수 없는 계정입니다."),
 
     // 404
     EMAIL_VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CLIENT_ERROR_404_EMAIL_VERIFICATION_NOT_FOUND", "유효한 인증번호 발송 내역이 없습니다. 인증번호를 다시 요청해주세요."),
