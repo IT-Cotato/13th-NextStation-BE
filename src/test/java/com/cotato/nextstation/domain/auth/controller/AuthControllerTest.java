@@ -1,6 +1,9 @@
 package com.cotato.nextstation.domain.auth.controller;
 
+import com.cotato.nextstation.domain.auth.dto.request.EmailVerificationConfirmRequest;
 import com.cotato.nextstation.domain.auth.dto.request.LoginRequest;
+import com.cotato.nextstation.domain.auth.dto.request.PasswordResetRequest;
+import com.cotato.nextstation.domain.auth.dto.request.PasswordResetSendRequest;
 import com.cotato.nextstation.domain.auth.dto.request.ProfileSetupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupVerificationSendRequest;
@@ -9,6 +12,7 @@ import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.exception.TermsErrorCode;
 import com.cotato.nextstation.domain.auth.service.command.EmailVerificationCommandService;
+import com.cotato.nextstation.domain.auth.service.command.PasswordResetCommandService;
 import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
 import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
@@ -72,6 +76,9 @@ class AuthControllerTest {
 
     @MockitoBean
     RefreshTokenCookieFactory refreshTokenCookieFactory;
+
+    @MockitoBean
+    PasswordResetCommandService passwordResetCommandService;
 
     // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
     @MockitoBean
@@ -448,5 +455,145 @@ class AuthControllerTest {
                         .cookie(new Cookie("refreshToken", "bad-token")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_REFRESH_TOKEN.getCode()));
+    }
+
+    @Test
+    @DisplayName("가입된 로컬 계정이면 비밀번호 재설정 인증번호 발송 시 200을 반환한다")
+    void sendPasswordResetVerificationCode_success() throws Exception {
+        PasswordResetSendRequest request = new PasswordResetSendRequest("user@example.com");
+        willDoNothing().given(emailVerificationCommandService).sendPasswordResetVerificationCode("user@example.com");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset/email/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("가입되지 않은 이메일로 비밀번호 재설정 인증번호를 요청하면 404를 반환한다")
+    void sendPasswordResetVerificationCode_memberNotFound() throws Exception {
+        PasswordResetSendRequest request = new PasswordResetSendRequest("user@example.com");
+        willThrow(new CustomException(AuthErrorCode.MEMBER_NOT_FOUND))
+                .given(emailVerificationCommandService).sendPasswordResetVerificationCode("user@example.com");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset/email/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.MEMBER_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("소셜 로그인 전용 계정으로 비밀번호 재설정 인증번호를 요청하면 400을 반환한다")
+    void sendPasswordResetVerificationCode_socialOnlyAccount() throws Exception {
+        PasswordResetSendRequest request = new PasswordResetSendRequest("user@example.com");
+        willThrow(new CustomException(AuthErrorCode.SOCIAL_ONLY_ACCOUNT))
+                .given(emailVerificationCommandService).sendPasswordResetVerificationCode("user@example.com");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset/email/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.SOCIAL_ONLY_ACCOUNT.getCode()));
+    }
+
+    @Test
+    @DisplayName("비밀번호 재설정 인증번호가 일치하면 200을 반환한다")
+    void confirmPasswordResetVerificationCode_success() throws Exception {
+        EmailVerificationConfirmRequest request = new EmailVerificationConfirmRequest("user@example.com", "123456");
+        willDoNothing().given(emailVerificationCommandService).verifyPasswordResetCode("user@example.com", "123456");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset/email/verification/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("비밀번호 재설정 인증번호가 일치하지 않으면 400을 반환한다")
+    void confirmPasswordResetVerificationCode_codeMismatch() throws Exception {
+        EmailVerificationConfirmRequest request = new EmailVerificationConfirmRequest("user@example.com", "000000");
+        willThrow(new CustomException(AuthErrorCode.EMAIL_VERIFICATION_CODE_MISMATCH))
+                .given(emailVerificationCommandService).verifyPasswordResetCode("user@example.com", "000000");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset/email/verification/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.EMAIL_VERIFICATION_CODE_MISMATCH.getCode()));
+    }
+
+    @Test
+    @DisplayName("정상 요청이면 비밀번호가 재설정되고 200을 반환한다")
+    void resetPassword_success() throws Exception {
+        PasswordResetRequest request = new PasswordResetRequest("user@example.com", "123456", "newPass12!", "newPass12!");
+        willDoNothing().given(passwordResetCommandService)
+                .resetPassword("user@example.com", "123456", "newPass12!", "newPass12!");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("새 비밀번호와 확인이 다르면 400을 반환한다")
+    void resetPassword_passwordConfirmationMismatch() throws Exception {
+        PasswordResetRequest request = new PasswordResetRequest("user@example.com", "123456", "newPass12!", "different1!");
+        willThrow(new CustomException(AuthErrorCode.PASSWORD_CONFIRMATION_MISMATCH))
+                .given(passwordResetCommandService)
+                .resetPassword("user@example.com", "123456", "newPass12!", "different1!");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.PASSWORD_CONFIRMATION_MISMATCH.getCode()));
+    }
+
+    @Test
+    @DisplayName("인증 완료 내역이 없으면 404를 반환한다")
+    void resetPassword_verificationNotFound() throws Exception {
+        PasswordResetRequest request = new PasswordResetRequest("user@example.com", "123456", "newPass12!", "newPass12!");
+        willThrow(new CustomException(AuthErrorCode.EMAIL_VERIFICATION_NOT_FOUND))
+                .given(passwordResetCommandService)
+                .resetPassword("user@example.com", "123456", "newPass12!", "newPass12!");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.EMAIL_VERIFICATION_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("재설정 시점에 인증번호가 만료됐으면 400을 반환한다")
+    void resetPassword_verificationExpired() throws Exception {
+        PasswordResetRequest request = new PasswordResetRequest("user@example.com", "123456", "newPass12!", "newPass12!");
+        willThrow(new CustomException(AuthErrorCode.EMAIL_VERIFICATION_EXPIRED))
+                .given(passwordResetCommandService)
+                .resetPassword("user@example.com", "123456", "newPass12!", "newPass12!");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.EMAIL_VERIFICATION_EXPIRED.getCode()));
+    }
+
+    @Test
+    @DisplayName("새 비밀번호 형식이 올바르지 않으면 400을 반환한다")
+    void resetPassword_invalidPasswordFormat() throws Exception {
+        PasswordResetRequest request = new PasswordResetRequest("user@example.com", "123456", "short1!", "short1!");
+
+        mockMvc.perform(post("/api/v1/auth/password-reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.reasons.newPassword").exists());
     }
 }

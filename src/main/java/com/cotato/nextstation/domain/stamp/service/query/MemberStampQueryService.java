@@ -1,6 +1,10 @@
 package com.cotato.nextstation.domain.stamp.service.query;
 
+import com.cotato.nextstation.domain.journal.repository.JournalRepository;
+import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
+import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
+import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +23,7 @@ import java.util.Set;
 public class MemberStampQueryService {
 
     private final MemberStampRepository memberStampRepository;
+    private final JournalRepository journalRepository;
 
     // 넘긴 코스들 중 회원이 완료한 코스 id 집합. 목록에서 카드별 완료 여부를 판단하는 데 쓴다.
     public Set<Long> getCompletedCourseIds(Long memberId, List<Long> courseIds) {
@@ -26,5 +31,33 @@ public class MemberStampQueryService {
             return Set.of();
         }
         return Set.copyOf(memberStampRepository.findCompletedCourseIds(memberId, courseIds));
+    }
+
+    // memberStampId → courseId (소유권 검증 포함)
+    public Long getCourseId(Long memberId, Long memberStampId) {
+        MemberStamp memberStamp = memberStampRepository.findById(memberStampId)
+                .orElseThrow(() -> new CustomException(StampErrorCode.MEMBER_STAMP_NOT_FOUND));
+
+        if (!memberStamp.getMemberId().equals(memberId)) {
+            // 존재 여부 노출 방지: 남의 스탬프도 NOT_FOUND로 응답
+            throw new CustomException(StampErrorCode.MEMBER_STAMP_NOT_FOUND);
+        }
+
+        return memberStamp.getCourseId();
+    }
+
+    // 본인 스탬프인지 소유권 검증 (JournalCommandService에서 사용)
+    public boolean existsByMemberIdAndId(Long memberId, Long memberStampId) {
+        return memberStampRepository.existsByMemberIdAndId(memberId, memberStampId);
+    }
+
+    // 여행일지 미작성 스탬프. completedStampIds를 파라미터로 받아서 처리
+    public List<MemberStamp> getUncompletedStamps(Long memberId, Set<Long> completedStampIds) {
+        if (completedStampIds.isEmpty()) {
+            return memberStampRepository.findByMemberIdOrderByCreatedAtDesc(memberId);
+        }
+
+        return memberStampRepository.findByMemberIdAndIdNotInOrderByCreatedAtDesc(
+                memberId, completedStampIds);
     }
 }

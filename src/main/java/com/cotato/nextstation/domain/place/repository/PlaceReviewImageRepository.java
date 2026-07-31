@@ -14,4 +14,10 @@ public interface PlaceReviewImageRepository extends JpaRepository<PlaceReviewIma
 
     @Query("SELECT pri FROM PlaceReviewImage pri WHERE pri.placeReview.id IN :reviewIds")
     List<PlaceReviewImage> findByPlaceReviewIdIn(@Param("reviewIds") List<Long> reviewIds);
+
+    void deleteByPlaceReview_JournalId(Long journalId);
+    
+    void deleteByPlaceReviewId(Long placeReviewId);
+
+
 }

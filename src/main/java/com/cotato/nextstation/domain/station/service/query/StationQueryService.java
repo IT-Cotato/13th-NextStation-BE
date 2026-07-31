@@ -20,11 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 // 역 조회 전용 서비스. 다른 도메인이 역 정보가 필요할 때 이 서비스를 호출한다
@@ -165,5 +161,28 @@ public class StationQueryService {
                         StationLineView::getStationId,
                         Collectors.mapping(lineConverter::toSummaryResponse, Collectors.toList())
                 ));
+    }
+
+    public String getStationName(Long stationId) {
+        return getStationNames(Set.of(stationId)).get(stationId);
+    }
+
+    public Map<Long, String> getStationNames(Collection<Long> stationIds) {
+        return stationRepository.findAllById(stationIds).stream()
+                .collect(Collectors.toMap(Station::getId, Station::getStationName));
+    }
+
+    public LineSummaryResponse getLine(Long stationId) {
+        return stationRepository.findById(stationId)
+                .map(station -> {
+                    // draw_line 우선, 없으면 StationLine에서 첫 번째
+                    if (station.getDrawLine() != null) {
+                        return lineConverter.toSummaryResponse(station.getDrawLine());
+                    }
+                    return stationLineRepository.findFirstByStationId(stationId)
+                            .map(stationLine -> lineConverter.toSummaryResponse(stationLine.getLine()))
+                            .orElse(null);
+                })
+                .orElse(null);
     }
 }

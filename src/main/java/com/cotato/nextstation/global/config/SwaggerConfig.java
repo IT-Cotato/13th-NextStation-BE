@@ -141,4 +141,14 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // 여행일지 관련 API
+    @Bean
+    public GroupedOpenApi journalApi() {
+        return GroupedOpenApi.builder()
+                .group("Journal")
+                .displayName("Journal API")
+                .packagesToScan("com.cotato.nextstation.domain.journal.controller")
+                .build();
+    }
+
 }
