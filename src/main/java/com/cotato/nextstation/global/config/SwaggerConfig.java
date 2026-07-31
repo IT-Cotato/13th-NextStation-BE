@@ -141,7 +141,7 @@ public class SwaggerConfig {
                 .build();
     }
 
-    // 추천 관련 API (랜덤뽑기/맞춤추천)
+    // 여행일지 관련 API
     @Bean
     public GroupedOpenApi journalApi() {
         return GroupedOpenApi.builder()
