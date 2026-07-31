@@ -29,7 +29,7 @@ import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
-import com.cotato.nextstation.domain.journal.service.query.JournalQueryService;
+import com.cotato.nextstation.domain.journal.service.query.JournalCardQueryService;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
@@ -85,7 +85,7 @@ public class CourseQueryService {
     private final CourseLikeRepository courseLikeRepository;
     private final PlaceInfoQueryService placeInfoQueryService;
     private final MemberStampQueryService memberStampQueryService;
-    private final JournalQueryService journalQueryService;
+    private final JournalCardQueryService journalCardQueryService;
     private final CourseConverter courseConverter;
 
     /**
@@ -447,7 +447,7 @@ public class CourseQueryService {
      * 노출하므로 실제로는 항상 채워지지만, 호출부가 null을 견디도록 두었다.
      */
     private Map<Long, JournalCardInfoResponse> resolveJournalCardInfos(List<Long> journalIds) {
-        return journalQueryService.getJournalCourseCardInfos(journalIds);
+        return journalCardQueryService.getJournalCourseCardInfos(journalIds);
     }
     private String resolveJournalImageUrl(Map<Long, JournalCardInfoResponse> journalInfos, Long journalId) {
         JournalCardInfoResponse info = journalInfos.get(journalId);

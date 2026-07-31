@@ -26,7 +26,7 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.StationV
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
-import com.cotato.nextstation.domain.journal.service.query.JournalQueryService;
+import com.cotato.nextstation.domain.journal.service.query.JournalCardQueryService;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
@@ -87,7 +87,7 @@ class CourseQueryServiceTest {
     private MemberStampQueryService memberStampQueryService;
 
     @Mock
-    private JournalQueryService journalQueryService;
+    private JournalCardQueryService journalCardQueryService;
 
     @Mock
     private CourseConverter courseConverter;
@@ -637,7 +637,7 @@ class CourseQueryServiceTest {
                 .willReturn(List.of(withImage, withoutImage));
         given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
         given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
-        given(journalQueryService.getJournalCourseCardInfos(List.of(11L, 12L)))
+        given(journalCardQueryService.getJournalCourseCardInfos(List.of(11L, 12L)))
                 .willReturn(Map.of(
                         11L, new JournalCardInfoResponse(11L, "cover.jpg", null),
                         12L, new JournalCardInfoResponse(12L, null, null)));
