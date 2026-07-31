@@ -127,6 +127,10 @@ public class PlaceReviewCommandService {
                 }
                 case UPDATE -> {
                     // 기존 이미지 삭제 후 새 이미지 저장
+                    if (request.imageUrl() == null) {
+                        throw new CustomException(PlaceErrorCode.INVALID_PLACE_REVIEW_IMAGE);
+                    }
+
                     placeReviewImageRepository.deleteByPlaceReviewId(placeReview.getId());
                     placeReviewImageRepository.save(
                             PlaceReviewImage.builder()
