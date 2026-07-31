@@ -10,6 +10,7 @@ import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.domain.member.util.NicknameProfanityFilter;
+import com.cotato.nextstation.domain.member.util.NicknameReservedWordsFilter;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import io.jsonwebtoken.Claims;
@@ -38,16 +39,19 @@ public class ProfileSetupCommandService {
 
     private final MemberRepository memberRepository;
     private final NicknameProfanityFilter nicknameProfanityFilter;
+    private final NicknameReservedWordsFilter nicknameReservedWordsFilter;
     private final JwtProvider jwtProvider;
     private final String expectedProfileImageHost;
 
     public ProfileSetupCommandService(MemberRepository memberRepository,
                                        NicknameProfanityFilter nicknameProfanityFilter,
+                                       NicknameReservedWordsFilter nicknameReservedWordsFilter,
                                        JwtProvider jwtProvider,
                                        @Value("${aws.s3.bucket-name}") String bucketName,
                                        @Value("${spring.cloud.aws.region.static}") String region) {
         this.memberRepository = memberRepository;
         this.nicknameProfanityFilter = nicknameProfanityFilter;
+        this.nicknameReservedWordsFilter = nicknameReservedWordsFilter;
         this.jwtProvider = jwtProvider;
         this.expectedProfileImageHost = "%s.s3.%s.amazonaws.com".formatted(bucketName, region);
     }
@@ -56,7 +60,6 @@ public class ProfileSetupCommandService {
     public ProfileSetupResponse setupProfile(String authorizationHeader, String nickname, String profileImageUrl,
                                               Gender gender, LocalDate birthDate) {
         Long memberId = resolveMemberId(authorizationHeader);
-        log.info("프로필 설정 요청: memberId={}", memberId);
 
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new CustomException(AuthErrorCode.MEMBER_NOT_FOUND));
@@ -74,7 +77,6 @@ public class ProfileSetupCommandService {
             throw new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME);
         }
 
-        log.info("프로필 설정 완료: memberId={}, nickname={}", memberId, nickname);
         return new ProfileSetupResponse(member.getId(), member.getNickname(), member.getStatus());
     }
 
@@ -86,29 +88,24 @@ public class ProfileSetupCommandService {
         try {
             claims = jwtProvider.parseClaims(token);
         } catch (ExpiredJwtException e) {
-            log.warn("만료된 signupToken으로 프로필 설정 시도");
             throw new CustomException(AuthErrorCode.SIGNUP_TOKEN_EXPIRED);
         } catch (JwtException e) {
-            log.warn("유효하지 않은 signupToken으로 프로필 설정 시도: {}", e.getMessage());
             throw new CustomException(AuthErrorCode.INVALID_SIGNUP_TOKEN);
         }
 
         if (!SignupTokenClaims.SIGNUP_PURPOSE.equals(claims.get(SignupTokenClaims.PURPOSE_KEY, String.class))) {
-            log.warn("purpose가 SIGNUP이 아닌 토큰으로 프로필 설정 시도");
             throw new CustomException(AuthErrorCode.INVALID_SIGNUP_TOKEN);
         }
 
         try {
             return Long.valueOf(claims.getSubject());
         } catch (NumberFormatException e) {
-            log.warn("subject가 memberId 형식이 아닌 signupToken: subject={}", claims.getSubject());
             throw new CustomException(AuthErrorCode.INVALID_SIGNUP_TOKEN);
         }
     }
 
     private String extractToken(String authorizationHeader) {
         if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
-            log.warn("Authorization 헤더 없이 프로필 설정 시도");
             throw new CustomException(AuthErrorCode.INVALID_SIGNUP_TOKEN);
         }
         return authorizationHeader.substring(BEARER_PREFIX.length()).trim();
@@ -117,7 +114,6 @@ public class ProfileSetupCommandService {
     // 이미 프로필 설정을 마친 회원의 재요청 차단 (signupToken 재사용 방지 가드)
     private void validateProfileNotAlreadyCompleted(Member member) {
         if (member.getStatus() != MemberStatus.PENDING) {
-            log.warn("이미 프로필 설정이 완료된 회원의 재요청: memberId={}, status={}", member.getId(), member.getStatus());
             throw new CustomException(AuthErrorCode.PROFILE_ALREADY_COMPLETED);
         }
     }
@@ -133,12 +129,13 @@ public class ProfileSetupCommandService {
         if (!NICKNAME_ALLOWED_PATTERN.matcher(nickname).matches()) {
             throw new CustomException(NicknameErrorCode.NICKNAME_INVALID_CHARACTER);
         }
+        if (nicknameReservedWordsFilter.isReservedWord(nickname)) {
+            throw new CustomException(NicknameErrorCode.NICKNAME_CONTAINS_RESERVED_WORD);
+        }
         if (nicknameProfanityFilter.containsBannedWord(nickname)) {
-            log.warn("금칙어가 포함된 닉네임으로 프로필 설정 시도: nickname={}", nickname);
             throw new CustomException(NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD);
         }
         if (memberRepository.existsByNickname(nickname)) {
-            log.warn("이미 사용 중인 닉네임으로 프로필 설정 시도: nickname={}", nickname);
             throw new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME);
         }
     }

@@ -8,6 +8,7 @@ import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.domain.member.util.NicknameProfanityFilter;
+import com.cotato.nextstation.domain.member.util.NicknameReservedWordsFilter;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import io.jsonwebtoken.Claims;
@@ -43,6 +44,9 @@ class ProfileSetupCommandServiceTest {
     private NicknameProfanityFilter nicknameProfanityFilter;
 
     @Mock
+    private NicknameReservedWordsFilter nicknameReservedWordsFilter;
+
+    @Mock
     private JwtProvider jwtProvider;
 
     private static final Long MEMBER_ID = 1L;
@@ -58,7 +62,7 @@ class ProfileSetupCommandServiceTest {
     @BeforeEach
     void setUp() {
         profileSetupCommandService = new ProfileSetupCommandService(
-                memberRepository, nicknameProfanityFilter, jwtProvider, "test-bucket", "ap-northeast-2");
+                memberRepository, nicknameProfanityFilter, nicknameReservedWordsFilter, jwtProvider, "test-bucket", "ap-northeast-2");
     }
 
     private Member pendingMember() {
@@ -259,5 +263,19 @@ class ProfileSetupCommandServiceTest {
         assertThatThrownBy(() -> profileSetupCommandService.setupProfile(AUTH_HEADER, NICKNAME, null, GENDER, BIRTH_DATE))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD.getMessage());
+    }
+
+    @Test
+    @DisplayName("닉네임에 예약어가 포함되거나 일치하면 예외가 발생한다")
+    void setupProfile_containsReservedWord() {
+        // given
+        givenValidToken();
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
+        given(nicknameReservedWordsFilter.isReservedWord(anyString())).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> profileSetupCommandService.setupProfile(AUTH_HEADER, "운영자1", null, GENDER, BIRTH_DATE))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(NicknameErrorCode.NICKNAME_CONTAINS_RESERVED_WORD.getMessage());
     }
 }
