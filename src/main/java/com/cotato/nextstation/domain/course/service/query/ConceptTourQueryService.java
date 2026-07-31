@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.course.service.query;
 
+import com.cotato.nextstation.domain.course.converter.ConceptTourConverter;
 import com.cotato.nextstation.domain.course.dto.response.ConceptTourResponse;
 import com.cotato.nextstation.domain.course.repository.ConceptTourRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import java.util.List;
 public class ConceptTourQueryService {
 
     private final ConceptTourRepository conceptTourRepository;
+    private final ConceptTourConverter conceptTourConverter;
 
     /**
      * 컨셉별 투어 목록. 관리자가 정한 표시 순서대로 전부 내려준다.
@@ -23,12 +25,6 @@ public class ConceptTourQueryService {
      * 프론트에서 걸러내면 되므로 서버는 검색어를 받지 않는다.
      */
     public List<ConceptTourResponse> getConceptTours() {
-        return conceptTourRepository.findAllWithCourseCount().stream()
-                .map(conceptTour -> new ConceptTourResponse(
-                        conceptTour.getConceptTourId(),
-                        conceptTour.getName(),
-                        conceptTour.getDescription(),
-                        conceptTour.getCourseCount()))
-                .toList();
+        return conceptTourConverter.toResponses(conceptTourRepository.findAllWithCourseCount());
     }
 }
