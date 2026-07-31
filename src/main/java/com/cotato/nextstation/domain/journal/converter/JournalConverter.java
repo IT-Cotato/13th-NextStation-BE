@@ -71,6 +71,8 @@ public class JournalConverter {
             LineSummaryResponse line,
             String stationName,
             CourseInfoResponse courseInfo,
+            boolean isMine,
+            boolean isLiked,
             List<String> tags,
             List<String> imageUrls,
             List<CoursePlaceInfoResponse> coursePlaces,
@@ -91,7 +93,10 @@ public class JournalConverter {
                 journal.getTraveledAt(),
                 line,
                 stationName,
+                courseInfo.courseId(),
                 courseInfo.name(),
+                isMine,
+                isLiked,
                 tags,
                 journal.getTravelDuration(),
                 courseInfo.viewCount(),
@@ -120,6 +125,8 @@ public class JournalConverter {
                             cp.orderNum(),
                             cp.placeId(),
                             placeInfo != null ? placeInfo.placeName() : null,
+                            placeInfo != null ? placeInfo.xCoordinate() : null,
+                            placeInfo != null ? placeInfo.yCoordinate() : null,
                             review != null ? review.getReview() : null,
                             reviewImageUrl
                     );
