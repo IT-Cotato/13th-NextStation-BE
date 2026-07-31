@@ -21,26 +21,7 @@ public record JournalWriteInfoResponse(
         @Schema(description = "코스 내 장소 목록")
         List<PlaceSimpleResponse> places
 ) {
-    public static JournalWriteInfoResponse of(
-            String stationName,
-            String courseName,
-            List<String> tags,
-            List<CoursePlaceInfoResponse> coursePlaces,
-            Map<Long, PlaceInfoResponse> placeInfoMap
-    ) {
-        List<PlaceSimpleResponse> places = coursePlaces.stream()
-                .map(cp -> new PlaceSimpleResponse(
-                        cp.placeId(),
-                        placeInfoMap.getOrDefault(cp.placeId(), null) != null
-                                ? placeInfoMap.get(cp.placeId()).placeName()
-                                : null,
-                        cp.orderNum()
-                ))
-                .toList();
-
-        return new JournalWriteInfoResponse(stationName, courseName, tags, places);
-    }
-
+    @Schema(description = "장소 간략 정보")
     public record PlaceSimpleResponse(
             Long placeId,
             String placeName,

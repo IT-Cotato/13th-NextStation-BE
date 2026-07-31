@@ -3,6 +3,7 @@ package com.cotato.nextstation.domain.journal.service.query;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
+import com.cotato.nextstation.domain.journal.converter.JournalConverter;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
@@ -53,6 +54,9 @@ public class JournalQueryService {
     private final PlaceReviewRepository placeReviewRepository;
     private final PlaceReviewImageRepository placeReviewImageRepository;
 
+    private final JournalConverter journalConverter;
+
+
     // 여행일지 작성 초기 정보 조회
     public JournalWriteInfoResponse getWriteInfo(Long memberId, Long memberStampId) {
         // 1. memberStampId → courseId
@@ -80,7 +84,7 @@ public class JournalQueryService {
         // 6. placeIds → 태그 상위 3개
         List<String> tags = placeInfoQueryService.getTopTagNames(placeIds);
 
-        return JournalWriteInfoResponse.of(stationName, courseInfo.name(), tags, coursePlaces, placeInfoMap);
+        return journalConverter.toWriteInfoResponse(stationName, courseInfo.name(), tags, coursePlaces, placeInfoMap);
     }
 
     // 여행일지 미작성 코스 조회
@@ -126,25 +130,9 @@ public class JournalQueryService {
             tagsByCourse.put(courseId, tags);
         }
 
-        // 7. 응답 조합
-        List<UncompletedJournalListResponse.UncompletedCourseResponse> courses =
-                uncompletedStamps.stream()
-                        .map(stamp -> {
-                            CourseInfoResponse courseInfo = courseInfoMap.get(stamp.getCourseId());
-                            String stationName = stationNameMap.get(courseInfo.stationId());
-                            List<String> tags = tagsByCourse.get(stamp.getCourseId());
 
-                            return new UncompletedJournalListResponse.UncompletedCourseResponse(
-                                    stamp.getId(),
-                                    stationName,
-                                    courseInfo.name(),
-                                    tags,
-                                    stamp.getCreatedAt()
-                            );
-                        })
-                        .toList();
-
-        return new UncompletedJournalListResponse(courses.size(), courses);
+        return journalConverter.toUncompletedJournalListResponse(
+                uncompletedStamps, courseInfoMap, stationNameMap, tagsByCourse);
     }
 
 
@@ -231,21 +219,9 @@ public class JournalQueryService {
                 ? null
                 : profileImageUrl;
 
-        return new JournalDetailResponse(
-                journal.getMember().getNickname(),
-                writerProfileImageUrl,
-                journal.getTraveledAt(),
-                line,
-                stationName,
-                courseInfo.name(),
-                tags,
-                journal.getTravelDuration(),
-                courseInfo.viewCount(),
-                courseInfo.likeCount(),
-                imageUrls,
-                journal.getOverallReview(),
-                visitedPlaces
-        );
+        return journalConverter.toJournalDetailResponse(
+                journal, line, stationName, courseInfo, tags, imageUrls,
+                coursePlaces, placeInfoMap, reviewByPlaceId, imageUrlByReviewId);
     }
     // Course 도메인이 코스 카드의 소요시간(travel_duration) 표시를 위함
     public TravelDuration getTravelDuration(Long journalId) {
