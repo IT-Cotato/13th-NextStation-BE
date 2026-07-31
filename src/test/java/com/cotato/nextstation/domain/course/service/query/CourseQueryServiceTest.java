@@ -529,6 +529,21 @@ class CourseQueryServiceTest {
     }
 
     @Test
+    @DisplayName("코스 확인은 역의 대표 호선을 함께 내려준다")
+    void getMyCourseDetail_includesLine() {
+        // given: 화면 상단 배지가 호선에 따라 달라져서 대표 호선이 필요하다
+        MyCourseDetailView view = mock(MyCourseDetailView.class);
+        given(courseRepository.findMyCourseDetail(1L, 1L)).willReturn(Optional.of(view));
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(List.of());
+
+        // when
+        courseQueryService.getMyCourseDetail(1L, 1L);
+
+        // then: 조회 결과를 그대로 컨버터에 넘긴다
+        verify(courseConverter).toMyCourseDetailResponse(view, List.of());
+    }
+
+    @Test
     @DisplayName("코스 확인은 장소 조회 결과 순서와 무관하게 order_num 순으로 채운다")
     void getMyCourseDetail_ordersPlacesByOrderNum() {
         // given: 코스 순서는 20 -> 10 인데 장소 조회는 10 -> 20 으로 돌려준다
