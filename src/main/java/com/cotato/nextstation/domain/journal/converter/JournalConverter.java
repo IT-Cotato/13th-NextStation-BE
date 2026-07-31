@@ -26,13 +26,15 @@ public class JournalConverter {
             Map<Long, PlaceInfoResponse> placeInfoMap
     ) {
         List<JournalWriteInfoResponse.PlaceSimpleResponse> places = coursePlaces.stream()
-                .map(cp -> new JournalWriteInfoResponse.PlaceSimpleResponse(
-                        cp.placeId(),
-                        placeInfoMap.getOrDefault(cp.placeId(), null) != null
-                                ? placeInfoMap.get(cp.placeId()).placeName()
-                                : null,
-                        cp.orderNum()
-                ))
+                .map(cp -> {
+                    PlaceInfoResponse info = placeInfoMap.get(cp.placeId());
+                    String placeName = info != null ? info.placeName() : null;
+
+                    return new JournalWriteInfoResponse.PlaceSimpleResponse(cp.placeId(),
+                            placeName,
+                            cp.orderNum()
+                    );
+                } )
                 .toList();
 
         return new JournalWriteInfoResponse(stationName, courseName, tags, places);
