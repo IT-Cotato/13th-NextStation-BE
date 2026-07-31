@@ -25,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -33,8 +34,11 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 /**
@@ -74,7 +78,7 @@ class JournalCommandServiceTest {
     }
 
     private Journal createJournalFixture() {
-        return Journal.builder()
+        Journal journal = Journal.builder()
                 .member(member)
                 .memberStampId(MEMBER_STAMP_ID)
                 .title("보문 골목 산책")
@@ -83,6 +87,8 @@ class JournalCommandServiceTest {
                 .travelDuration(TravelDuration.HALF_DAY)
                 .isPublic(true)
                 .build();
+        ReflectionTestUtils.setField(journal, "id", JOURNAL_ID);
+        return journal;
     }
 
     private JournalCreateRequest createRequest(List<String> imageUrls,
@@ -240,22 +246,48 @@ class JournalCommandServiceTest {
         }
 
         @Test
-        @DisplayName("journalPhotos의 DELETE 액션이면 해당 photoId를 삭제한다")
-        void updateJournal_photoDelete_removesImage() {
+        @DisplayName("본인 일지의 사진을 삭제하면 성공한다")
+        void updateJournal_photoDelete_success() {
             // given
             Journal journal = createJournalFixture();
-            when(journalRepository.findById(JOURNAL_ID)).thenReturn(Optional.of(journal));
+
+            when(journalRepository.findById(JOURNAL_ID))
+                    .thenReturn(Optional.of(journal));
+
+            ReflectionTestUtils.setField(journal, "id", JOURNAL_ID);
+
+            JournalImage journalImage = JournalImage.builder()
+                    .journal(journal)
+                    .imageUrl("image.jpg")
+                    .build();
+
+            Long photoId = 55L;
+
+            when(journalImageRepository.findByIdAndJournalId(photoId, JOURNAL_ID))
+                    .thenReturn(Optional.of(journalImage));
 
             JournalUpdateRequest.JournalPhotoUpdateRequest deletePhoto =
-                    new JournalUpdateRequest.JournalPhotoUpdateRequest(55L, ImageAction.DELETE, null);
+                    new JournalUpdateRequest.JournalPhotoUpdateRequest(
+                            photoId,
+                            ImageAction.DELETE,
+                            null
+                    );
+
             JournalUpdateRequest request = new JournalUpdateRequest(
-                    null, null, null, null, null, List.of(deletePhoto), null);
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of(deletePhoto),
+                    null
+            );
 
             // when
             journalCommandService.updateJournal(MEMBER_ID, JOURNAL_ID, request);
 
             // then
-            verify(journalImageRepository).deleteById(55L);
+            assertThat(journalImage.isDeleted()).isTrue();
         }
 
         @Test
@@ -278,25 +310,32 @@ class JournalCommandServiceTest {
         }
 
         @Test
-        @DisplayName("KNOWN BUG: journalPhotos의 imageAction이 null이면 NPE가 발생한다 " +
-                "(PlaceReviewUpdateRequest와 달리 null-safe 처리가 안 되어 있음)")
-        void updateJournal_photoActionNull_currentlyThrowsNpe() {
+        @DisplayName("imageAction이 null이면 KEEP으로 간주하여 예외 없이 통과한다")
+        void updateJournal_photoActionNull_treatedAsKeep() {
             // given
             Journal journal = createJournalFixture();
-            when(journalRepository.findById(JOURNAL_ID)).thenReturn(Optional.of(journal));
+            when(journalRepository.findById(JOURNAL_ID))
+                    .thenReturn(Optional.of(journal));
 
-            JournalUpdateRequest.JournalPhotoUpdateRequest photoWithNullAction =
-                    new JournalUpdateRequest.JournalPhotoUpdateRequest(55L, null, null);
+            JournalUpdateRequest.JournalPhotoUpdateRequest nullActionPhoto =
+                    new JournalUpdateRequest.JournalPhotoUpdateRequest(
+                            null,
+                            null,  // imageAction = null
+                            null
+                    );
+
             JournalUpdateRequest request = new JournalUpdateRequest(
-                    null, null, null, null, null, List.of(photoWithNullAction), null);
+                    null, null, null, null, null,
+                    List.of(nullActionPhoto),
+                    null
+            );
 
-            // when & then
-            // 이 테스트는 "고쳐야 할 버그"를 문서화하는 용도다.
-            // JournalPhotoUpdateRequest.imageAction()이 null일 때 KEEP으로 간주하도록 고치면
-            // 이 테스트는 실패하게 되므로, 수정 후에는 NPE가 아니라
-            // "아무 것도 삭제/저장되지 않음"을 검증하는 테스트로 바꿔야 한다.
-            assertThatThrownBy(() -> journalCommandService.updateJournal(MEMBER_ID, JOURNAL_ID, request))
-                    .isInstanceOf(NullPointerException.class);
+            // when & then — 예외 없이 정상 통과
+            assertThatCode(() -> journalCommandService.updateJournal(MEMBER_ID, JOURNAL_ID, request))
+                    .doesNotThrowAnyException();
+
+            // 아무 저장/삭제도 호출되지 않음 (KEEP이므로)
+            verifyNoInteractions(journalImageRepository);
         }
 
         @Test
@@ -317,6 +356,44 @@ class JournalCommandServiceTest {
             // then
             verify(placeReviewCommandService).updatePlaceReviews(journal, placeReviews);
         }
+
+        @Test
+        @DisplayName("존재하지 않는 photoId로 삭제하면 JOURNAL_IMAGE_NOT_FOUND 예외가 발생한다")
+        void updateJournal_deletePhoto_notFound() {
+            // given
+            Journal journal = createJournalFixture();
+
+            when(journalRepository.findById(JOURNAL_ID))
+                    .thenReturn(Optional.of(journal));
+
+            Long photoId = 999L;
+
+            when(journalImageRepository.findByIdAndJournalId(photoId, JOURNAL_ID))
+                    .thenReturn(Optional.empty());
+
+            JournalUpdateRequest.JournalPhotoUpdateRequest deletePhoto =
+                    new JournalUpdateRequest.JournalPhotoUpdateRequest(
+                            photoId,
+                            ImageAction.DELETE,
+                            null
+                    );
+
+            JournalUpdateRequest request = new JournalUpdateRequest(
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of(deletePhoto),
+                    null
+            );
+
+            // when & then
+            assertThatThrownBy(() ->
+                    journalCommandService.updateJournal(MEMBER_ID, JOURNAL_ID, request)
+            )
+                    .isInstanceOf(CustomException.class);
+        }
     }
 
     @Nested
@@ -334,15 +411,12 @@ class JournalCommandServiceTest {
             journalCommandService.deleteJournal(MEMBER_ID, JOURNAL_ID);
 
             // then
-            verify(journalImageRepository).deleteByJournalId(JOURNAL_ID);
+            verify(journalImageRepository).findByJournalId(JOURNAL_ID);
             assertThat(journal.isDeleted()).isTrue();
             assertThat(journal.getDeletedAt()).isNotNull();
 
-            // KNOWN BUG: 주석("리뷰는 삭제하되, 장소 데이터는 남겨두기")과 달리
-            // PlaceReview / PlaceReviewImage 삭제 로직이 전혀 호출되지 않는다.
-            // PlaceReviewImageRepository.deleteByPlaceReview_JournalId(Long)이 정의만 되어 있고
-            // 어디서도 쓰이지 않는 것도 같은 문제. 리뷰 목록 등에서 삭제된 일지의
-            // 리뷰가 계속 노출될 수 있으니 우선적으로 고쳐야 한다.
+            // PlaceReview/PlaceReviewImage는 건드리지 않음 (의도한 동작)
+            // journal.isDeleted=true + @SQLRestriction으로 장소 상세 조회에서 자동 필터링됨
             verifyNoInteractions(placeReviewCommandService);
         }
 
@@ -356,7 +430,7 @@ class JournalCommandServiceTest {
             assertThatThrownBy(() -> journalCommandService.deleteJournal(MEMBER_ID, JOURNAL_ID))
                     .isInstanceOf(CustomException.class);
 
-            verify(journalImageRepository, never()).deleteByJournalId(any());
+            verify(journalImageRepository, never()).findByJournalId(any());
         }
 
         @Test
@@ -371,7 +445,93 @@ class JournalCommandServiceTest {
                     .isInstanceOf(CustomException.class);
 
             assertThat(journal.isDeleted()).isFalse();
-            verify(journalImageRepository, never()).deleteByJournalId(any());
+            verify(journalImageRepository, never()).findByJournalId(any());
         }
     }
+
+    @Test
+    @DisplayName("본인 일지의 사진을 삭제하면 성공한다")
+    void updateJournal_deletePhoto_success() {
+        // given
+        Long memberId = 1L;
+        Long journalId = 10L;
+        Long photoId = 100L;
+
+        Member member = mock(Member.class);
+        given(member.getId()).willReturn(memberId);
+        Journal journal = Journal.builder().member(member).build();
+        ReflectionTestUtils.setField(journal, "id", journalId);
+
+        JournalImage journalImage = JournalImage.builder()
+                .journal(journal)
+                .imageUrl("image.jpg")
+                .build();
+
+        JournalUpdateRequest.JournalPhotoUpdateRequest photoRequest =
+                new JournalUpdateRequest.JournalPhotoUpdateRequest(photoId, ImageAction.DELETE, null);
+
+        JournalUpdateRequest request = new JournalUpdateRequest(
+                null, null, null, null, null,
+                List.of(photoRequest),
+                null
+        );
+
+        given(journalRepository.findById(journalId))
+                .willReturn(Optional.of(journal));
+
+        given(journalImageRepository.findByIdAndJournalId(photoId, journalId))
+                .willReturn(Optional.of(journalImage));
+
+        // when
+        journalCommandService.updateJournal(memberId, journalId, request);
+
+        // then
+        assertTrue(journalImage.isDeleted());
+    }
+
+    @Test
+    @DisplayName("다른 일지의 photoId로 삭제하면 JOURNAL_IMAGE_NOT_FOUND 예외가 발생한다")
+    void updateJournal_deletePhoto_otherJournalPhoto() {
+        // given
+        Journal journal = createJournalFixture();
+
+        when(journalRepository.findById(JOURNAL_ID))
+                .thenReturn(Optional.of(journal));
+
+        Long otherJournalPhotoId = 200L;
+
+        // 다른 journalId에 속한 이미지라 조회되지 않음
+        when(journalImageRepository.findByIdAndJournalId(
+                otherJournalPhotoId,
+                JOURNAL_ID
+        ))
+                .thenReturn(Optional.empty());
+
+        JournalUpdateRequest.JournalPhotoUpdateRequest deletePhoto =
+                new JournalUpdateRequest.JournalPhotoUpdateRequest(
+                        otherJournalPhotoId,
+                        ImageAction.DELETE,
+                        null
+                );
+
+        JournalUpdateRequest request = new JournalUpdateRequest(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(deletePhoto),
+                null
+        );
+
+        // when & then
+        assertThatThrownBy(() ->
+                journalCommandService.updateJournal(MEMBER_ID, JOURNAL_ID, request)
+        )
+                .isInstanceOf(CustomException.class);
+
+        verify(journalImageRepository, never())
+                .delete(any());
+    }
+
 }
