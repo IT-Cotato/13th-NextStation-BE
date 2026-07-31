@@ -4,6 +4,7 @@ import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.converter.JournalConverter;
+import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
@@ -28,10 +29,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -218,12 +216,30 @@ public class JournalQueryService {
                 journal, line, stationName, courseInfo, tags, imageUrls,
                 coursePlaces, placeInfoMap, reviewByPlaceId, imageUrlByReviewId);
     }
+
     // Course 도메인이 코스 카드의 소요시간(travel_duration) 표시를 위함
     public TravelDuration getTravelDuration(Long journalId) {
         return journalRepository.findById(journalId)
                 .map(Journal::getTravelDuration)
                 .orElse(null);  // 일지 없거나 미작성이면 null (장소 수로 추정)
     }
+
+    public Optional<JournalCardInfoResponse> getJournalCourseCardInfo(Long journalId) {
+        return journalRepository.findById(journalId)
+                .map(journal -> {
+                    String imageUrl = journalImageRepository
+                            .findFirstByJournalIdOrderByCreatedAtAsc(journalId)
+                            .map(JournalImage::getImageUrl)
+                            .orElse(null);
+                    return new JournalCardInfoResponse(
+                            journal.getId(),
+                            imageUrl,
+                            journal.getTravelDuration()
+                    );
+                });
+    }
+
+
 
 
 }

@@ -14,4 +14,6 @@ public interface JournalImageRepository extends JpaRepository<JournalImage, Long
     List<JournalImage> findByJournalId(Long journal);
 
     Optional<JournalImage> findByIdAndJournalId(Long id, Long journalId);
+
+    Optional<JournalImage> findFirstByJournalIdOrderByCreatedAtAsc(Long journalId);
 }
