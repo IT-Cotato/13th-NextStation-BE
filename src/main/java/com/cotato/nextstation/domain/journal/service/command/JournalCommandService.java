@@ -132,8 +132,10 @@ public class JournalCommandService {
                     case KEEP -> { /* 유지 */ }
                     case DELETE -> {
                         // journalId 스코프로 소유권 검증 (다른 일지의 사진 삭제 방지)
-                        journalImageRepository.findByIdAndJournalId(photo.photoId(), journal.getId())
-                                .ifPresent(JournalImage::delete);
+                        JournalImage journalImage =  journalImageRepository.findByIdAndJournalId(photo.photoId(), journal.getId())
+                                .orElseThrow(() -> new CustomException(JournalErrorCode.JOURNAL_IMAGE_NOT_FOUND));
+
+                        journalImage.delete();
 
                     }
                     case UPDATE -> {
