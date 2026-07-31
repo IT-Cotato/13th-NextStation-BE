@@ -164,6 +164,38 @@ class JournalQueryServiceTest {
         }
 
         @Test
+        @DisplayName("타인 조회로 조회수 증가에 성공하면 CourseCommandService가 반환한 최신 값을 응답에 담는다")
+        void otherMemberViews_responseUsesReturnedViewCount() {
+            // given: setUp의 courseInfo는 viewCount=10이지만, 증가 호출이 반환하는 11을 응답에 써야 한다.
+            // (같은 readOnly 트랜잭션에서 courseInfo를 다시 조회하면 REPEATABLE READ 스냅샷 때문에
+            //  여전히 10이 보이므로, 재조회가 아니라 반환값을 받아써야 증가분이 응답에 반영된다.)
+            given(courseCommandService.increaseViewCount(COURSE_ID, OTHER_MEMBER_ID)).willReturn(11);
+            given(courseQueryService.isLikedByMember(COURSE_ID, OTHER_MEMBER_ID)).willReturn(false);
+
+            // when
+            JournalDetailResponse response = journalQueryService.getJournalDetail(OTHER_MEMBER_ID, JOURNAL_ID);
+
+            // then
+            assertThat(response.viewCount()).isEqualTo(11);
+        }
+
+        @Test
+        @DisplayName("조회수 증가가 null을 반환하면(본인 조회 또는 실패) 4번에서 조회해 둔 값으로 대체한다")
+        void increaseViewCountReturnsNull_fallsBackToOriginalCourseInfo() {
+            // given: setUp의 courseInfo는 viewCount=10. increaseViewCount가 실패(또는 본인 조회로 no-op)해
+            // null을 반환하는 상황을 명시적으로 스텁한다 (모의 객체의 Integer 반환 기본값은 null이 아니라
+            // 0이라 명시하지 않으면 이 케이스를 재현하지 못한다).
+            given(courseCommandService.increaseViewCount(COURSE_ID, OTHER_MEMBER_ID)).willReturn(null);
+            given(courseQueryService.isLikedByMember(COURSE_ID, OTHER_MEMBER_ID)).willReturn(false);
+
+            // when
+            JournalDetailResponse response = journalQueryService.getJournalDetail(OTHER_MEMBER_ID, JOURNAL_ID);
+
+            // then
+            assertThat(response.viewCount()).isEqualTo(10);
+        }
+
+        @Test
         @DisplayName("비로그인 조회도 조회수 반영 호출은 그대로 나간다 (본인 제외 판단은 CourseCommandService 몫)")
         void anonymousViews_stillCallsIncreaseViewCount() {
             // given

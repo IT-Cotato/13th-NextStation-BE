@@ -58,6 +58,16 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     int increaseViewCount(@Param("courseId") Long courseId,
                           @Param("viewerMemberId") Long viewerMemberId);
 
+    /**
+     * 증가 직후 최신 조회수를 같은(REQUIRES_NEW) 트랜잭션 안에서 읽어오기 위한 조회다.
+     * <p>
+     * 호출부(코스 상세 조회)의 바깥 트랜잭션은 REPEATABLE READ 스냅샷을 이미 떠 놓은 상태라,
+     * 거기서 다시 조회하면 이 UPDATE가 커밋됐어도 증가 전 값이 보인다. 그래서 증가를 수행한
+     * 바로 그 트랜잭션 안에서 값을 읽어 반환해야 한다.
+     */
+    @Query("SELECT c.viewCount FROM Course c WHERE c.id = :courseId")
+    int findViewCountById(@Param("courseId") Long courseId);
+
     // like_count는 DB에서 직접 증감시킨다.
     // 엔티티를 읽어 +1 하면 동시 좋아요 시 한쪽 증가분이 유실된다.
     @Modifying(clearAutomatically = true, flushAutomatically = true)

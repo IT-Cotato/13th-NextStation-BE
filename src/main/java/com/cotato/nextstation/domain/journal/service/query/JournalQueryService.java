@@ -190,11 +190,17 @@ public class JournalQueryService {
                 ));
 
         // 11. 조회수 반영 (본인 조회는 CourseCommandService 내부에서 제외) + 좋아요 여부
-        courseCommandService.increaseViewCount(courseId, memberId);
+        //
+        // increaseViewCount가 반환하는 값을 그대로 써야 한다. 이 트랜잭션(readOnly)에서 courseInfo를
+        // 다시 조회해도 REPEATABLE READ 스냅샷 때문에 증가 전 값이 보인다 — REQUIRES_NEW로 증가를 수행한
+        // 그 트랜잭션 안에서 읽은 값만 증가분을 반영하고 있다. 실패(또는 본인 조회로 no-op)했으면
+        // null이 오므로 4번에서 조회해 둔 courseInfo의 값으로 대체한다.
+        Integer updatedViewCount = courseCommandService.increaseViewCount(courseId, memberId);
         boolean isLiked = courseQueryService.isLikedByMember(courseId, memberId);
+        int viewCount = updatedViewCount != null ? updatedViewCount : courseInfo.viewCount();
 
         return journalConverter.toJournalDetailResponse(
-                journal, line, stationName, courseInfo, isOwner, isLiked, tags, imageUrls,
+                journal, line, stationName, courseInfo, viewCount, isOwner, isLiked, tags, imageUrls,
                 coursePlaces, placeInfoMap, reviewByPlaceId, imageUrlByReviewId);
     }
 
