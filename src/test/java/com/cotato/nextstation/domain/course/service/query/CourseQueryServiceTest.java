@@ -984,6 +984,29 @@ class CourseQueryServiceTest {
                 .hasMessageContaining(GlobalErrorCode.INVALID_CURSOR.getMessage());
     }
 
+    // ---------- 좋아요 여부 창구 ----------
+
+    @Test
+    @DisplayName("좋아요한 코스면 true를 반환한다")
+    void isLikedByMember_liked() {
+        // given
+        given(courseLikeRepository.existsByMemberIdAndCourseId(1L, 10L)).willReturn(true);
+
+        // when & then
+        assertThat(courseQueryService.isLikedByMember(10L, 1L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("비로그인이면 조회하지 않고 false를 반환한다")
+    void isLikedByMember_anonymous() {
+        // when: 누를 사람이 없으므로 하트는 항상 비어 있다
+        boolean result = courseQueryService.isLikedByMember(10L, null);
+
+        // then
+        assertThat(result).isFalse();
+        verify(courseLikeRepository, never()).existsByMemberIdAndCourseId(any(), any());
+    }
+
     // ---------- 코스 확인 (내가 만든 코스 단건) ----------
 
     private PlaceInfoResponse placeInfo(Long placeId, Double x, Double y) {

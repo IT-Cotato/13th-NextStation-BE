@@ -595,6 +595,18 @@ public class CourseQueryService {
         return courseConverter.toInfoResponse(findCourse(courseId));
     }
 
+    /**
+     * 이 코스에 좋아요(하트)를 눌러 뒀는지. 코스 상세 화면의 하트를 채울지 판단하는 데 쓴다.
+     * <p>
+     * 비로그인({@code memberId}가 null)이면 누를 사람이 없으므로 항상 false다.
+     */
+    public boolean isLikedByMember(Long courseId, Long memberId) {
+        if (memberId == null) {
+            return false;
+        }
+        return courseLikeRepository.existsByMemberIdAndCourseId(memberId, courseId);
+    }
+
     public List<CoursePlaceInfoResponse> getCoursePlaces(Long courseId) {
         findCourse(courseId);
         return courseConverter.toPlaceInfoResponses(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId));
