@@ -6,6 +6,7 @@ import com.cotato.nextstation.domain.place.dto.request.PlaceReviewUpdateRequest;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -15,6 +16,7 @@ import java.util.List;
 public record JournalUpdateRequest(
 
         @Schema(description = "여행일지 제목", example = "보문 골목 산책")
+        @Pattern(regexp = "(?s).*\\S.*", message = "제목은 공백만 입력할 수 없습니다.")
         @Size(max = 20, message = "제목은 최대 20자까지 입력 가능합니다.") // 코스 이름이 최대 20자 -> 통일
         String title,
 

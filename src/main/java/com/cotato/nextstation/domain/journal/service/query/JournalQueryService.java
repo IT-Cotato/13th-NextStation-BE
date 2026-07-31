@@ -188,7 +188,7 @@ public class JournalQueryService {
         List<String> tags = placeInfoQueryService.getTopTagNames(placeIds);
 
         // 9. journalId → 대표 사진 + 서브 사진
-        List<String> imageUrls = journalImageRepository.findByJournalId(journalId)
+        List<String> imageUrls = journalImageRepository.findByJournalIdOrderByIdAsc(journalId)
                 .stream()
                 .map(JournalImage::getImageUrl)
                 .toList();

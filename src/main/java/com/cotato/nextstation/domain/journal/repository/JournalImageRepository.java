@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface JournalImageRepository extends JpaRepository<JournalImage, Long> {
 
-    List<JournalImage> findByJournalId(Long journalId);
+    List<JournalImage> findByJournalIdOrderByIdAsc(Long journalId);
 
     void deleteByJournalId(Long journalId);
 
