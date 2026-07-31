@@ -1,26 +1,36 @@
 package com.cotato.nextstation.domain.course.service.query;
 
 import com.cotato.nextstation.domain.course.converter.CourseConverter;
+import com.cotato.nextstation.domain.course.dto.request.ExploreCourseCondition;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
+import com.cotato.nextstation.domain.course.entity.CourseSort;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
+import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
+import com.cotato.nextstation.domain.journal.service.query.JournalCardQueryService;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
@@ -36,6 +46,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -43,8 +54,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -72,6 +85,9 @@ class CourseQueryServiceTest {
 
     @Mock
     private MemberStampQueryService memberStampQueryService;
+
+    @Mock
+    private JournalCardQueryService journalCardQueryService;
 
     @Mock
     private CourseConverter courseConverter;
@@ -150,7 +166,7 @@ class CourseQueryServiceTest {
         ArgumentCaptor<Integer> countCaptor = ArgumentCaptor.forClass(Integer.class);
         ArgumentCaptor<List<String>> tagsCaptor = ArgumentCaptor.forClass(List.class);
         verify(courseConverter, times(2))
-                .toPlaceCourseResponse(any(), countCaptor.capture(), tagsCaptor.capture(), any());
+                .toPlaceCourseResponse(any(), countCaptor.capture(), tagsCaptor.capture(), any(), any());
         // 노출 순서를 섞으므로 두 코스가 어떤 순서로 들어와도 되도록 쌍으로 확인한다
         assertThat(countCaptor.getAllValues()).containsExactlyInAnyOrder(3, 2);
         // 카드에는 태그를 2개까지만 노출한다
@@ -176,7 +192,7 @@ class CourseQueryServiceTest {
 
         // then: 두 번째 장소가 아니라 첫 번째 장소의 이미지를 조회해 넘긴다
         ArgumentCaptor<String> imageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toPlaceCourseResponse(any(), anyInt(), any(), imageCaptor.capture());
+        verify(courseConverter).toPlaceCourseResponse(any(), anyInt(), any(), imageCaptor.capture(), any());
         assertThat(imageCaptor.getValue()).isEqualTo("cover.jpg");
     }
 
@@ -198,7 +214,7 @@ class CourseQueryServiceTest {
 
         // then
         ArgumentCaptor<String> imageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toPlaceCourseResponse(any(), anyInt(), any(), imageCaptor.capture());
+        verify(courseConverter).toPlaceCourseResponse(any(), anyInt(), any(), imageCaptor.capture(), any());
         assertThat(imageCaptor.getValue()).isNull();
     }
 
@@ -520,6 +536,475 @@ class CourseQueryServiceTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(courseRepository).findPopularPublicCoursesByStationId(eq(6L), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue()).isEqualTo(PageRequest.of(0, 3));
+    }
+
+    // ---------- 둘러보기 코스 목록 ----------
+
+    private ExploreCourseView exploreView(Long courseId, LocalDateTime createdAt, int viewCount, int likeCount) {
+        ExploreCourseView view = mock(ExploreCourseView.class);
+        lenient().when(view.getCourseId()).thenReturn(courseId);
+        lenient().when(view.getCreatedAt()).thenReturn(createdAt);
+        lenient().when(view.getViewCount()).thenReturn(viewCount);
+        lenient().when(view.getLikeCount()).thenReturn(likeCount);
+        return view;
+    }
+
+    private LineView lineView(Long id, String name, LineCode code) {
+        LineView view = mock(LineView.class);
+        lenient().when(view.getLineId()).thenReturn(id);
+        lenient().when(view.getLineName()).thenReturn(name);
+        lenient().when(view.getLineCode()).thenReturn(code);
+        return view;
+    }
+
+    private StationView stationView(Long id, String name) {
+        StationView view = mock(StationView.class);
+        lenient().when(view.getStationId()).thenReturn(id);
+        lenient().when(view.getStationName()).thenReturn(name);
+        return view;
+    }
+
+    @Test
+    @DisplayName("노선 칩은 코스가 없는 노선도 담고 hasCourses로 구분한다")
+    void getExploreLines_marksLinesWithoutCourses() {
+        // given: 코스 없는 노선을 빼면 데이터가 쌓일 때마다 칩이 늘어나 노선도가 흔들려 보인다
+        // 프로젝션 mock에 스터빙이 들어 있어 given(...) 밖에서 미리 만든다
+        LineView line1 = lineView(4L, "1호선", LineCode.LINE_1);
+        LineView line2 = lineView(9L, "2호선", LineCode.LINE_2);
+        given(courseRepository.findDrawableLines()).willReturn(List.of(line1, line2));
+        given(courseRepository.findLinesWithPublicCourses()).willReturn(List.of(line2));
+
+        // when
+        List<ExploreLineResponse> result = courseQueryService.getExploreLines();
+
+        // then
+        assertThat(result).extracting(ExploreLineResponse::id, ExploreLineResponse::hasCourses)
+                .containsExactly(tuple(4L, false), tuple(9L, true));
+    }
+
+    @Test
+    @DisplayName("역 필터 목록은 코스가 없는 역도 담고 hasCourses로 구분한다")
+    void getExploreCourses_marksStationsWithoutCourses() {
+        // given
+        StationView bomun = stationView(123L, "보문역");
+        StationView oksu = stationView(232L, "옥수역");
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+        given(courseRepository.findDrawableStations(any())).willReturn(List.of(bomun, oksu));
+        given(courseRepository.findStationsWithPublicCourses(any())).willReturn(List.of(oksu));
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, null, null);
+
+        // then: 후보 역은 둘 다 넘기고, 코스가 있는 역만 표시하도록 id 집합을 함께 넘긴다
+        ArgumentCaptor<List<StationView>> stationsCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<Set<Long>> withCoursesCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(courseConverter).toExploreListResponse(
+                any(), stationsCaptor.capture(), withCoursesCaptor.capture(), any(), eq(false));
+        assertThat(stationsCaptor.getValue()).hasSize(2);
+        assertThat(withCoursesCaptor.getValue()).containsExactly(232L);
+    }
+
+    @Test
+    @DisplayName("역 필터 목록은 노선만 반영하고 역 필터는 반영하지 않는다")
+    void getExploreCourses_availableStationsIgnoresStationFilter() {
+        // given: 고른 역으로 좁히면 드롭다운에 그 역만 남아 다른 역으로 바꿀 수 없다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+        given(courseRepository.findDrawableStations(2L)).willReturn(List.of());
+        given(courseRepository.findStationsWithPublicCourses(2L)).willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(2L, 123L, null, null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository).findDrawableStations(2L);
+        verify(courseRepository).findStationsWithPublicCourses(2L);
+    }
+
+    @Test
+    @DisplayName("둘러보기 카드 배경은 여행일지 첫 사진을 쓴다")
+    void getExploreCourses_cardImageFromJournal() {
+        // given: 일지 11번에는 사진이 있고, 12번에는 없다
+        LocalDateTime now = LocalDateTime.now();
+        ExploreCourseView withImage = exploreView(1L, now, 0, 0);
+        ExploreCourseView withoutImage = exploreView(2L, now, 0, 0);
+        lenient().when(withImage.getJournalId()).thenReturn(11L);
+        lenient().when(withoutImage.getJournalId()).thenReturn(12L);
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of(withImage, withoutImage));
+        given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
+        given(journalCardQueryService.getJournalCourseCardInfos(List.of(11L, 12L)))
+                .willReturn(Map.of(
+                        11L, new JournalCardInfoResponse(11L, "cover.jpg", null),
+                        12L, new JournalCardInfoResponse(12L, null, null)));
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, null, null);
+
+        // then
+        ArgumentCaptor<String> imageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(courseConverter, times(2))
+                .toExploreCourseResponse(any(), any(), anyBoolean(), imageCaptor.capture());
+        assertThat(imageCaptor.getAllValues()).containsExactly("cover.jpg", null);
+    }
+
+    @Test
+    @DisplayName("검색 요청에는 역 필터 목록을 계산하지 않는다")
+    void getExploreCourses_noStationsWhenSearching() {
+        // given: 검색 결과 화면에는 "역 선택"이 없어 후보 역 50개를 실어 보낼 이유가 없다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "신림", null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository, never()).findDrawableStations(any());
+        verify(courseRepository, never()).findStationsWithPublicCourses(any());
+    }
+
+    @Test
+    @DisplayName("역 필터 목록은 최초 조회에서만 계산한다")
+    void getExploreCourses_availableStationsOnlyOnFirstPage() {
+        // given: 드롭다운은 화면에 한 번만 그리므로 다음 페이지에서는 조회하지 않는다
+        String cursor = new CursorData(1L, null, LocalDateTime.now()).encode();
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(2L, null, null, null), CourseSort.LATEST, cursor, null);
+
+        // then
+        verify(courseRepository, never()).findDrawableStations(any());
+    }
+
+    @Test
+    @DisplayName("다른 목록의 커서를 많이 찾는 코스에 넣으면 400이다")
+    void getMostLikedCourses_rejectsForeignCursor() {
+        // given: 인기순 커서의 점수를 시작 위치로 읽으면 조용히 빈 목록이 된다
+        String popularCursor = new CursorData(1L, 322L, LocalDateTime.now()).encode();
+
+        // when & then
+        assertThatThrownBy(() -> courseQueryService.getMostLikedCourses(null, popularCursor, null))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", GlobalErrorCode.INVALID_CURSOR);
+    }
+
+    @Test
+    @DisplayName("둘러보기 메인의 노선 코스는 역 목록을 조회하지 않는다")
+    void getLineCourses_noAvailableStations() {
+        // given: 메인 화면에는 역 선택이 없어 계산해도 응답에 담기지 않는다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+        given(courseConverter.toExploreListResponse(any(), any(), any(), any(), anyBoolean()))
+                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
+
+        // when
+        courseQueryService.getLineCourses(null, 6L, 3);
+
+        // then
+        verify(courseRepository, never()).findDrawableStations(any());
+        verify(courseRepository, never()).findStationsWithPublicCourses(any());
+    }
+
+    @Test
+    @DisplayName("컨셉별 코스 목록은 역 선택 드롭다운이 없어 역 목록을 조회하지 않는다")
+    void getConceptTourCourses_noAvailableStations() {
+        // given: 컨셉 상세에는 정렬 토글만 있어 후보 역 50개를 실어 보낼 이유가 없다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getConceptTourCourses(null, 1L, CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository, never()).findDrawableStations(any());
+        verify(courseRepository, never()).findStationsWithPublicCourses(any());
+    }
+
+    @Test
+    @DisplayName("컨셉별 코스 목록은 컨셉 id를 조회 조건으로 넘긴다")
+    void getConceptTourCourses_passesConceptTourId() {
+        // given
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), eq(7L), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getConceptTourCourses(null, 7L, CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository)
+                .findExploreCoursesByLatest(isNull(), isNull(), isNull(), eq(7L), any(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("많이 찾는 코스는 역 선택 드롭다운이 없어 역 목록을 조회하지 않는다")
+    void getMostLikedCourses_noAvailableStations() {
+        // given
+        given(courseRepository.findMostLikedCourses(any(Pageable.class))).willReturn(List.of());
+
+        // when
+        courseQueryService.getMostLikedCourses(null, null, null);
+
+        // then
+        verify(courseRepository, never()).findDrawableStations(any());
+    }
+
+    @Test
+    @DisplayName("정렬을 생략하면 최신순으로 조회한다")
+    void getExploreCourses_defaultsToLatest() {
+        // given
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), null, null, null);
+
+        // then: 정렬이 없으면 페이지마다 순서가 흔들려 커서 페이징이 성립하지 않는다
+        verify(courseRepository).findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class));
+        verify(courseRepository, never())
+                .findExploreCoursesByPopular(any(), any(), any(), any(), any(), any(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("검색어의 꼬리 \"역\"은 떼고 조회한다")
+    void getExploreCourses_normalizesKeyword() {
+        // given: 역명은 쿼리에서 꼬리를 떼고 비교하므로 검색어도 같은 규칙으로 맞춰야 걸린다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), eq("왕십리"), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "왕십리역", null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository)
+                .findExploreCoursesByLatest(any(), any(), eq("왕십리"), any(), any(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("검색어의 LIKE 와일드카드는 이스케이프해서 문자 그대로 찾는다")
+    void getExploreCourses_escapesLikeWildcards() {
+        // given: 이스케이프하지 않으면 "%" 한 글자로 공개 코스 전체가 조회된다
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), eq("!%50!_"), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "%50_", null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository)
+                .findExploreCoursesByLatest(any(), any(), eq("!%50!_"), any(), any(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("이스케이프 문자 자체가 검색어에 있으면 두 번 겹쳐 문자로 취급한다")
+    void getExploreCourses_escapesEscapeCharacter() {
+        // given
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), eq("!!느낌표"), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "!느낌표", null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository)
+                .findExploreCoursesByLatest(any(), any(), eq("!!느낌표"), any(), any(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("빈 검색어는 조건에서 빼고 전체를 조회한다")
+    void getExploreCourses_blankKeyword() {
+        // given
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), isNull(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, "  ", null), CourseSort.LATEST, null, null);
+
+        // then
+        verify(courseRepository)
+                .findExploreCoursesByLatest(any(), any(), isNull(), any(), any(), any(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("인기순 커서의 점수는 int 범위를 넘어도 그대로 담긴다")
+    void getExploreCourses_scoreDoesNotOverflow() {
+        // given: 조회수·좋아요는 int라 int로 더하면 넘친다. 쿼리 쪽은 DB가 BIGINT로 계산하므로
+        // 커서 값도 long이어야 비교값과 어긋나지 않는다.
+        LocalDateTime now = LocalDateTime.now();
+        List<ExploreCourseView> found = List.of(
+                exploreView(1L, now, 2_000_000_000, 1_000_000_000),
+                exploreView(2L, now, 0, 0));
+        given(courseRepository.findExploreCoursesByPopular(
+                any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(found);
+        given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
+
+        // when: size 1이라 첫 코스로 커서를 만든다
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.POPULAR, null, 1);
+
+        // then: 2,000,000,000 + 1,000,000,000 × 2 = 4,000,000,000
+        ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
+        verify(courseConverter).toExploreListResponse(any(), any(), any(), cursorCaptor.capture(), eq(true));
+        assertThat(CursorData.decode(cursorCaptor.getValue()).longValue()).isEqualTo(4_000_000_000L);
+    }
+
+    @Test
+    @DisplayName("다음 페이지가 있으면 마지막 코스로 커서를 만들고 초과분은 잘라낸다")
+    void getExploreCourses_paging() {
+        // given: hasNext 판단용으로 size + 1개를 조회한다.
+        // 목 생성은 스터빙 밖에서 끝내야 Mockito가 중첩 스터빙으로 보지 않는다.
+        LocalDateTime now = LocalDateTime.now();
+        List<ExploreCourseView> found =
+                List.of(exploreView(1L, now, 0, 0), exploreView(2L, now, 0, 0), exploreView(3L, now, 0, 0));
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(found);
+        given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, null, 2);
+
+        // then: 초과분 1개는 빼고 커서를 만든다
+        ArgumentCaptor<List<ExploreCourseResponse>> coursesCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
+        verify(courseConverter).toExploreListResponse(
+                coursesCaptor.capture(), any(), any(), cursorCaptor.capture(), eq(true));
+        assertThat(coursesCaptor.getValue()).hasSize(2);
+        assertThat(cursorCaptor.getValue()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("인기순 커서를 최신순 조회에 쓰면 400이다")
+    void getExploreCourses_cursorSortMismatch() {
+        // given: 인기순 커서에는 점수가 들어 있어 최신순 조회에 그대로 쓰면 순서가 뒤엉킨다
+        String popularCursor = new CursorData(1L, 50L, LocalDateTime.now()).encode();
+
+        // when & then
+        assertThatThrownBy(() -> courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, popularCursor, null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(GlobalErrorCode.INVALID_CURSOR.getMessage());
+    }
+
+    @Test
+    @DisplayName("비로그인이면 좋아요 여부를 조회하지 않고 전부 false로 내린다")
+    void getExploreCourses_anonymousHasNoLikes() {
+        // given
+        List<ExploreCourseView> found = List.of(exploreView(1L, LocalDateTime.now(), 0, 0));
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(found);
+        given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, null, null);
+
+        // then: 누를 사람이 없으므로 조회 자체를 하지 않는다
+        verify(courseLikeRepository, never()).findLikedCourseIds(any(), any());
+    }
+
+    // ---------- 사람들이 많이 찾는 코스 ----------
+
+    @Test
+    @DisplayName("많이 찾는 코스는 상위 30개까지만 조회한다")
+    void getMostLikedCourses_limitedTo30() {
+        // given
+        given(courseRepository.findMostLikedCourses(any(Pageable.class))).willReturn(List.of());
+
+        // when
+        courseQueryService.getMostLikedCourses(null, null, null);
+
+        // then: 무한스크롤도 30번째에서 끝난다
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(courseRepository).findMostLikedCourses(pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(30);
+    }
+
+    @Test
+    @DisplayName("많이 찾는 코스의 커서는 다음 시작 위치를 담는다")
+    void getMostLikedCourses_offsetCursor() {
+        // given: 좋아요 수는 수시로 바뀌어 값 기준 커서를 쓰면 순위가 흔들릴 때 결과가 어긋난다
+        LocalDateTime now = LocalDateTime.now();
+        List<ExploreCourseView> found =
+                List.of(exploreView(1L, now, 0, 9), exploreView(2L, now, 0, 6), exploreView(3L, now, 0, 3));
+        given(courseRepository.findMostLikedCourses(any(Pageable.class))).willReturn(found);
+        given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
+
+        // when
+        courseQueryService.getMostLikedCourses(null, null, 2);
+
+        // then
+        ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
+        verify(courseConverter).toExploreListResponse(any(), any(), any(), cursorCaptor.capture(), eq(true));
+        assertThat(CursorData.decode(cursorCaptor.getValue()).longValue()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("커서 위치가 목록 끝을 넘으면 빈 목록을 반환한다")
+    void getMostLikedCourses_cursorBeyondEnd() {
+        // given: 사이에 코스가 줄어 위치가 범위를 벗어나도 오류 없이 끝으로 처리한다
+        List<ExploreCourseView> found = List.of(exploreView(1L, LocalDateTime.now(), 0, 9));
+        given(courseRepository.findMostLikedCourses(any(Pageable.class))).willReturn(found);
+        String cursor = new CursorData(null, 10L, null).encode();
+
+        // when
+        courseQueryService.getMostLikedCourses(null, cursor, null);
+
+        // then
+        verify(courseConverter).toExploreListResponse(List.of(), List.of(), Set.of(), null, false);
+    }
+
+    @Test
+    @DisplayName("위치가 없는 커서는 400이다")
+    void getMostLikedCourses_invalidCursor() {
+        // given: 이 목록의 커서에는 위치(longValue)가 반드시 들어 있어야 한다
+        String timeCursor = new CursorData(1L, null, LocalDateTime.now()).encode();
+
+        // when & then
+        assertThatThrownBy(() -> courseQueryService.getMostLikedCourses(null, timeCursor, null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(GlobalErrorCode.INVALID_CURSOR.getMessage());
+    }
+
+    // ---------- 좋아요 여부 창구 ----------
+
+    @Test
+    @DisplayName("좋아요한 코스면 true를 반환한다")
+    void isLikedByMember_liked() {
+        // given
+        given(courseLikeRepository.existsByMemberIdAndCourseId(1L, 10L)).willReturn(true);
+
+        // when & then
+        assertThat(courseQueryService.isLikedByMember(10L, 1L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("비로그인이면 조회하지 않고 false를 반환한다")
+    void isLikedByMember_anonymous() {
+        // when: 누를 사람이 없으므로 하트는 항상 비어 있다
+        boolean result = courseQueryService.isLikedByMember(10L, null);
+
+        // then
+        assertThat(result).isFalse();
+        verify(courseLikeRepository, never()).existsByMemberIdAndCourseId(any(), any());
     }
 
     // ---------- 코스 확인 (내가 만든 코스 단건) ----------

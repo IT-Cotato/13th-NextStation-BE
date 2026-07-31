@@ -38,7 +38,6 @@ public class CourseController {
 
     private final CourseCommandService courseCommandService;
     private final CourseLikeCommandService courseLikeCommandService;
-
     @Operation(
             summary = "코스 생성",
             description = """

@@ -4,7 +4,6 @@ import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.converter.JournalConverter;
-import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
@@ -224,20 +223,7 @@ public class JournalQueryService {
                 .orElse(null);  // 일지 없거나 미작성이면 null (장소 수로 추정)
     }
 
-    public Optional<JournalCardInfoResponse> getJournalCourseCardInfo(Long journalId) {
-        return journalRepository.findById(journalId)
-                .map(journal -> {
-                    String imageUrl = journalImageRepository
-                            .findFirstByJournalIdOrderByCreatedAtAsc(journalId)
-                            .map(JournalImage::getImageUrl)
-                            .orElse(null);
-                    return new JournalCardInfoResponse(
-                            journal.getId(),
-                            imageUrl,
-                            journal.getTravelDuration()
-                    );
-                });
-    }
+
 
 
 

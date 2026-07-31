@@ -38,6 +38,22 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "WHERE c.id = :courseId AND j.isPublic = true")
     boolean existsPublicById(@Param("courseId") Long courseId);
 
+    /**
+     * 코스 상세를 열 때 조회수를 올린다.
+     * <p>
+     * like_count와 같은 이유로 DB에서 직접 증가시킨다. 엔티티를 읽어 +1 하면
+     * 동시 조회 시 한쪽 증가분이 유실된다.
+     * <p>
+     * 본인이 자기 코스를 열었을 때는 올리지 않는다. 저장 탭에서 자기 코스를 드나들 때마다
+     * 오르면 인기순(view_count + like_count×2)이 자주 열어본 사람 순으로 부풀려진다.
+     * 비로그인 조회는 본인일 수 없으므로 항상 올린다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Course c SET c.viewCount = c.viewCount + 1 " +
+            "WHERE c.id = :courseId AND (:viewerMemberId IS NULL OR c.memberId <> :viewerMemberId)")
+    int increaseViewCount(@Param("courseId") Long courseId,
+                          @Param("viewerMemberId") Long viewerMemberId);
+
     // like_count는 DB에서 직접 증감시킨다.
     // 엔티티를 읽어 +1 하면 동시 좋아요 시 한쪽 증가분이 유실된다.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -139,7 +155,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 특정 장소를 담고 있는 공개 코스를 인기순으로 조회한다 (장소 상세 화면 하단).
     // 카드에 필요한 역·대표 호선을 함께 가져온다(코스마다 조회하면 N+1).
     // 노출 조건과 인기순 공식은 위 역별 인기 코스와 같다.
-    @Query("SELECT c.id AS courseId, c.name AS name, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CoursePlace cp " +
@@ -150,6 +166,185 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "WHERE cp.placeId = :placeId AND j.isPublic = true " +
             "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC, c.id DESC")
     List<PlaceCourseView> findPopularPublicCoursesByPlaceId(@Param("placeId") Long placeId, Pageable pageable);
+
+    /**
+     * 둘러보기 코스 목록 - 최신순. 노선따라 둘러보기와 코스 검색이 같은 조회를 쓴다.
+     * <p>
+     * 공개 조건(journal_id가 있고 그 일지가 공개)·필터·검색이 모두 같아서 하나로 합쳤다.
+     * 화면마다 쿼리를 복붙하면 공개 조건이 바뀔 때 한 곳을 빠뜨려 비공개 코스가 새어 나간다.
+     * <p>
+     * 필터는 전부 선택 사항이라 파라미터가 null이면 조건을 건너뛴다.
+     * 호선 필터는 저장 탭과 같은 기준으로 역이 속한 호선 전체(StationLine)를 본다.
+     * 대표 호선으로 거르면 환승역 코스가 실제로 갈 수 있는 다른 호선 탭에서 사라진다.
+     * <p>
+     * 검색 대상은 코스 이름과 역명뿐이다("동네" 제외 확정). 역명은 역 검색과 같은 규칙으로
+     * 꼬리의 "역"을 떼고 비교하며, 검색어 쪽도 서비스에서 같은 규칙으로 다듬어 넘긴다.
+     * <p>
+     * 커서(createdAt·courseId)가 null이면 첫 페이지다.
+     */
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+            "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE j.isPublic = true " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:stationId IS NULL OR s.id = :stationId) " +
+            "AND (:conceptTourId IS NULL OR c.conceptTourId = :conceptTourId) " +
+            "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') ESCAPE '!' " +
+            "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%') ESCAPE '!') " +
+                        "AND (:createdAt IS NULL OR c.createdAt < :createdAt " +
+            "     OR (c.createdAt = :createdAt AND c.id < :courseId)) " +
+            "ORDER BY c.createdAt DESC, c.id DESC")
+    List<ExploreCourseView> findExploreCoursesByLatest(@Param("lineId") Long lineId,
+                                                       @Param("stationId") Long stationId,
+                                                       @Param("keyword") String keyword,
+                                                       @Param("conceptTourId") Long conceptTourId,
+                                                       @Param("createdAt") LocalDateTime createdAt,
+                                                       @Param("courseId") Long courseId,
+                                                       Pageable pageable);
+
+    /**
+     * 둘러보기 코스 목록 - 인기순(view_count + like_count × 2), 동률이면 최신순.
+     * <p>
+     * 조건은 최신순과 같고 정렬과 커서만 다르다. 커서는 점수를 먼저 비교하고,
+     * 점수가 같으면 최신순과 같은 방식으로 시각·id를 비교한다.
+     * <p>
+     * 점수는 조회수·좋아요가 바뀌면 함께 변한다. 페이징 도중 순위가 흔들려 같은 코스가
+     * 두 번 나오거나 빠질 수 있지만, 목록이 실시간으로 요동치는 화면이 아니라 감수한다.
+     */
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+            "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE j.isPublic = true " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:stationId IS NULL OR s.id = :stationId) " +
+            "AND (:conceptTourId IS NULL OR c.conceptTourId = :conceptTourId) " +
+            "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') ESCAPE '!' " +
+            "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%') ESCAPE '!') " +
+                        "AND (:score IS NULL OR (c.viewCount + c.likeCount * 2) < :score " +
+            "     OR ((c.viewCount + c.likeCount * 2) = :score " +
+            "         AND (c.createdAt < :createdAt OR (c.createdAt = :createdAt AND c.id < :courseId)))) " +
+            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC, c.id DESC")
+    List<ExploreCourseView> findExploreCoursesByPopular(@Param("lineId") Long lineId,
+                                                        @Param("stationId") Long stationId,
+                                                        @Param("keyword") String keyword,
+                                                        @Param("conceptTourId") Long conceptTourId,
+                                                        @Param("score") Long score,
+                                                        @Param("createdAt") LocalDateTime createdAt,
+                                                        @Param("courseId") Long courseId,
+                                                        Pageable pageable);
+
+    /**
+     * 사람들이 많이 찾는 코스 - 좋아요 수 내림차순, 동률이면 최신순.
+     * <p>
+     * 둘러보기 목록의 "인기순"(조회수 + 좋아요 × 2)과는 다른 기준이다. 화면 부제가
+     * "가장 많이 담아둔 코스"라 담은 횟수, 즉 좋아요 수만 본다.
+     * <p>
+     * 상위 몇 개까지 보여줄지는 서비스가 정한다. 이 쿼리는 정렬만 책임진다.
+     */
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+            "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE j.isPublic = true " +
+            "ORDER BY c.likeCount DESC, c.createdAt DESC, c.id DESC")
+    List<ExploreCourseView> findMostLikedCourses(Pageable pageable);
+
+    /**
+     * 노선 칩으로 그릴 후보 노선. 뽑기 역이 속한 노선 전체를 내려준다.
+     * <p>
+     * 코스는 뽑기 역에만 붙으므로 이 집합이 곧 "코스가 존재할 수 있는 노선"이다.
+     * {@code line} 테이블 전체를 쓰면 코스가 생길 수 없는 노선까지 칩으로 뜨고,
+     * 공개 코스가 있는 노선만 쓰면 데이터가 쌓일 때마다 칩이 늘어나 노선도가 흔들려 보인다.
+     * <p>
+     * 뽑기 역이 늘어나면 노선도 자연히 늘어나므로 목록을 하드코딩하지 않고 데이터에서 유도한다.
+     * 환승역이 있어 1~9호선 외 노선(경의중앙선 등)도 포함될 수 있다.
+     */
+    @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Station s " +
+            "JOIN StationLine sl ON sl.station.id = s.id " +
+            "JOIN sl.line l " +
+            "WHERE s.isDrawable = true " +
+            "ORDER BY l.name")
+    List<LineView> findDrawableLines();
+
+    /**
+     * 공개 코스가 하나라도 있는 노선. 칩의 활성/비활성을 가르는 데 쓴다.
+     * <p>
+     * 노선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
+     * "칩은 비활성인데 필터를 걸면 결과가 나오는" 불일치가 생긴다.
+     */
+    @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "JOIN StationLine sl ON sl.station.id = s.id " +
+            "JOIN sl.line l " +
+            "WHERE j.isPublic = true " +
+            "ORDER BY l.name")
+    List<LineView> findLinesWithPublicCourses();
+
+    /**
+     * "역 선택" 드롭다운으로 그릴 후보 역. 뽑기 역만 내려준다.
+     * <p>
+     * 코스는 뽑기 역에만 붙으므로 이 집합이 곧 "코스가 존재할 수 있는 역"이다.
+     * 노선 칩과 같은 이유로, 공개 코스가 있는 역만 내려주면 데이터가 쌓일 때마다 항목이 늘어난다.
+     * <p>
+     * 노선 칩으로 좁힌 범위에서 고르는 목록이라 {@code lineId}만 반영하고, 역·검색어 필터는 반영하지 않는다.
+     * 지금 고른 역으로 좁히면 드롭다운에 그 역 하나만 남아 다른 역으로 바꿀 수 없다.
+     */
+    @Query("SELECT s.id AS stationId, s.stationName AS stationName " +
+            "FROM Station s " +
+            "WHERE s.isDrawable = true " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "ORDER BY s.stationName")
+    List<StationView> findDrawableStations(@Param("lineId") Long lineId);
+
+    /**
+     * 공개 코스가 하나라도 있는 역. "역 선택" 항목의 활성/비활성을 가르는 데 쓴다.
+     * <p>
+     * 노선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
+     * "목록에서 고를 수 있는 역인데 고르면 결과가 없는" 불일치가 생긴다.
+     */
+    @Query("SELECT DISTINCT s.id AS stationId, s.stationName AS stationName " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "WHERE j.isPublic = true " +
+            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
+            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "ORDER BY s.stationName")
+    List<StationView> findStationsWithPublicCourses(@Param("lineId") Long lineId);
+
+    interface ExploreCourseView {
+        Long getCourseId();
+        Long getJournalId();
+        String getName();
+        LocalDateTime getCreatedAt();
+        int getViewCount();
+        int getLikeCount();
+        Long getStationId();
+        String getStationName();
+        Long getLineId();
+        String getLineName();
+        LineCode getLineCode();
+    }
 
     interface MyCourseDetailView {
         Long getCourseId();
@@ -171,6 +366,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     interface PlaceCourseView {
         Long getCourseId();
+        Long getJournalId();
         String getName();
         Long getStationId();
         String getStationName();
@@ -183,5 +379,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         Long getLineId();
         String getLineName();
         LineCode getLineCode();
+    }
+
+    interface StationView {
+        Long getStationId();
+        String getStationName();
     }
 }
