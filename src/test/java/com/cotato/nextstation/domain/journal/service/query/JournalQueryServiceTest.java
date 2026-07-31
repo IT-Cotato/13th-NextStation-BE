@@ -130,7 +130,7 @@ class JournalQueryServiceTest {
     class GetJournalDetail {
 
         @Test
-        @DisplayName("본인이 조회하면 courseId/isMine=true가 채워지고 조회수는 증가시키지 않는다")
+        @DisplayName("본인이 조회하면 courseId/isMine=true가 채워지고, 조회수 처리는 CourseCommandService에 위임한다")
         void ownerViews_fillsCourseIdAndIsMine() {
             // given
             given(courseQueryService.isLikedByMember(COURSE_ID, OWNER_ID)).willReturn(false);
@@ -142,6 +142,9 @@ class JournalQueryServiceTest {
             assertThat(response.courseId()).isEqualTo(COURSE_ID);
             assertThat(response.isMine()).isTrue();
             assertThat(response.isLiked()).isFalse();
+            // 본인 조회라 실제로 증가하지 않아야 하지만, 그 판단은 CourseRepository의 SQL 조건
+            // (c.memberId <> viewerMemberId)이 담당한다. 여기서는 위임(호출) 자체만 검증할 수 있고,
+            // "정말 증가하지 않는지"는 이 유닛 테스트로는(courseCommandService가 목이라) 검증 대상이 아니다.
             verify(courseCommandService).increaseViewCount(COURSE_ID, OWNER_ID);
         }
 
