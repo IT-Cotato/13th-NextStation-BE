@@ -27,6 +27,9 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.StationV
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
+import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
+import com.cotato.nextstation.domain.journal.enums.TravelDuration;
+import com.cotato.nextstation.domain.journal.service.query.JournalQueryService;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
@@ -46,6 +49,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -82,6 +86,7 @@ public class CourseQueryService {
     private final CourseLikeRepository courseLikeRepository;
     private final PlaceInfoQueryService placeInfoQueryService;
     private final MemberStampQueryService memberStampQueryService;
+    private final JournalQueryService journalQueryService;
     private final CourseConverter courseConverter;
 
     /**
@@ -395,12 +400,16 @@ public class CourseQueryService {
         Map<Long, List<String>> tagsByCourse = resolveTagsByCourse(placeIdsByCourse);
         Set<Long> likedCourseIds = resolveLikedCourseIds(memberId, courseIds);
 
+        // 카드 배경은 작성자가 여행일지에 올린 첫 사진이다.
+        Map<Long, JournalCardInfoResponse> journalInfos = resolveJournalCardInfos(
+                courses.stream().map(ExploreCourseView::getJournalId).toList());
+
         return courses.stream()
                 .map(course -> courseConverter.toExploreCourseResponse(
                         course,
                         tagsByCourse.getOrDefault(course.getCourseId(), List.of()),
                         likedCourseIds.contains(course.getCourseId()),
-                        null)) // TODO: 여행일지 대표 사진. JournalImage 머지 후 연결한다
+                        resolveJournalImageUrl(journalInfos, course.getJournalId())))
                 .toList();
     }
 
@@ -430,6 +439,29 @@ public class CourseQueryService {
         });
         return result;
     }
+
+    /**
+     * 카드에 얹을 여행일지 정보(대표 사진·소요시간)를 journalId 기준으로 모은다.
+     * <p>
+     * 일지가 없거나 미작성이면 값이 빠진다. 둘러보기·장소별 코스는 공개 일지가 있는 코스만
+     * 노출하므로 실제로는 항상 채워지지만, 호출부가 null을 견디도록 두었다.
+     * <p>
+     * TODO: 현재는 journalId마다 한 번씩 부른다. 목록이 길어지면 일괄 조회 창구를 요청한다.
+     */
+    private Map<Long, JournalCardInfoResponse> resolveJournalCardInfos(List<Long> journalIds) {
+        Map<Long, JournalCardInfoResponse> result = new LinkedHashMap<>();
+        journalIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(journalId -> journalQueryService.getJournalCourseCardInfo(journalId)
+                        .ifPresent(info -> result.put(journalId, info)));
+        return result;
+    }
+    private String resolveJournalImageUrl(Map<Long, JournalCardInfoResponse> journalInfos, Long journalId) {
+        JournalCardInfoResponse info = journalInfos.get(journalId);
+        return (info == null) ? null : info.imageUrl();
+    }
+
 
     private Set<Long> resolveLikedCourseIds(Long memberId, List<Long> courseIds) {
         if (memberId == null || courseIds.isEmpty()) {
@@ -503,13 +535,23 @@ public class CourseQueryService {
 
         List<Long> courseIds = courses.stream().map(PlaceCourseView::getCourseId).toList();
         Map<Long, List<Long>> placeIdsByCourse = groupPlaceIdsByCourse(courseIds);
-        Map<Long, String> imageUrlByCourse = resolveCoverImages(placeIdsByCourse);
+        Map<Long, String> placeImageByCourse = resolveCoverImages(placeIdsByCourse);
+
+        // 카드 배경과 소요시간은 여행일지 값을 먼저 쓴다.
+        // 사진이 없으면 첫 장소 사진으로, 소요시간이 없으면 장소 수 추정으로 물러난다.
+        Map<Long, JournalCardInfoResponse> journalInfos = resolveJournalCardInfos(
+                courses.stream().map(PlaceCourseView::getJournalId).toList());
 
         return courses.stream()
                 .map(course -> {
                     List<Long> placeIds = placeIdsByCourse.getOrDefault(course.getCourseId(), List.of());
+                    JournalCardInfoResponse journalInfo = journalInfos.get(course.getJournalId());
+                    String imageUrl = (journalInfo != null && journalInfo.imageUrl() != null)
+                            ? journalInfo.imageUrl()
+                            : placeImageByCourse.get(course.getCourseId());
+                    TravelDuration travelDuration = (journalInfo == null) ? null : journalInfo.travelDuration();
                     return courseConverter.toPlaceCourseResponse(
-                            course, placeIds.size(), resolveCourseTags(placeIds), imageUrlByCourse.get(course.getCourseId()));
+                            course, placeIds.size(), resolveCourseTags(placeIds), imageUrl, travelDuration);
                 })
                 .toList();
     }

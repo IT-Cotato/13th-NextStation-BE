@@ -18,6 +18,7 @@ import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
+import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
@@ -195,8 +196,10 @@ public class CourseConverter {
         return new ExploreCourseListResponse(courses, stationFilters, nextCursor, hasNext);
     }
 
+    // 소요시간은 여행일지에 남긴 값을 쓰고, 아직 없으면 장소 수로 추정한다.
     public PlaceCourseResponse toPlaceCourseResponse(PlaceCourseView course, int placeCount,
-                                                     List<String> tags, String imageUrl) {
+                                                     List<String> tags, String imageUrl,
+                                                     TravelDuration travelDuration) {
         return new PlaceCourseResponse(
                 course.getCourseId(),
                 course.getName(),
@@ -204,7 +207,7 @@ public class CourseConverter {
                 course.getStationName(),
                 toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
                 placeCount,
-                estimateDuration(placeCount),
+                (travelDuration != null) ? travelDuration.name() : estimateDuration(placeCount),
                 tags,
                 imageUrl
         );

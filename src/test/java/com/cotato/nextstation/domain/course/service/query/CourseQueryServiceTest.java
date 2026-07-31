@@ -25,6 +25,8 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCou
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
+import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
+import com.cotato.nextstation.domain.journal.service.query.JournalQueryService;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
@@ -83,6 +85,9 @@ class CourseQueryServiceTest {
 
     @Mock
     private MemberStampQueryService memberStampQueryService;
+
+    @Mock
+    private JournalQueryService journalQueryService;
 
     @Mock
     private CourseConverter courseConverter;
@@ -161,7 +166,7 @@ class CourseQueryServiceTest {
         ArgumentCaptor<Integer> countCaptor = ArgumentCaptor.forClass(Integer.class);
         ArgumentCaptor<List<String>> tagsCaptor = ArgumentCaptor.forClass(List.class);
         verify(courseConverter, times(2))
-                .toPlaceCourseResponse(any(), countCaptor.capture(), tagsCaptor.capture(), any());
+                .toPlaceCourseResponse(any(), countCaptor.capture(), tagsCaptor.capture(), any(), any());
         // 노출 순서를 섞으므로 두 코스가 어떤 순서로 들어와도 되도록 쌍으로 확인한다
         assertThat(countCaptor.getAllValues()).containsExactlyInAnyOrder(3, 2);
         // 카드에는 태그를 2개까지만 노출한다
@@ -187,7 +192,7 @@ class CourseQueryServiceTest {
 
         // then: 두 번째 장소가 아니라 첫 번째 장소의 이미지를 조회해 넘긴다
         ArgumentCaptor<String> imageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toPlaceCourseResponse(any(), anyInt(), any(), imageCaptor.capture());
+        verify(courseConverter).toPlaceCourseResponse(any(), anyInt(), any(), imageCaptor.capture(), any());
         assertThat(imageCaptor.getValue()).isEqualTo("cover.jpg");
     }
 
@@ -209,7 +214,7 @@ class CourseQueryServiceTest {
 
         // then
         ArgumentCaptor<String> imageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toPlaceCourseResponse(any(), anyInt(), any(), imageCaptor.capture());
+        verify(courseConverter).toPlaceCourseResponse(any(), anyInt(), any(), imageCaptor.capture(), any());
         assertThat(imageCaptor.getValue()).isNull();
     }
 
@@ -617,6 +622,35 @@ class CourseQueryServiceTest {
         // then
         verify(courseRepository).findDrawableStations(2L);
         verify(courseRepository).findStationsWithPublicCourses(2L);
+    }
+
+    @Test
+    @DisplayName("둘러보기 카드 배경은 여행일지 첫 사진을 쓴다")
+    void getExploreCourses_cardImageFromJournal() {
+        // given: 일지 11번에는 사진이 있고, 12번에는 없다
+        LocalDateTime now = LocalDateTime.now();
+        ExploreCourseView withImage = exploreView(1L, now, 0, 0);
+        ExploreCourseView withoutImage = exploreView(2L, now, 0, 0);
+        lenient().when(withImage.getJournalId()).thenReturn(11L);
+        lenient().when(withoutImage.getJournalId()).thenReturn(12L);
+        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of(withImage, withoutImage));
+        given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
+        given(journalQueryService.getJournalCourseCardInfo(11L))
+                .willReturn(Optional.of(new JournalCardInfoResponse(11L, "cover.jpg", null)));
+        given(journalQueryService.getJournalCourseCardInfo(12L))
+                .willReturn(Optional.of(new JournalCardInfoResponse(12L, null, null)));
+
+        // when
+        courseQueryService.getExploreCourses(
+                null, new ExploreCourseCondition(null, null, null, null), CourseSort.LATEST, null, null);
+
+        // then
+        ArgumentCaptor<String> imageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(courseConverter, times(2))
+                .toExploreCourseResponse(any(), any(), anyBoolean(), imageCaptor.capture());
+        assertThat(imageCaptor.getAllValues()).containsExactly("cover.jpg", null);
     }
 
     @Test

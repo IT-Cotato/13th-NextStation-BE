@@ -139,7 +139,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 특정 장소를 담고 있는 공개 코스를 인기순으로 조회한다 (장소 상세 화면 하단).
     // 카드에 필요한 역·대표 호선을 함께 가져온다(코스마다 조회하면 N+1).
     // 노출 조건과 인기순 공식은 위 역별 인기 코스와 같다.
-    @Query("SELECT c.id AS courseId, c.name AS name, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CoursePlace cp " +
@@ -350,6 +350,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     interface PlaceCourseView {
         Long getCourseId();
+        Long getJournalId();
         String getName();
         Long getStationId();
         String getStationName();
