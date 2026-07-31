@@ -132,10 +132,9 @@ public class JournalCommandService {
                     case KEEP -> { /* 유지 */ }
                     case DELETE -> {
                         // journalId 스코프로 소유권 검증 (다른 일지의 사진 삭제 방지)
-                        journalImageRepository.deleteByIdAndJournalId(photo.photoId(), journal.getId());
+                        journalImageRepository.findByIdAndJournalId(photo.photoId(), journal.getId())
+                                .ifPresent(JournalImage::delete);
 
-                        // photoId로 DB에서 삭제 (S3는 배치 잡으로 정리)
-                        journalImageRepository.deleteById(photo.photoId());
                     }
                     case UPDATE -> {
                         // 새 이미지 추가 (photoId 없음)
@@ -163,10 +162,12 @@ public class JournalCommandService {
     public void deleteJournal(Long memberId, Long journalId) {
         Journal journal = findOwnJournal(memberId, journalId);
 
-        // 여행일지 대표 사진만 DB에서 삭제 (PlaceReview/PlaceReviewImage는 유지)
-        journalImageRepository.deleteByJournalId(journalId);
+        // 여행일지 대표 사진 soft delete S3 추적을 위해 DB 레코드 유지, 배치로 N일 뒤 정리 예정)
+        journalImageRepository.findByJournalId(journalId)
+                .forEach(JournalImage::delete);
 
         // 여행일지 soft delete
+        // PlaceReview/PlaceReviewImage는 유지
         journal.delete();
         log.info("여행일지 삭제 완료: memberId={}, journalId={}", memberId, journalId);
     }

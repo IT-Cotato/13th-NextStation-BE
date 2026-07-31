@@ -93,6 +93,8 @@ public class PlaceReviewCommandService {
                 placeReviewImageRepository.saveAll(reviewImages);
             };
 
+
+            // PlaceReviewImage 저장 실패 시 PlaceReview도 함께 롤백되는 상황
     }
 
     // 여행일지 수정 시 장소 리뷰 수정
