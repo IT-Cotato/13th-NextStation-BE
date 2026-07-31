@@ -224,6 +224,40 @@ public class JournalQueryService {
                 .orElse(null);  // 일지 없거나 미작성이면 null (장소 수로 추정)
     }
 
+    /**
+     * 코스 카드용 여행일지 정보를 여러 건 한 번에 조회한다.
+     * <p>
+     * 둘러보기·장소별 코스처럼 카드가 여러 개인 화면은 {@link #getJournalCourseCardInfo}를
+     * 카드마다 부르면 카드 수만큼 쿼리가 나간다. 일지와 사진을 각각 한 번씩만 읽는다.
+     * <p>
+     * 일지가 없는 id는 결과에서 빠진다. null은 무시한다.
+     */
+    public Map<Long, JournalCardInfoResponse> getJournalCourseCardInfos(List<Long> journalIds) {
+        List<Long> targets = journalIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (targets.isEmpty()) {
+            return Map.of();
+        }
+
+        // 일지마다 첫 사진(created_at 오름차순) 하나만 남긴다.
+        Map<Long, String> firstImageByJournal = journalImageRepository
+                .findImagesByJournalIds(targets).stream()
+                .collect(Collectors.toMap(
+                        JournalImageRepository.JournalImageView::getJournalId,
+                        JournalImageRepository.JournalImageView::getImageUrl,
+                        (first, next) -> first));
+
+        return journalRepository.findAllById(targets).stream()
+                .collect(Collectors.toMap(
+                        Journal::getId,
+                        journal -> new JournalCardInfoResponse(
+                                journal.getId(),
+                                firstImageByJournal.get(journal.getId()),
+                                journal.getTravelDuration())));
+    }
+
     public Optional<JournalCardInfoResponse> getJournalCourseCardInfo(Long journalId) {
         return journalRepository.findById(journalId)
                 .map(journal -> {

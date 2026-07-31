@@ -49,7 +49,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -443,19 +442,12 @@ public class CourseQueryService {
     /**
      * 카드에 얹을 여행일지 정보(대표 사진·소요시간)를 journalId 기준으로 모은다.
      * <p>
+     * 카드마다 조회하면 카드 수만큼 쿼리가 나가므로 페이지 단위로 한 번에 받는다.
      * 일지가 없거나 미작성이면 값이 빠진다. 둘러보기·장소별 코스는 공개 일지가 있는 코스만
      * 노출하므로 실제로는 항상 채워지지만, 호출부가 null을 견디도록 두었다.
-     * <p>
-     * TODO: 현재는 journalId마다 한 번씩 부른다. 목록이 길어지면 일괄 조회 창구를 요청한다.
      */
     private Map<Long, JournalCardInfoResponse> resolveJournalCardInfos(List<Long> journalIds) {
-        Map<Long, JournalCardInfoResponse> result = new LinkedHashMap<>();
-        journalIds.stream()
-                .filter(Objects::nonNull)
-                .distinct()
-                .forEach(journalId -> journalQueryService.getJournalCourseCardInfo(journalId)
-                        .ifPresent(info -> result.put(journalId, info)));
-        return result;
+        return journalQueryService.getJournalCourseCardInfos(journalIds);
     }
     private String resolveJournalImageUrl(Map<Long, JournalCardInfoResponse> journalInfos, Long journalId) {
         JournalCardInfoResponse info = journalInfos.get(journalId);

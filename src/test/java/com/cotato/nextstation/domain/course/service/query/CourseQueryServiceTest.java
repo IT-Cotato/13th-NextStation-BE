@@ -637,10 +637,10 @@ class CourseQueryServiceTest {
                 .willReturn(List.of(withImage, withoutImage));
         given(coursePlaceRepository.findByCourseIdInOrderByCourseIdAscOrderNumAsc(any())).willReturn(List.of());
         given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
-        given(journalQueryService.getJournalCourseCardInfo(11L))
-                .willReturn(Optional.of(new JournalCardInfoResponse(11L, "cover.jpg", null)));
-        given(journalQueryService.getJournalCourseCardInfo(12L))
-                .willReturn(Optional.of(new JournalCardInfoResponse(12L, null, null)));
+        given(journalQueryService.getJournalCourseCardInfos(List.of(11L, 12L)))
+                .willReturn(Map.of(
+                        11L, new JournalCardInfoResponse(11L, "cover.jpg", null),
+                        12L, new JournalCardInfoResponse(12L, null, null)));
 
         // when
         courseQueryService.getExploreCourses(
