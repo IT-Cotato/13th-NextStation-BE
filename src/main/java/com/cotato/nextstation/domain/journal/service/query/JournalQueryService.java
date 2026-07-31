@@ -22,7 +22,6 @@ import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
-import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.domain.station.service.query.StationQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +47,6 @@ public class JournalQueryService {
     private final PlaceInfoQueryService placeInfoQueryService;
     private final StationQueryService stationQueryService;
 
-    private final StationRepository stationRepository;
     private final JournalRepository journalRepository;
     private final JournalImageRepository journalImageRepository;
     private final PlaceReviewRepository placeReviewRepository;
@@ -66,9 +64,7 @@ public class JournalQueryService {
         CourseInfoResponse courseInfo = courseQueryService.getCourseInfo(courseId);
 
         // 3. stationId → stationName
-        String stationName = stationRepository.findById(courseInfo.stationId())
-                .map(station -> station.getStationName())
-                .orElse(null);
+        String stationName = stationQueryService.getStationName(courseInfo.stationId());
 
         // 4. courseId → 장소 목록 (placeId + orderNum)
         List<CoursePlaceInfoResponse> coursePlaces = courseQueryService.getCoursePlaces(courseId);
@@ -156,9 +152,8 @@ public class JournalQueryService {
         CourseInfoResponse courseInfo = courseQueryService.getCourseInfo(courseId);
 
         // 5. stationId → stationName, line
-        Map<Long, String> stationNameMap = stationQueryService
-                .getStationNames(Set.of(courseInfo.stationId()));
-        String stationName = stationNameMap.get(courseInfo.stationId());
+       String stationName = stationQueryService
+                .getStationName(courseInfo.stationId());
         LineSummaryResponse line = stationQueryService.getLine(courseInfo.stationId());
 
         // 6. courseId → 장소 목록 (placeId + orderNum)
