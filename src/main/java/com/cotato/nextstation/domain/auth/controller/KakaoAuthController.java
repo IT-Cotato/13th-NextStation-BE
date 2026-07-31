@@ -14,6 +14,7 @@ import com.cotato.nextstation.global.util.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -36,6 +37,7 @@ public class KakaoAuthController {
     private final KakaoSignupCommandService kakaoSignupCommandService;
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
+    @Tag(name = "카카오 로그인")
     @Operation(
             summary = "카카오 로그인/신규가입 판별",
             description = """
@@ -74,6 +76,7 @@ public class KakaoAuthController {
         return CommonResponse.success(response);
     }
 
+    @Tag(name = "카카오 로그인")
     @Operation(
             summary = "카카오 신규 회원가입 완료(약관 동의)",
             description = """
