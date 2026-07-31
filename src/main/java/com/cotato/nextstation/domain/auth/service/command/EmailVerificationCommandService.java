@@ -11,6 +11,8 @@ import com.cotato.nextstation.domain.auth.repository.TermsConsentRepository;
 import com.cotato.nextstation.domain.auth.service.EmailVerificationWriter;
 import com.cotato.nextstation.domain.auth.util.EmailMasker;
 import com.cotato.nextstation.domain.auth.util.VerificationMailSender;
+import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.extern.slf4j.Slf4j;
@@ -70,35 +72,79 @@ public class EmailVerificationCommandService {
     // 회원가입 인증번호 확인
     @Transactional(noRollbackFor = CustomException.class)
     public void verifySignupCode(String email, String code) {
-        log.info("이메일 인증번호 확인 요청: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
+        verifyCode(VerificationType.SIGNUP, email, code);
+    }
+
+    // 비밀번호 재설정 인증번호 발송
+    public void sendPasswordResetVerificationCode(String email) {
+        log.info("이메일 인증번호 발송 요청: type={}, email={}", VerificationType.PASSWORD_RESET, EmailMasker.mask(email));
+
+        validateResettablePasswordAccount(email);
+
+        // 발송 로직(rate limit/코드 발급/메일 발송)은 회원가입과 동일한 인프라를 재사용한다.
+        String code = emailVerificationWriter.issue(email, VerificationType.PASSWORD_RESET, codeExpirationMillis);
+
+        verificationMailSender.sendVerificationCode(email, code);
+        log.info("이메일 인증번호 발송 완료: type={}, email={}", VerificationType.PASSWORD_RESET, EmailMasker.mask(email));
+    }
+
+    // 비밀번호 재설정 인증번호 확인
+    @Transactional(noRollbackFor = CustomException.class)
+    public void verifyPasswordResetCode(String email, String code) {
+        verifyCode(VerificationType.PASSWORD_RESET, email, code);
+    }
+
+    // 발송된 인증번호가 맞는지 확인 (만료/시도횟수/불일치 처리는 인증 목적과 무관하게 동일)
+    private void verifyCode(VerificationType type, String email, String code) {
+        log.info("이메일 인증번호 확인 요청: type={}, email={}", type, EmailMasker.mask(email));
 
         EmailVerification verification = emailVerificationRepository
-                .findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(email, VerificationType.SIGNUP, VerificationStatus.PENDING)
+                .findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(email, type, VerificationStatus.PENDING)
                 .orElseThrow(() -> {
-                    log.warn("유효한 인증번호 발송 내역 없음: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
+                    log.warn("유효한 인증번호 발송 내역 없음: type={}, email={}", type, EmailMasker.mask(email));
                     return new CustomException(AuthErrorCode.EMAIL_VERIFICATION_NOT_FOUND);
                 });
 
         if (verification.isExpired()) {
-            log.warn("만료된 인증번호로 확인 시도: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
+            log.warn("만료된 인증번호로 확인 시도: type={}, email={}", type, EmailMasker.mask(email));
             verification.expire();
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_EXPIRED);
         }
 
         if (!verification.getVerificationCode().equals(code)) {
             verification.increaseAttemptCount();
-            log.warn("인증번호 불일치: type={}, email={}, attemptCount={}", VerificationType.SIGNUP, EmailMasker.mask(email), verification.getAttemptCount());
+            log.warn("인증번호 불일치: type={}, email={}, attemptCount={}", type, EmailMasker.mask(email), verification.getAttemptCount());
 
             if (verification.getAttemptCount() >= MAX_ATTEMPT_COUNT) {
                 verification.fail();
-                log.warn("인증번호 확인 시도 횟수 초과: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
+                log.warn("인증번호 확인 시도 횟수 초과: type={}, email={}", type, EmailMasker.mask(email));
                 throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_ATTEMPT_EXCEEDED);
             }
             throw new CustomException(AuthErrorCode.EMAIL_VERIFICATION_CODE_MISMATCH);
         }
 
         verification.verify();
-        log.info("이메일 인증번호 확인 완료: type={}, email={}", VerificationType.SIGNUP, EmailMasker.mask(email));
+        log.info("이메일 인증번호 확인 완료: type={}, email={}", type, EmailMasker.mask(email));
+    }
+
+    // 비밀번호 재설정이 가능한 계정인지 확인 (가입된 이메일 + 비밀번호 보유한 로컬 계정)
+    private void validateResettablePasswordAccount(String email) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    log.warn("존재하지 않는 이메일로 비밀번호 재설정 시도: email={}", EmailMasker.mask(email));
+                    return new CustomException(AuthErrorCode.MEMBER_NOT_FOUND);
+                });
+
+        if (member.getPassword() == null) {
+            log.warn("소셜 전용 계정으로 비밀번호 재설정 시도: memberId={}", member.getId());
+            throw new CustomException(AuthErrorCode.SOCIAL_ONLY_ACCOUNT);
+        }
+
+        // 탈퇴/정지 회원은 재설정 대상이 아니다. 탈퇴 회원은 재가입을 통해 새 계정을 만드는 흐름을 유지한다.
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            log.warn("ACTIVE 상태가 아닌 회원의 비밀번호 재설정 시도: memberId={}, status={}", member.getId(), member.getStatus());
+            throw new CustomException(AuthErrorCode.MEMBER_NOT_ACTIVE);
+        }
     }
 
     // 이미 가입한 이메일인지 확인

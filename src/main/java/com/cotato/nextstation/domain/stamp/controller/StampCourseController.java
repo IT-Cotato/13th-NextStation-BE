@@ -5,10 +5,13 @@ import com.cotato.nextstation.domain.stamp.dto.response.StationPopularCoursesRes
 import com.cotato.nextstation.domain.stamp.service.command.StampCommandService;
 import com.cotato.nextstation.domain.stamp.service.query.StampCourseQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.security.AuthenticationPrincipal;
+import com.cotato.nextstation.global.security.JwtPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,10 +19,6 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1")
 public class StampCourseController {
-
-    // TODO: Auth 적용 시 X-Member-Id 헤더를 @AuthenticationPrincipal 로 교체한다.
-    private static final String MEMBER_ID_HEADER = "X-Member-Id";
-    private static final String MEMBER_ID_DESCRIPTION = "회원 ID (Auth 적용 전까지 사용하는 임시 헤더)";
 
     private final StampCommandService stampCommandService;
     private final StampCourseQueryService stampCourseQueryService;
@@ -39,13 +38,13 @@ public class StampCourseController {
             @ApiResponse(responseCode = "403", description = "본인 코스가 아님 (`StampErrorCode.COURSE_NOT_OWNED`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @PostMapping("/courses/{courseId}/complete")
     public CommonResponse<CourseCompleteResponse> completeCourse(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "코스 ID", example = "1")
             @PathVariable Long courseId) {
-        return CommonResponse.success(stampCommandService.completeCourse(memberId, courseId));
+        return CommonResponse.success(stampCommandService.completeCourse(principal.memberId(), courseId));
     }
 
 
@@ -60,10 +59,9 @@ public class StampCourseController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "401", description = "인증이 필요함"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @GetMapping("/stamps/stations/{stationId}/courses")
     public CommonResponse<StationPopularCoursesResponse> getPopularCoursesByStation(
-            @Parameter(description = MEMBER_ID_DESCRIPTION, example = "1")
-            @RequestHeader(MEMBER_ID_HEADER) Long memberId,
             @Parameter(description = "역 ID", example = "12")
             @PathVariable Long stationId) {
         return CommonResponse.success(stampCourseQueryService.getPopularCoursesByStation(stationId));

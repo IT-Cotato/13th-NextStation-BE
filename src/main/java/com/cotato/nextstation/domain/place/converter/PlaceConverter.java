@@ -88,6 +88,13 @@ public class PlaceConverter {
 
     // ===== 조회 전용 포트(PlaceInfoResponse)용  =====
 
+    public PlaceInfoResponse toPlaceInfoResponse(Place place) {
+        String imageUrl = resolveImageUrlsByPlaceId(List.of(place.getId()), List.of(place))
+                .get(place.getId());
+        return toPlaceInfoResponse(place, imageUrl);
+    }
+
+
     public List<PlaceInfoResponse> toPlaceInfoResponses(List<Place> places) {
         if (places.isEmpty()) {
         return List.of();

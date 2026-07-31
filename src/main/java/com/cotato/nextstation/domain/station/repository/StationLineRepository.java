@@ -30,4 +30,7 @@ public interface StationLineRepository extends JpaRepository<StationLine, Long> 
         String getLineName();
         LineCode getLineCode();
     }
+
+    Optional<StationLine> findFirstByStationId(Long stationId);
+
 }
