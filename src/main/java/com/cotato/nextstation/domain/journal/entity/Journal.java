@@ -1,6 +1,8 @@
 package com.cotato.nextstation.domain.journal.entity;
 
+import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.global.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -9,6 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -16,7 +19,14 @@ import java.time.LocalDateTime;
  *
  */
 @Entity
-@Table(name = "journal")
+@Table(name = "journal",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_journal_member_stamp",
+                        columnNames = {"member_stamp_id"}
+                )
+        }
+)
 @SQLRestriction("is_deleted = false")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -25,6 +35,22 @@ public class Journal extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
+
+    @Column(name = "member_stamp_id")
+    private Long memberStampId;
+
+    @Column(nullable = false)
+    private String title;
+
+    @Column(name = "overall_review", columnDefinition = "TEXT")
+    private String overallReview;
+
+    @Column(name = "traveled_at", nullable = false)
+    private LocalDate traveledAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "travel_duration", nullable = false)
+    private TravelDuration travelDuration;
 
     @Column(name = "is_public", nullable = false)
     private boolean isPublic;
@@ -36,8 +62,15 @@ public class Journal extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    public Journal(Member member, boolean isPublic) {
+    public Journal(Member member, Long memberStampId, String title,
+                   String overallReview, LocalDate traveledAt,
+                   TravelDuration travelDuration, boolean isPublic) {
         this.member = member;
+        this.memberStampId = memberStampId;
+        this.title = title;
+        this.overallReview = overallReview;
+        this.traveledAt = traveledAt;
+        this.travelDuration = travelDuration;
         this.isPublic = isPublic;
         this.isDeleted = false;
     }
@@ -45,5 +78,15 @@ public class Journal extends BaseTimeEntity {
     public void delete() {
         this.isDeleted = true;
         this.deletedAt = LocalDateTime.now();
+        this.memberStampId = null; // 재작성 허용을 위한 null
+    }
+
+    public void update(String title, String overallReview,
+                       LocalDate traveledAt, TravelDuration travelDuration, boolean isPublic) {
+        this.title = title;
+        this.overallReview = overallReview;
+        this.traveledAt = traveledAt;
+        this.travelDuration = travelDuration;
+        this.isPublic = isPublic;
     }
 }

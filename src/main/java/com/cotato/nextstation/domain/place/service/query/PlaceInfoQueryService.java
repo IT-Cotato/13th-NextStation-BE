@@ -6,8 +6,10 @@ import com.cotato.nextstation.domain.place.dto.response.StationTagCountResponse;
 import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceTagMapping;
 import com.cotato.nextstation.domain.place.enums.PlaceTagName;
+import com.cotato.nextstation.domain.place.exception.PlaceErrorCode;
 import com.cotato.nextstation.domain.place.repository.PlaceRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceTagMappingRepository;
+import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,12 @@ public class PlaceInfoQueryService {
     private final PlaceRepository placeRepository;
     private final PlaceTagMappingRepository placeTagMappingRepository;
     private final PlaceConverter placeConverter;
+
+    public PlaceInfoResponse getPlaceInfo(Long placeId) {
+        Place place = placeRepository.findById(placeId)
+                .orElseThrow(() -> new CustomException(PlaceErrorCode.PLACE_NOT_FOUND));
+        return placeConverter.toPlaceInfoResponse(place);
+    }
 
     public List<PlaceInfoResponse> getPlaceInfos(List<Long> placeIds) {
         List<Place> places = placeRepository.findAllById(placeIds);
