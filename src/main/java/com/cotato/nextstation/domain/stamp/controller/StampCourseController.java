@@ -59,9 +59,9 @@ public class StampCourseController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "401", description = "인증이 필요함"),
     })
+    @SecurityRequirement(name = "accessTokenAuth")
     @GetMapping("/stamps/stations/{stationId}/courses")
     public CommonResponse<StationPopularCoursesResponse> getPopularCoursesByStation(
-            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "역 ID", example = "12")
             @PathVariable Long stationId) {
         return CommonResponse.success(stampCourseQueryService.getPopularCoursesByStation(stationId));
