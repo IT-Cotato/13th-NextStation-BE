@@ -28,6 +28,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -55,14 +56,16 @@ public class AuthController {
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
     private final PasswordResetCommandService passwordResetCommandService;
 
+    @Tag(name = "회원가입")
     @Operation(
-            summary = "회원가입 이메일 인증번호 발송",
+            summary = "[1단계] 회원가입 이메일 인증번호 발송",
             description = """
                     입력한 이메일로 6자리 인증번호를 발송한다.
                     - 인증번호 유효시간: 3분
                     - 발송 한도: 시간당 5회 / 하루 10회, 초과 시 일정 시간 잠금
                     - 이미 PENDING 상태의 코드가 있으면 새 코드 발송 시 기존 코드는 즉시 무효화된다.
                     - 필수 약관에 모두 동의해야 발송된다(`agreedTermsIds`에 현재 필수 약관 id가 전부 포함돼야 함).
+                    - 발송 후에는 인증번호 확인(2단계, `/email/verification/confirm`) API로 검증한 뒤, 회원가입 비밀번호 설정(3단계, `/signup`) API로 이어진다.
                     """
     )
     @ApiResponses({
@@ -79,12 +82,14 @@ public class AuthController {
         return CommonResponse.success(null);
     }
 
+    @Tag(name = "회원가입")
     @Operation(
-            summary = "회원가입 이메일 인증번호 확인",
+            summary = "[2단계] 회원가입 이메일 인증번호 확인",
             description = """
                     발송된 6자리 인증번호가 맞는지 확인한다.
                     - 인증번호 불일치 시도는 최대 5회까지 허용되며, 초과 시 해당 인증번호는 실패 처리된다.
                     - 만료된 인증번호로 확인을 시도하면 즉시 실패 처리된다.
+                    - 확인 성공 후에는 회원가입 비밀번호 설정(3단계, `/signup`) API를 호출해 회원(Member)을 생성한다.
                     """
     )
     @ApiResponses({
@@ -99,12 +104,13 @@ public class AuthController {
         return CommonResponse.success(null);
     }
 
+    @Tag(name = "회원가입")
     @Operation(
-            summary = "회원가입 비밀번호 설정",
+            summary = "[3단계] 회원가입 비밀번호 설정",
             description = """
                     이메일 인증이 완료된 이메일로 회원(Member)을 생성하고 비밀번호를 설정한다.
                     - Member 생성과 약관 동의(`member_terms_agreement`) 저장이 한 트랜잭션으로 처리된다.
-                    - 응답으로 받는 `signupToken`은 **다음 단계인 "프로필 설정" API를 호출할 때만 쓰는 전용 토큰**이다.
+                    - 응답으로 받는 `signupToken`은 **다음 단계인 프로필 설정(`/profile`) API를 호출할 때만 쓰는 전용 토큰**이다.
                       로그인 상태를 유지하는 access token이 아니므로 다른 API 호출에는 쓸 수 없고, 발급 후 30분이 지나면 만료된다.
                     - 프로필 설정 화면으로 넘어갈 때 이 값을 프론트에서 잠깐 들고 있다가, 프로필 설정 API 요청의 `Authorization: Bearer {signupToken}` 헤더에 그대로 실어서 보내면 된다.
                     - access token(로그인 유지용)과 refresh token은 이 API가 아니라 로그인 API에서 발급된다.
@@ -131,11 +137,13 @@ public class AuthController {
         return CommonResponse.success(HttpStatus.CREATED, response);
     }
 
+    @Tag(name = "프로필 설정")
     @Operation(
             summary = "프로필 설정",
             description = """
                     닉네임/프로필 사진/성별/생년월일을 설정하고 회원가입을 완료한다(status: PENDING -> ACTIVE).
-                    - signupToken 인증 필요. 우측 상단 자물쇠(Authorize) 버튼을 눌러 회원가입 비밀번호 설정 API 응답의 signupToken 값을 그대로(Bearer 접두사 없이) 넣으면 된다.
+                    - 로컬 회원가입(`/signup`)과 카카오 회원가입(`/kakao/login`의 `PENDING_PROFILE` 또는 `/kakao/signup`) 양쪽 흐름의 마지막 단계로 공통으로 쓰인다.
+                    - signupToken 인증 필요. 우측 상단 자물쇠(Authorize) 버튼을 눌러 위 API들의 응답으로 받은 signupToken 값을 그대로(Bearer 접두사 없이) 넣으면 된다.
                     - 프로필 사진은 선택 입력이며, presigned URL로 S3에 업로드 완료 후 받은 imageUrl을 그대로 넣으면 된다.
                     - 성별의 "선택 안함"도 `UNSPECIFIED`로 명시적으로 보내야 한다.
                     - 이미 프로필 설정이 완료된 회원(status != PENDING)이 같은 토큰으로 다시 요청하면 거부된다(재사용 방지).
@@ -163,6 +171,7 @@ public class AuthController {
         return CommonResponse.success(response);
     }
 
+    @Tag(name = "로그인")
     @Operation(
             summary = "로그인",
             description = """
@@ -187,6 +196,7 @@ public class AuthController {
         return CommonResponse.success(new LoginResponse(result.memberId(), result.accessToken()));
     }
 
+    @Tag(name = "로그인")
     @Operation(
             summary = "액세스 토큰 재발급",
             description = """
@@ -212,14 +222,16 @@ public class AuthController {
         return CommonResponse.success(new ReissueResponse(result.accessToken()));
     }
 
+    @Tag(name = "비밀번호 재설정")
     @Operation(
-            summary = "비밀번호 재설정 이메일 인증번호 발송",
+            summary = "[1단계] 비밀번호 재설정 이메일 인증번호 발송",
             description = """
                     가입된 로컬 계정 이메일로 6자리 인증번호를 발송한다.
                     - 인증번호 유효시간: 3분
                     - 발송 한도: 시간당 5회 / 하루 10회, 초과 시 일정 시간 잠금 (회원가입 인증번호와는 별도로 집계된다)
                     - 이미 PENDING 상태의 코드가 있으면 새 코드 발송 시 기존 코드는 즉시 무효화된다.
                     - 소셜 로그인 전용 계정(비밀번호가 없는 계정)은 재설정 대상에서 제외된다.
+                    - 발송 후에는 인증번호 확인(2단계, `/password-reset/email/verification/confirm`) API로 검증한 뒤, 비밀번호 재설정(3단계, `/password-reset`) API로 이어진다.
                     """
     )
     @ApiResponses({
@@ -236,12 +248,14 @@ public class AuthController {
         return CommonResponse.success(null);
     }
 
+    @Tag(name = "비밀번호 재설정")
     @Operation(
-            summary = "비밀번호 재설정 이메일 인증번호 확인",
+            summary = "[2단계] 비밀번호 재설정 이메일 인증번호 확인",
             description = """
                     발송된 6자리 인증번호가 맞는지 확인한다.
                     - 인증번호 불일치 시도는 최대 5회까지 허용되며, 초과 시 해당 인증번호는 실패 처리된다.
                     - 만료된 인증번호로 확인을 시도하면 즉시 실패 처리된다.
+                    - 확인 성공 후에는 비밀번호 재설정(3단계, `/password-reset`) API를 호출해 새 비밀번호로 변경한다.
                     """
     )
     @ApiResponses({
@@ -256,8 +270,9 @@ public class AuthController {
         return CommonResponse.success(null);
     }
 
+    @Tag(name = "비밀번호 재설정")
     @Operation(
-            summary = "비밀번호 재설정",
+            summary = "[3단계] 비밀번호 재설정",
             description = """
                     이메일 인증이 완료된 로컬 계정의 비밀번호를 새 비밀번호로 변경한다.
                     - 인증번호 확인(confirm) 이후 비밀번호 입력까지 시간이 걸릴 수 있으므로, 재설정 시점에 인증번호 일치/만료 여부를 다시 검증한다.

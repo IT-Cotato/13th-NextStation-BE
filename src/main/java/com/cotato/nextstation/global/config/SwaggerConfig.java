@@ -87,6 +87,17 @@ public class SwaggerConfig {
                 .build();
     }
 
+    // 둘러보기 관련 API (둘러보기 메인/코스 목록/컨셉투어)
+    @Bean
+    public GroupedOpenApi exploreApi() {
+        return GroupedOpenApi.builder()
+                .group("Explore")
+                .displayName("Explore API")
+                .packagesToScan("com.cotato.nextstation.domain.course.controller")
+                .pathsToMatch("/api/v1/explore/**")
+                .build();
+    }
+
     // 회원 관련 API (내 프로필 등)
     @Bean
     public GroupedOpenApi memberApi() {

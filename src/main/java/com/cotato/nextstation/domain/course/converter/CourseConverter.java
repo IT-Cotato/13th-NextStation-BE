@@ -6,6 +6,9 @@ import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreStationResponse;
+import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
@@ -15,7 +18,10 @@ import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
+import com.cotato.nextstation.domain.journal.enums.TravelDuration;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
@@ -161,8 +167,40 @@ public class CourseConverter {
         return new LineSummaryResponse(lineId, lineName, lineCode);
     }
 
+    // 둘러보기 카드. 사진은 작성자가 여행일지에 올린 첫 사진인데 아직 데이터가 없어 null로 나간다.
+    public ExploreCourseResponse toExploreCourseResponse(ExploreCourseView course,
+                                                         List<String> tags, boolean isLiked, String imageUrl) {
+        return new ExploreCourseResponse(
+                course.getCourseId(),
+                course.getJournalId(),
+                course.getName(),
+                course.getStationId(),
+                course.getStationName(),
+                toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
+                tags,
+                course.getLikeCount(),
+                isLiked,
+                imageUrl
+        );
+    }
+
+    // availableStations는 "역 선택" 드롭다운이 있는 목록만 채운다. 없는 화면은 빈 목록을 넘긴다.
+    // 후보 역을 모두 담고, 공개 코스가 있는 역만 hasCourses = true로 표시한다.
+    public ExploreCourseListResponse toExploreListResponse(List<ExploreCourseResponse> courses,
+                                                           List<StationView> availableStations,
+                                                           Set<Long> stationIdsWithCourses,
+                                                           String nextCursor, boolean hasNext) {
+        List<ExploreStationResponse> stationFilters = availableStations.stream()
+                .map(station -> new ExploreStationResponse(station.getStationId(), station.getStationName(),
+                        stationIdsWithCourses.contains(station.getStationId())))
+                .toList();
+        return new ExploreCourseListResponse(courses, stationFilters, nextCursor, hasNext);
+    }
+
+    // 소요시간은 여행일지에 남긴 값을 쓰고, 아직 없으면 장소 수로 추정한다.
     public PlaceCourseResponse toPlaceCourseResponse(PlaceCourseView course, int placeCount,
-                                                     List<String> tags, String imageUrl) {
+                                                     List<String> tags, String imageUrl,
+                                                     TravelDuration travelDuration) {
         return new PlaceCourseResponse(
                 course.getCourseId(),
                 course.getName(),
@@ -170,7 +208,7 @@ public class CourseConverter {
                 course.getStationName(),
                 toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
                 placeCount,
-                estimateDuration(placeCount),
+                (travelDuration != null) ? travelDuration.name() : estimateDuration(placeCount),
                 tags,
                 imageUrl
         );
