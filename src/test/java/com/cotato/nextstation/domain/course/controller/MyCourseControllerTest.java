@@ -177,6 +177,7 @@ class MyCourseControllerTest {
     void getMyCourseDetail_success() throws Exception {
         given(courseQueryService.getMyCourseDetail(1L, 1L)).willReturn(new MyCourseDetailResponse(
                 1L, "민성이랑 떠나는 느좋투어", 6L, "신림역",
+                new LineSummaryResponse(2L, "2호선", LineCode.LINE_2),
                 List.of(
                         new MyCoursePlaceResponse(11L, "보문숲길도서관", "혼자 조용히 머물기 좋은 동네 도서관",
                                 "https://img/1.jpg", 127.0345, 37.5804, 1),
@@ -188,6 +189,7 @@ class MyCourseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.courseId").value(1))
                 .andExpect(jsonPath("$.data.name").value("민성이랑 떠나는 느좋투어"))
+                .andExpect(jsonPath("$.data.line.code").value("LINE_2"))
                 .andExpect(jsonPath("$.data.stationName").value("신림역"))
                 // 지도 핀을 찍으려면 좌표가 반드시 실려야 한다
                 .andExpect(jsonPath("$.data.places[0].xCoordinate").value(127.0345))

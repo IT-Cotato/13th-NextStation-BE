@@ -1,6 +1,8 @@
 package com.cotato.nextstation.domain.course.converter;
 
+import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.station.entity.LineCode;
@@ -29,6 +31,43 @@ class CourseConverterTest {
         given(view.getLineName()).willReturn("6호선");
         given(view.getLineCode()).willReturn(LineCode.LINE_6);
         return view;
+    }
+
+    private MyCourseDetailView detailView(Long lineId, String lineName, LineCode lineCode) {
+        MyCourseDetailView view = mock(MyCourseDetailView.class);
+        given(view.getCourseId()).willReturn(1L);
+        given(view.getName()).willReturn("민성이랑 떠나는 느좋투어");
+        given(view.getStationId()).willReturn(6L);
+        given(view.getStationName()).willReturn("신림역");
+        given(view.getLineId()).willReturn(lineId);
+        given(view.getLineName()).willReturn(lineName);
+        given(view.getLineCode()).willReturn(lineCode);
+        return view;
+    }
+
+    @Test
+    @DisplayName("코스 확인 응답에 역의 대표 호선을 담는다")
+    void toMyCourseDetailResponse_withLine() {
+        // when: 화면 상단 배지가 호선에 따라 달라진다
+        MyCourseDetailResponse response = courseConverter.toMyCourseDetailResponse(
+                detailView(2L, "2호선", LineCode.LINE_2), List.of());
+
+        // then
+        assertThat(response.stationName()).isEqualTo("신림역");
+        assertThat(response.line().id()).isEqualTo(2L);
+        assertThat(response.line().name()).isEqualTo("2호선");
+        assertThat(response.line().code()).isEqualTo(LineCode.LINE_2);
+    }
+
+    @Test
+    @DisplayName("대표 호선이 없는 역이면 line을 null로 내린다")
+    void toMyCourseDetailResponse_withoutLine() {
+        // given: 뽑기 대상이 아닌 역은 대표 호선이 비어 있을 수 있다
+        MyCourseDetailResponse response = courseConverter.toMyCourseDetailResponse(
+                detailView(null, null, null), List.of());
+
+        // then: 셋 다 null이므로 노선 객체 자체를 내리지 않는다
+        assertThat(response.line()).isNull();
     }
 
     @ParameterizedTest(name = "장소 {0}곳이면 {1}")

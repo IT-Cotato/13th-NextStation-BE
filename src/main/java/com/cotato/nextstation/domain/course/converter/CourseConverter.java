@@ -104,6 +104,7 @@ public class CourseConverter {
                 course.getName(),
                 course.getStationId(),
                 course.getStationName(),
+                toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
                 places
         );
     }

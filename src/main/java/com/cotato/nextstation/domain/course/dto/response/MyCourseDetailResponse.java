@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.course.dto.response;
 
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -18,6 +19,12 @@ public record MyCourseDetailResponse(
 
         @Schema(description = "역 이름", example = "신림역")
         String stationName,
+
+        @Schema(description = """
+                역의 대표 호선. 화면 상단 배지 색·모양을 이 값으로 정한다.
+                대표 호선이 없는 역이면 null이다.
+                """, nullable = true)
+        LineSummaryResponse line,
 
         @Schema(description = "코스에 담긴 장소 (순서대로)")
         List<MyCoursePlaceResponse> places

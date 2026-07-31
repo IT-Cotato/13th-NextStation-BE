@@ -22,10 +22,14 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // memberId를 조건에 넣어 남의 코스는 애초에 조회되지 않는다(존재 여부도 알리지 않는다).
     // 공개 조건은 걸지 않는다. 본인 코스는 일지를 안 썼거나 비공개여도 보여야 한다.
     // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
+    // 화면 상단 "Next Station" 배지가 호선에 따라 달라져서 대표 호선까지 함께 가져온다.
+    // 뽑기 대상이 아닌 역은 대표 호선이 없을 수 있어 LEFT JOIN으로 둔다(목록 카드와 같은 기준).
     @Query("SELECT c.id AS courseId, c.name AS name, " +
-            "s.id AS stationId, s.stationName AS stationName " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
             "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
             "WHERE c.id = :courseId AND c.memberId = :memberId")
     Optional<MyCourseDetailView> findMyCourseDetail(@Param("memberId") Long memberId,
                                                     @Param("courseId") Long courseId);
@@ -351,6 +355,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         String getName();
         Long getStationId();
         String getStationName();
+        Long getLineId();
+        String getLineName();
+        LineCode getLineCode();
     }
 
     interface MyCourseView {
