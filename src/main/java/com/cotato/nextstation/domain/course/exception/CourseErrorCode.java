@@ -17,7 +17,6 @@ public enum CourseErrorCode implements ErrorCode {
     CANNOT_LIKE_OWN_COURSE(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_CANNOT_LIKE_OWN_COURSE", "본인이 만든 코스는 좋아요할 수 없습니다."),
     CANNOT_COPY_OWN_COURSE(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_CANNOT_COPY_OWN_COURSE", "본인이 만든 코스는 가져올 수 없습니다."),
     COURSE_LIKE_NOT_FOUND(HttpStatus.NOT_FOUND, "CLIENT_ERROR_404_COURSE_LIKE_NOT_FOUND", "좋아요하지 않은 코스입니다."),
-    COURSE_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "CLIENT_ERROR_403_COURSE_DELETE_FORBIDDEN", "본인 코스만 삭제할 수 있습니다."),
     ;
 
     private final HttpStatus httpStatus;

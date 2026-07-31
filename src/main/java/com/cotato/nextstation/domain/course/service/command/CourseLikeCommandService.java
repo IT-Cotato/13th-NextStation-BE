@@ -97,19 +97,6 @@ public class CourseLikeCommandService {
         cancelLikes(memberId, targetCourseIds);
     }
 
-    // 코스 삭제(soft delete). 본인 코스만 삭제할 수 있다.
-    public void deleteCourse(Long memberId, Long courseId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
-
-        if (!course.getMemberId().equals(memberId)) {
-            log.warn("타인 코스 삭제 시도: memberId={}, courseId={}", memberId, courseId);
-            throw new CustomException(CourseErrorCode.COURSE_DELETE_FORBIDDEN);
-        }
-
-        course.delete();
-    }
-
     /**
      * 코스 다중 삭제(저장 탭 선택 모드). 본인 코스만 대상이 되며, 남의 코스나 이미 삭제된 코스가
      * 섞여 있어도 나머지는 정상 삭제되는 부분 성공을 허용한다. soft delete라 좋아요 다중 취소와
