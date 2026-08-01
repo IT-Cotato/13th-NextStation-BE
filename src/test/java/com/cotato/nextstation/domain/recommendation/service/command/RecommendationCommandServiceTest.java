@@ -1,12 +1,19 @@
 package com.cotato.nextstation.domain.recommendation.service.command;
 
+import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.recommendation.converter.RecommendationConverter;
+import com.cotato.nextstation.domain.recommendation.dto.request.CustomRecommendationRequest;
+import com.cotato.nextstation.domain.recommendation.dto.response.CustomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.RandomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.entity.RecommendationLog;
+import com.cotato.nextstation.domain.recommendation.enums.TravelTime;
 import com.cotato.nextstation.domain.recommendation.exception.RecommendationErrorCode;
 import com.cotato.nextstation.domain.recommendation.repository.RecommendationLogRepository;
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceReader;
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceView;
+import com.cotato.nextstation.domain.recommendation.service.port.StationTagCountReader;
+import com.cotato.nextstation.domain.route.repository.StationRouteRepository;
+import com.cotato.nextstation.domain.route.repository.StationRouteRepository.ReachableStationView;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.Line;
 import com.cotato.nextstation.domain.station.entity.LineCode;
@@ -26,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +61,15 @@ class RecommendationCommandServiceTest {
     @Mock
     private StationLineRepository stationLineRepository;
 
+    @Mock
+    private StationRouteRepository stationRouteRepository;
+
+    @Mock
+    private CourseRepository courseRepository;
+
+    @Mock
+    private StationTagCountReader stationTagCountReader;
+
     private final RecommendationConverter recommendationConverter = new RecommendationConverter(new LineConverter());
 
     private RecommendationCommandService recommendationCommandService;
@@ -60,9 +77,10 @@ class RecommendationCommandServiceTest {
     @BeforeEach
     void setUp() {
         recommendationCommandService = new RecommendationCommandService(
-                stationRepository, stationLineRepository, recommendationLogRepository,
-                stationPlaceReader, recommendationConverter);
+                stationRepository, stationLineRepository, stationRouteRepository, courseRepository,
+                recommendationLogRepository, stationPlaceReader, stationTagCountReader, recommendationConverter);
         lenient().when(stationLineRepository.findLinesByStationIdIn(any())).thenReturn(List.of());
+        lenient().when(courseRepository.findVisitedStationIds(any())).thenReturn(List.of());
     }
 
     private Station station(Long id, String name) {
@@ -295,5 +313,221 @@ class RecommendationCommandServiceTest {
                 .stationName(name).description(name + " 소개").todo(todo).isDrawable(true).build();
         ReflectionTestUtils.setField(station, "id", id);
         return station;
+    }
+
+    // ---------- 맞춤추천 ----------
+
+    private static final List<String> TRAVEL_STYLES = List.of("NATURE", "BUDGET", "EXPERIENCE");
+
+    private ReachableStationView reachableView(Long stationId, int durationMinutes) {
+        ReachableStationView view = mock(ReachableStationView.class);
+        lenient().when(view.getStationId()).thenReturn(stationId);
+        lenient().when(view.getDurationMinutes()).thenReturn(durationMinutes);
+        return view;
+    }
+
+    private CustomRecommendationRequest customRequest(Long departureStationId, TravelTime travelTime, List<String> travelStyles) {
+        return new CustomRecommendationRequest(departureStationId, travelTime, travelStyles);
+    }
+
+    // 출발역은 항상 존재하는 것으로 스텁하고, 도달 가능 구간은 '상관없음'으로 단순화한다.
+    private void givenDeparture(Long departureStationId) {
+        given(stationRepository.existsById(departureStationId)).willReturn(true);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 출발역이면 예외가 발생한다")
+    void recommendCustom_departureStationNotFound() {
+        // given
+        given(stationRepository.existsById(99L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> recommendationCommandService.recommendCustom(1L,
+                customRequest(99L, TravelTime.ANY, TRAVEL_STYLES)))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(RecommendationErrorCode.DEPARTURE_STATION_NOT_FOUND.getMessage());
+        verify(recommendationLogRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("여행 스타일이 중복되면 예외가 발생한다")
+    void recommendCustom_duplicateTravelStyle() {
+        // given
+        givenDeparture(1L);
+
+        // when & then
+        assertThatThrownBy(() -> recommendationCommandService.recommendCustom(1L,
+                customRequest(1L, TravelTime.ANY, List.of("NATURE", "NATURE", "BUDGET"))))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(RecommendationErrorCode.DUPLICATE_TRAVEL_STYLE.getMessage());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 여행 스타일이면 예외가 발생한다")
+    void recommendCustom_invalidTravelStyle() {
+        // given
+        givenDeparture(1L);
+
+        // when & then
+        assertThatThrownBy(() -> recommendationCommandService.recommendCustom(1L,
+                customRequest(1L, TravelTime.ANY, List.of("NATURE", "BUDGET", "NOT_A_TAG"))))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(RecommendationErrorCode.INVALID_TRAVEL_STYLE.getMessage());
+    }
+
+    @Test
+    @DisplayName("도달 가능한 역이 없으면 예외가 발생한다")
+    void recommendCustom_noReachableStation() {
+        // given
+        givenDeparture(1L);
+        given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(List.of());
+
+        // when & then
+        assertThatThrownBy(() -> recommendationCommandService.recommendCustom(1L,
+                customRequest(1L, TravelTime.ANY, TRAVEL_STYLES)))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(RecommendationErrorCode.NO_REACHABLE_STATION.getMessage());
+        verify(recommendationLogRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("이동 가능 시간이 정해져 있으면 그 시간 이내 구간만 조회한다")
+    void recommendCustom_usesReachableWithLimit() {
+        // given
+        givenDeparture(1L);
+        List<ReachableStationView> routes = List.of(reachableView(2L, 20));
+        given(stationRouteRepository.findReachable(1L, 30)).willReturn(routes);
+        given(stationRepository.findAllById(any())).willReturn(List.of(station(2L, "B역")));
+        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(Map.of());
+
+        // when
+        recommendationCommandService.recommendCustom(1L, customRequest(1L, TravelTime.THIRTY_MINUTES, TRAVEL_STYLES));
+
+        // then
+        verify(stationRouteRepository).findReachable(1L, 30);
+        verify(stationRouteRepository, never()).findAllFromDeparture(any());
+    }
+
+    @Test
+    @DisplayName("태그 점수가 최고점의 90% 미만인 역은 후보에서 빠진다(가중치 10)")
+    void recommendCustom_filtersByScoreRatio() {
+        // given: A는 1개 태그만 겹쳐 점수 11(=1+10), B는 3개 태그가 모두 겹쳐 점수 45(=15+30)
+        // 임계값 = 45*0.9 = 40.5 → A는 탈락하고 B만 남아 결과가 B로 고정된다
+        givenDeparture(1L);
+        List<ReachableStationView> routes = List.of(reachableView(1L, 10), reachableView(2L, 20));
+        given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(routes);
+        given(stationRepository.findAllById(any())).willReturn(List.of(station(1L, "A역"), station(2L, "B역")));
+        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(Map.of(
+                1L, Map.of("NATURE", 1L),
+                2L, Map.of("NATURE", 5L, "BUDGET", 5L, "EXPERIENCE", 5L)
+        ));
+
+        // when
+        CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
+                customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
+
+        // then
+        assertThat(response.station().stationId()).isEqualTo(2L);
+        assertThat(response.travelDurationMinutes()).isEqualTo(20);
+        ArgumentCaptor<RecommendationLog> captor = ArgumentCaptor.forClass(RecommendationLog.class);
+        verify(recommendationLogRepository).save(captor.capture());
+        assertThat(captor.getValue().getResultStationId()).isEqualTo(2L);
+        assertThat(captor.getValue().isRandom()).isFalse();
+    }
+
+    @Test
+    @DisplayName("동점 후보 중 안 가본 역이 있으면 가본 역은 제외된다")
+    void recommendCustom_excludesVisitedStation() {
+        // given: A·B 동점 후보, A는 이미 가본 역
+        givenDeparture(1L);
+        List<ReachableStationView> routes = List.of(reachableView(1L, 10), reachableView(2L, 10));
+        given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(routes);
+        given(stationRepository.findAllById(any())).willReturn(List.of(station(1L, "A역"), station(2L, "B역")));
+        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(Map.of());
+        given(courseRepository.findVisitedStationIds(1L)).willReturn(List.of(1L));
+
+        // when
+        CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
+                customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
+
+        // then
+        assertThat(response.station().stationId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("후보 전부 가본 역이면 안 가본 역 조건은 적용하지 않는다")
+    void recommendCustom_allVisitedFallsBackToAll() {
+        // given
+        givenDeparture(1L);
+        List<ReachableStationView> routes = List.of(reachableView(1L, 10));
+        given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(routes);
+        given(stationRepository.findAllById(any())).willReturn(List.of(station(1L, "A역")));
+        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(Map.of());
+        given(courseRepository.findVisitedStationIds(1L)).willReturn(List.of(1L));
+
+        // when
+        CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
+                customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
+
+        // then: 후보가 A뿐이라 결국 A가 나온다
+        assertThat(response.station().stationId()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("동점 후보 중 직전 추천 역은 제외된다")
+    void recommendCustom_excludesLastRecommended() {
+        // given
+        givenDeparture(1L);
+        List<ReachableStationView> routes = List.of(reachableView(1L, 10), reachableView(2L, 10));
+        given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(routes);
+        given(stationRepository.findAllById(any())).willReturn(List.of(station(1L, "A역"), station(2L, "B역")));
+        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(Map.of());
+        given(recommendationLogRepository.findTopByMemberIdOrderByCreatedAtDescIdDesc(1L))
+                .willReturn(Optional.of(RecommendationLog.builder().memberId(1L).resultStationId(1L).isRandom(false).build()));
+
+        // when
+        CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
+                customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
+
+        // then
+        assertThat(response.station().stationId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("후보가 직전 추천 역 하나뿐이면 제외하지 않고 그 역을 다시 추천한다")
+    void recommendCustom_lastRecommendedDeadEndFallsBack() {
+        // given
+        givenDeparture(1L);
+        List<ReachableStationView> routes = List.of(reachableView(1L, 10));
+        given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(routes);
+        given(stationRepository.findAllById(any())).willReturn(List.of(station(1L, "A역")));
+        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(Map.of());
+        given(recommendationLogRepository.findTopByMemberIdOrderByCreatedAtDescIdDesc(1L))
+                .willReturn(Optional.of(RecommendationLog.builder().memberId(1L).resultStationId(1L).isRandom(false).build()));
+
+        // when
+        CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
+                customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
+
+        // then
+        assertThat(response.station().stationId()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("도달 가능해도 뽑기 대상이 아닌 역은 후보에서 빠진다")
+    void recommendCustom_excludesNonDrawableReachableStation() {
+        // given
+        givenDeparture(1L);
+        List<ReachableStationView> routes = List.of(reachableView(1L, 10));
+        given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(routes);
+        Station notDrawable = Station.builder().stationName("출발전용역").isDrawable(false).build();
+        ReflectionTestUtils.setField(notDrawable, "id", 1L);
+        given(stationRepository.findAllById(any())).willReturn(List.of(notDrawable));
+
+        // when & then
+        assertThatThrownBy(() -> recommendationCommandService.recommendCustom(1L,
+                customRequest(1L, TravelTime.ANY, TRAVEL_STYLES)))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(RecommendationErrorCode.NO_REACHABLE_STATION.getMessage());
     }
 }
