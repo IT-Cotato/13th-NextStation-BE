@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -55,7 +56,12 @@ public class PlaceSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws IOException {
-        byte[] csvBytes = new ClassPathResource(SEED_CSV_PATH).getInputStream().readAllBytes();
+
+        byte[] csvBytes;
+        try (InputStream csvStream = new ClassPathResource(SEED_CSV_PATH).getInputStream()) {
+            csvBytes = csvStream.readAllBytes();
+        }
+
         String currentHash = sha256(csvBytes);
         boolean csvChanged = !currentHash.equals(readStoredHash());
 
@@ -112,6 +118,13 @@ public class PlaceSeeder implements ApplicationRunner {
                     continue;
                 }
 
+                String xCoordText = record.get("x좌표").trim();
+                String yCoordText = record.get("y좌표").trim();
+                if (xCoordText.isBlank() || yCoordText.isBlank()) {
+                    log.warn("좌표가 비어 있어 시딩에서 제외합니다. row={}, 장소명={}", record.getRecordNumber(), placeName);
+                    continue;
+                }
+
                 List<String> hashtagTexts = Stream.of(record.get("해시태그 1"), record.get("해시태그 2"))
                         .map(String::trim)
                         .filter(tag -> !tag.isBlank())
@@ -125,8 +138,8 @@ public class PlaceSeeder implements ApplicationRunner {
                         record.get("한 줄 설명").trim(),
                         record.get("주소").trim(),
                         blankToNull(record.get("전화번호")),
-                        Double.valueOf(record.get("x좌표").trim()),
-                        Double.valueOf(record.get("y좌표").trim()),
+                        Double.valueOf(xCoordText),
+                        Double.valueOf(yCoordText),
                         blankToNull(record.get("카카오맵 URL"))
                 ));
             }
