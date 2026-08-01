@@ -1,6 +1,8 @@
 package com.cotato.nextstation.domain.recommendation.dto.request;
 
+import com.cotato.nextstation.domain.place.enums.PlaceTagName;
 import com.cotato.nextstation.domain.recommendation.enums.TravelTime;
+import com.cotato.nextstation.global.validation.EnumNames;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -19,9 +21,10 @@ public record CustomRecommendationRequest(
         @NotNull(message = "이동 가능 시간은 필수입니다.")
         TravelTime travelTime,
 
-        @Schema(description = "여행 스타일 태그 (최소 1개, 최대 3개)", example = "[\"NATURE\", \"BUDGET\", \"EXPERIENCE\"]")
+        @Schema(description = "여행 스타일 태그 (최소 1개, 최대 3개, 중복 불가)", example = "[\"NATURE\", \"BUDGET\", \"EXPERIENCE\"]")
         @NotNull(message = "여행 스타일은 필수입니다.")
         @Size(min = 1, max = 3, message = "여행 스타일은 1개 이상 3개 이하로 선택해야 합니다.")
+        @EnumNames(value = PlaceTagName.class, message = "존재하지 않는 여행 스타일입니다.")
         List<String> travelStyles
 ) {
 }
