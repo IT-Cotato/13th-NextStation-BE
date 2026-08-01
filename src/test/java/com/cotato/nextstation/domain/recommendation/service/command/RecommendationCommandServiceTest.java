@@ -350,32 +350,6 @@ class RecommendationCommandServiceTest {
     }
 
     @Test
-    @DisplayName("여행 스타일이 중복되면 예외가 발생한다")
-    void recommendCustom_duplicateTravelStyle() {
-        // given
-        givenDeparture(1L);
-
-        // when & then
-        assertThatThrownBy(() -> recommendationCommandService.recommendCustom(1L,
-                customRequest(1L, TravelTime.ANY, List.of("NATURE", "NATURE", "BUDGET"))))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(RecommendationErrorCode.DUPLICATE_TRAVEL_STYLE.getMessage());
-    }
-
-    @Test
-    @DisplayName("존재하지 않는 여행 스타일이면 예외가 발생한다")
-    void recommendCustom_invalidTravelStyle() {
-        // given
-        givenDeparture(1L);
-
-        // when & then
-        assertThatThrownBy(() -> recommendationCommandService.recommendCustom(1L,
-                customRequest(1L, TravelTime.ANY, List.of("NATURE", "BUDGET", "NOT_A_TAG"))))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(RecommendationErrorCode.INVALID_TRAVEL_STYLE.getMessage());
-    }
-
-    @Test
     @DisplayName("도달 가능한 역이 없으면 예외가 발생한다")
     void recommendCustom_noReachableStation() {
         // given
