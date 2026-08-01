@@ -17,7 +17,7 @@ public interface StationRouteRepository extends JpaRepository<StationRoute, Long
     List<ReachableStationView> findReachable(@Param("departureStationId") Long departureStationId,
                                              @Param("maxDurationMinutes") int maxDurationMinutes);
 
-    // 이동 시간 제한이 없을 때(상관없음) 소요시간 표시용으로 전 구간을 가져온다.
+    // 이동 시간 제한이 없을 때 소요시간 표시용으로 전 구간을 가져온다.
     @Query("SELECT r.arrivalStationId AS stationId, r.durationMinutes AS durationMinutes " +
             "FROM StationRoute r " +
             "WHERE r.departureStationId = :departureStationId")

@@ -100,7 +100,7 @@ public class StationQueryService {
     }
 
     // 카테고리 후보가 최대 개수보다 많으면 잘라낸다.
-    // travelStyles가 없으면(id순 고정) 호출할 때마다 같은 결과가 나와야 선택 중인 사용자가 혼란스럽지 않다.
+    // travelStyles가 없으면 호출할 때마다 같은 결과가 나와야 선택 중인 사용자가 혼란스럽지 않다.
     // travelStyles가 있으면 태그 매칭 개수가 많은 순으로 정렬하되, 매칭 개수가 같은 장소끼리는 무작위로 섞는다.
     // 매칭 0개인 장소도 순위에 포함되므로 태그에 맞는 후보가 3개가 안 되면 자연히 무작위로 채워진다.
     private List<PlaceInfoResponse> selectCategoryPlaces(List<PlaceInfoResponse> places, List<String> travelStyles,

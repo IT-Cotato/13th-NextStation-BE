@@ -124,7 +124,7 @@ public class RecommendationCommandService {
         return List.copyOf(distinct);
     }
 
-    // 출발역에서 도달 가능한 뽑기 대상 역과 소요시간. 이동 시간 제한이 없으면(상관없음) 전 구간을 가져온다.
+    // 출발역에서 도달 가능한 뽑기 대상 역과 소요시간. 이동 시간 제한이 없으면 전 구간을 가져온다.
     private Map<Long, Integer> findReachableDurations(Long departureStationId, TravelTime travelTime) {
         List<StationRouteRepository.ReachableStationView> routes = travelTime.hasLimit()
                 ? stationRouteRepository.findReachable(departureStationId, travelTime.getMaxDurationMinutes())
@@ -149,7 +149,7 @@ public class RecommendationCommandService {
             maxScore = Math.max(maxScore, score);
         }
 
-        // 어느 역도 태그에 걸리지 않으면(전부 0점) 도달 가능한 역 전체를 후보로 둔다.
+        // 어느 역도 태그에 걸리지 않으면 도달 가능한 역 전체를 후보로 둔다.
         double threshold = maxScore * CANDIDATE_SCORE_RATIO;
         return stations.stream()
                 .filter(station -> scoreByStationId.get(station.getId()) >= threshold)
@@ -173,7 +173,7 @@ public class RecommendationCommandService {
         return placeCountSum + (long) matchedTagCount * TAG_MATCH_WEIGHT;
     }
 
-    // 안 가본 역(스탬프 완료 이력 없는 역)만 남긴다. 전부 가본 역이면 걸러내지 않는다.
+    // 안 가본 역만 남긴다. 전부 가본 역이면 걸러내지 않는다.
     private List<Station> excludeVisited(List<Station> stations, Long memberId) {
         if (memberId == null) {
             return stations;

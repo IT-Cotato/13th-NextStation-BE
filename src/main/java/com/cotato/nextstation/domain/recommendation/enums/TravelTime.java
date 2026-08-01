@@ -1,6 +1,6 @@
 package com.cotato.nextstation.domain.recommendation.enums;
 
-// 맞춤추천 이동 가능 시간(REC-03). 출발역에서 뽑기 대상 역까지의 소요시간 상한으로 쓰인다.
+// 맞춤추천 이동 가능 시간. 출발역에서 뽑기 대상 역까지의 소요시간 상한으로 쓰인다.
 public enum TravelTime {
 
     THIRTY_MINUTES(30),
