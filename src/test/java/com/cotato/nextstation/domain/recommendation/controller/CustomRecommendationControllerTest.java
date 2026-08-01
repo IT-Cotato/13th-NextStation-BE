@@ -98,10 +98,10 @@ class CustomRecommendationControllerTest {
     }
 
     @Test
-    @DisplayName("여행 스타일이 3개가 아니면 400을 반환한다")
-    void recommendCustom_invalidTravelStyleSize() throws Exception {
+    @DisplayName("여행 스타일이 4개 이상이면 400을 반환한다")
+    void recommendCustom_tooManyTravelStyles() throws Exception {
         CustomRecommendationRequest invalid = new CustomRecommendationRequest(
-                1L, TravelTime.ANY, List.of("NATURE", "BUDGET"));
+                1L, TravelTime.ANY, List.of("NATURE", "BUDGET", "EXPERIENCE", "INDOOR"));
 
         mockMvc.perform(post("/api/v1/recommendations/custom")
                         .header("Authorization", "Bearer " + TOKEN)
@@ -109,6 +109,33 @@ class CustomRecommendationControllerTest {
                         .content(objectMapper.writeValueAsString(invalid)))
                 .andExpect(status().isBadRequest());
         verify(recommendationCommandService, never()).recommendCustom(any(), any());
+    }
+
+    @Test
+    @DisplayName("여행 스타일이 비어 있으면 400을 반환한다")
+    void recommendCustom_emptyTravelStyles() throws Exception {
+        CustomRecommendationRequest invalid = new CustomRecommendationRequest(
+                1L, TravelTime.ANY, List.of());
+
+        mockMvc.perform(post("/api/v1/recommendations/custom")
+                        .header("Authorization", "Bearer " + TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest());
+        verify(recommendationCommandService, never()).recommendCustom(any(), any());
+    }
+
+    @Test
+    @DisplayName("여행 스타일이 1~2개여도 정상 추천된다")
+    void recommendCustom_allowsFewerThanThreeTravelStyles() throws Exception {
+        CustomRecommendationRequest oneStyle = new CustomRecommendationRequest(1L, TravelTime.ANY, List.of("NATURE"));
+        given(recommendationCommandService.recommendCustom(eq(1L), any())).willReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/recommendations/custom")
+                        .header("Authorization", "Bearer " + TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(oneStyle)))
+                .andExpect(status().isOk());
     }
 
     @Test
