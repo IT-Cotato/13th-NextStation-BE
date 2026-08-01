@@ -44,6 +44,14 @@ class NicknameValidatorTest {
     }
 
     @Test
+    @DisplayName("닉네임이 null이면 예외가 발생한다")
+    void validate_null() {
+        assertThatThrownBy(() -> nicknameValidator.validate(null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(NicknameErrorCode.NICKNAME_TOO_SHORT.getMessage());
+    }
+
+    @Test
     @DisplayName("닉네임이 2자 미만이면 예외가 발생한다")
     void validate_tooShort() {
         assertThatThrownBy(() -> nicknameValidator.validate("환"))

@@ -22,9 +22,10 @@ public class NicknameValidator {
     private final NicknameProfanityFilter nicknameProfanityFilter;
     private final NicknameReservedWordsFilter nicknameReservedWordsFilter;
 
-    // 길이 -> 허용 문자 -> 예약어 -> 금칙어 -> 중복 순으로 검증
+    // null -> 길이 -> 허용 문자 -> 예약어 -> 금칙어 -> 중복 순으로 검증
+    // 여러 호출부가 공유하는 컴포넌트라 null 방어는 호출부에 맡기지 않고 여기서 직접 한다.
     public void validate(String nickname) {
-        if (nickname.length() < NICKNAME_MIN_LENGTH) {
+        if (nickname == null || nickname.length() < NICKNAME_MIN_LENGTH) {
             throw new CustomException(NicknameErrorCode.NICKNAME_TOO_SHORT);
         }
         if (nickname.length() > NICKNAME_MAX_LENGTH) {
