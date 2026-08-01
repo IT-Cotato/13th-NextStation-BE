@@ -27,6 +27,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -264,7 +265,7 @@ class StationQueryServiceTest {
         ));
 
         // when
-        stationQueryService.getStationPlaces(6L);
+        stationQueryService.getStationPlaces(6L, null);
 
         // then: 카테고리가 정해진 순서로, 없는 WALK는 빠진 채 전달된다
         ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
@@ -291,7 +292,7 @@ class StationQueryServiceTest {
         given(placeQueryService.getPlacesByStation(6L)).willReturn(List.of());
 
         // when
-        stationQueryService.getStationPlaces(6L);
+        stationQueryService.getStationPlaces(6L, null);
 
         // then
         ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
@@ -307,7 +308,7 @@ class StationQueryServiceTest {
         given(placeQueryService.getPlacesByStation(300L)).willReturn(List.of());
 
         // when
-        stationQueryService.getStationPlaces(300L);
+        stationQueryService.getStationPlaces(300L, null);
 
         // then: 카테고리 변환은 한 번도 일어나지 않고, 빈 목록으로 응답이 만들어진다
         verify(stationConverter, never()).toPlaceCategoryResponse(any(), any(), any());
@@ -332,7 +333,7 @@ class StationQueryServiceTest {
                 .willReturn(List.of("LOCAL_EXPLORE", "NATURE", "BUDGET"));
 
         // when
-        stationQueryService.getStationPlaces(6L);
+        stationQueryService.getStationPlaces(6L, null);
 
         // then
         ArgumentCaptor<List<LineSummaryResponse>> linesCaptor = ArgumentCaptor.forClass(List.class);
@@ -351,7 +352,7 @@ class StationQueryServiceTest {
         given(placeQueryService.getPlacesByStation(300L)).willReturn(List.of());
 
         // when
-        stationQueryService.getStationPlaces(300L);
+        stationQueryService.getStationPlaces(300L, null);
 
         // then: 빈 id 목록으로 태그를 조회하는 낭비를 막는다
         verify(placeInfoQueryService, never()).getTopTagNames(any());
@@ -370,7 +371,7 @@ class StationQueryServiceTest {
                 .thenReturn(List.of(place(11L, "CULTURE", "문화공간")));
 
         // when
-        stationQueryService.getStationPlaces(300L);
+        stationQueryService.getStationPlaces(300L, null);
 
         // then: 장소 조회 자체를 하지 않고 카테고리·태그가 빈 채로 나간다
         verify(placeQueryService, never()).getPlacesByStation(any());
@@ -389,9 +390,116 @@ class StationQueryServiceTest {
         given(stationRepository.findById(999L)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> stationQueryService.getStationPlaces(999L))
+        assertThatThrownBy(() -> stationQueryService.getStationPlaces(999L, null))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(StationErrorCode.STATION_NOT_FOUND.getMessage());
         verify(placeQueryService, never()).getPlacesByStation(any());
+    }
+
+    // ---------- 역별 장소 목록: 맞춤추천 태그 우선 정렬 ----------
+
+    private static final List<String> TRAVEL_STYLES = List.of("NATURE", "BUDGET", "EXPERIENCE");
+
+    @Test
+    @DisplayName("travelStyles가 없으면 태그 조회 없이 기존처럼 id순으로 고른다")
+    void getStationPlaces_withoutTravelStyles_keepsIdOrder() {
+        // given
+        given(stationRepository.findById(6L)).willReturn(Optional.of(station(6L, "보문역")));
+        given(placeQueryService.getPlacesByStation(6L)).willReturn(List.of(
+                place(13L, "CULTURE", "문화공간"), place(11L, "CULTURE", "문화공간")));
+
+        // when
+        stationQueryService.getStationPlaces(6L, null);
+
+        // then
+        verify(placeInfoQueryService, never()).getTagNamesByPlace(any());
+        ArgumentCaptor<List<PlaceInfoResponse>> placesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(stationConverter).toPlaceCategoryResponse(any(), any(), placesCaptor.capture());
+        assertThat(placesCaptor.getValue()).extracting(PlaceInfoResponse::placeId).containsExactly(11L, 13L);
+    }
+
+    @Test
+    @DisplayName("travelStyles가 있으면 카테고리 안에서 태그 매칭 개수가 많은 장소부터 우선 노출한다")
+    void getStationPlaces_withTravelStyles_prioritizesTagMatches() {
+        // given: 21은 2개 태그 일치, 22는 1개, 23은 0개
+        given(stationRepository.findById(6L)).willReturn(Optional.of(station(6L, "보문역")));
+        List<PlaceInfoResponse> places = List.of(
+                place(23L, "CULTURE", "문화공간"), place(21L, "CULTURE", "문화공간"), place(22L, "CULTURE", "문화공간"));
+        given(placeQueryService.getPlacesByStation(6L)).willReturn(places);
+        given(placeInfoQueryService.getTagNamesByPlace(List.of(23L, 21L, 22L))).willReturn(Map.of(
+                21L, List.of("NATURE", "BUDGET"),
+                22L, List.of("NATURE"),
+                23L, List.of("INDOOR")
+        ));
+
+        // when
+        stationQueryService.getStationPlaces(6L, TRAVEL_STYLES);
+
+        // then
+        ArgumentCaptor<List<PlaceInfoResponse>> placesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(stationConverter).toPlaceCategoryResponse(any(), any(), placesCaptor.capture());
+        assertThat(placesCaptor.getValue()).extracting(PlaceInfoResponse::placeId).containsExactly(21L, 22L, 23L);
+    }
+
+    @Test
+    @DisplayName("태그 매칭 개수가 같은 장소끼리는 매번 같은 순서로 나오지 않는다")
+    void getStationPlaces_tiesAreShuffled() {
+        // given: 41~43 모두 매칭 0개. 3개가 정확히 3자리라 전부 뽑히지만 순서는 매번 달라야 한다
+        given(stationRepository.findById(6L)).willReturn(Optional.of(station(6L, "보문역")));
+        List<PlaceInfoResponse> places = List.of(
+                place(41L, "CULTURE", "문화공간"), place(42L, "CULTURE", "문화공간"), place(43L, "CULTURE", "문화공간"));
+        given(placeQueryService.getPlacesByStation(6L)).willReturn(places);
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of());
+
+        // when: 20번 반복해 첫 번째 자리에 오는 id를 모은다
+        for (int i = 0; i < 20; i++) {
+            stationQueryService.getStationPlaces(6L, TRAVEL_STYLES);
+        }
+        ArgumentCaptor<List<PlaceInfoResponse>> captor = ArgumentCaptor.forClass(List.class);
+        verify(stationConverter, times(20)).toPlaceCategoryResponse(any(), any(), captor.capture());
+        java.util.Set<Long> firstIds = captor.getAllValues().stream()
+                .map(selected -> selected.get(0).placeId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        // then: 20번 시도해서 항상 같은 자리에만 오지는 않는다
+        assertThat(firstIds).hasSizeGreaterThan(1);
+    }
+
+    @Test
+    @DisplayName("후보가 최대 개수보다 많으면 매칭 우선으로 3개만 남기고 매칭 0개끼리는 무작위로 채운다")
+    void getStationPlaces_withTravelStyles_fillsRemainingRandomlyWhenNoMoreMatches() {
+        // given: 31·32는 1개씩 매칭, 41~43은 매칭 0개 → 31,32는 항상 포함되고 세 번째 자리만 무작위
+        given(stationRepository.findById(6L)).willReturn(Optional.of(station(6L, "보문역")));
+        List<PlaceInfoResponse> places = List.of(
+                place(31L, "CULTURE", "문화공간"), place(32L, "CULTURE", "문화공간"),
+                place(41L, "CULTURE", "문화공간"), place(42L, "CULTURE", "문화공간"), place(43L, "CULTURE", "문화공간"));
+        given(placeQueryService.getPlacesByStation(6L)).willReturn(places);
+        given(placeInfoQueryService.getTagNamesByPlace(any())).willReturn(Map.of(
+                31L, List.of("NATURE"),
+                32L, List.of("BUDGET")
+        ));
+
+        // when
+        ArgumentCaptor<List<PlaceInfoResponse>> captor = ArgumentCaptor.forClass(List.class);
+        stationQueryService.getStationPlaces(6L, TRAVEL_STYLES);
+        verify(stationConverter).toPlaceCategoryResponse(any(), any(), captor.capture());
+
+        // then
+        List<Long> selectedIds = captor.getValue().stream().map(PlaceInfoResponse::placeId).toList();
+        assertThat(selectedIds).hasSize(3);
+        assertThat(selectedIds).contains(31L, 32L);
+        assertThat(selectedIds).anyMatch(id -> List.of(41L, 42L, 43L).contains(id));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 여행 스타일 태그면 예외가 발생한다")
+    void getStationPlaces_invalidTravelStyle() {
+        // given
+        given(stationRepository.findById(6L)).willReturn(Optional.of(station(6L, "보문역")));
+        given(placeQueryService.getPlacesByStation(6L)).willReturn(List.of(place(11L, "CULTURE", "문화공간")));
+
+        // when & then
+        assertThatThrownBy(() -> stationQueryService.getStationPlaces(6L, List.of("NOT_A_TAG")))
+                .isInstanceOf(CustomException.class);
     }
 }
