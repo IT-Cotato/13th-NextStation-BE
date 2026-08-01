@@ -1,7 +1,6 @@
 package com.cotato.nextstation.domain.recommendation.service.command;
 
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
-import com.cotato.nextstation.domain.place.enums.PlaceTagName;
 import com.cotato.nextstation.domain.recommendation.converter.RecommendationConverter;
 import com.cotato.nextstation.domain.recommendation.dto.request.CustomRecommendationRequest;
 import com.cotato.nextstation.domain.recommendation.dto.response.CustomRecommendationResponse;
@@ -25,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -76,7 +74,6 @@ public class RecommendationCommandService {
      */
     public CustomRecommendationResponse recommendCustom(Long memberId, CustomRecommendationRequest request) {
         validateDepartureStation(request.departureStationId());
-        List<String> travelStyles = validateTravelStyles(request.travelStyles());
 
         Map<Long, Integer> durationByStationId = findReachableDurations(request.departureStationId(), request.travelTime());
         if (durationByStationId.isEmpty()) {
@@ -90,7 +87,7 @@ public class RecommendationCommandService {
             throw new CustomException(RecommendationErrorCode.NO_REACHABLE_STATION);
         }
 
-        List<Station> scoreCandidates = selectScoreCandidates(reachableStations, travelStyles);
+        List<Station> scoreCandidates = selectScoreCandidates(reachableStations, request.travelStyles());
         List<Station> unvisited = excludeVisited(scoreCandidates, memberId);
         List<Station> finalCandidates = excludeLastRecommended(unvisited, memberId);
 
@@ -105,23 +102,6 @@ public class RecommendationCommandService {
         if (!stationRepository.existsById(departureStationId)) {
             throw new CustomException(RecommendationErrorCode.DEPARTURE_STATION_NOT_FOUND);
         }
-    }
-
-    // 태그는 PlaceTagName에 존재해야 하고 중복될 수 없다.
-    private List<String> validateTravelStyles(List<String> travelStyles) {
-        Set<String> distinct = new LinkedHashSet<>(travelStyles);
-        if (distinct.size() != travelStyles.size()) {
-            throw new CustomException(RecommendationErrorCode.DUPLICATE_TRAVEL_STYLE);
-        }
-
-        for (String travelStyle : distinct) {
-            try {
-                PlaceTagName.valueOf(travelStyle);
-            } catch (IllegalArgumentException e) {
-                throw new CustomException(RecommendationErrorCode.INVALID_TRAVEL_STYLE);
-            }
-        }
-        return List.copyOf(distinct);
     }
 
     // 출발역에서 도달 가능한 뽑기 대상 역과 소요시간. 이동 시간 제한이 없으면 전 구간을 가져온다.
