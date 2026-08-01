@@ -7,8 +7,7 @@ import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
-import com.cotato.nextstation.domain.member.util.NicknameProfanityFilter;
-import com.cotato.nextstation.domain.member.util.NicknameReservedWordsFilter;
+import com.cotato.nextstation.domain.member.util.NicknameValidator;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import io.jsonwebtoken.Claims;
@@ -28,8 +27,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,10 +40,7 @@ class ProfileSetupCommandServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
-    private NicknameProfanityFilter nicknameProfanityFilter;
-
-    @Mock
-    private NicknameReservedWordsFilter nicknameReservedWordsFilter;
+    private NicknameValidator nicknameValidator;
 
     @Mock
     private JwtProvider jwtProvider;
@@ -62,7 +58,7 @@ class ProfileSetupCommandServiceTest {
     @BeforeEach
     void setUp() {
         profileSetupCommandService = new ProfileSetupCommandService(
-                memberRepository, nicknameProfanityFilter, nicknameReservedWordsFilter, jwtProvider, "test-bucket", "ap-northeast-2");
+                memberRepository, nicknameValidator, jwtProvider, "test-bucket", "ap-northeast-2");
     }
 
     private Member pendingMember() {
@@ -86,7 +82,6 @@ class ProfileSetupCommandServiceTest {
         givenValidToken();
         Member member = pendingMember();
         given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
-        given(memberRepository.existsByNickname(NICKNAME)).willReturn(false);
 
         // when
         ProfileSetupResponse response = profileSetupCommandService.setupProfile(
@@ -107,7 +102,6 @@ class ProfileSetupCommandServiceTest {
         // given
         givenValidToken();
         given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
-        given(memberRepository.existsByNickname(NICKNAME)).willReturn(false);
 
         // when & then
         assertThatThrownBy(() -> profileSetupCommandService.setupProfile(
@@ -197,85 +191,20 @@ class ProfileSetupCommandServiceTest {
                 .hasMessageContaining(AuthErrorCode.PROFILE_ALREADY_COMPLETED.getMessage());
     }
 
+    // 닉네임 자체의 검증 규칙(길이/문자/금칙어/예약어/중복)은 NicknameValidatorTest에서 다루고,
+    // 여기서는 검증 실패 시 그 예외가 그대로 전파되는지만 확인한다.
     @Test
-    @DisplayName("닉네임이 중복이면 예외가 발생한다")
-    void setupProfile_duplicateNickname() {
+    @DisplayName("닉네임 검증에서 예외가 발생하면 그대로 전파된다")
+    void setupProfile_nicknameValidationFails() {
         // given
         givenValidToken();
-        Member member = pendingMember();
-        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
-        given(memberRepository.existsByNickname(NICKNAME)).willReturn(true);
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
+        doThrow(new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME))
+                .when(nicknameValidator).validate(NICKNAME);
 
         // when & then
         assertThatThrownBy(() -> profileSetupCommandService.setupProfile(AUTH_HEADER, NICKNAME, null, GENDER, BIRTH_DATE))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(NicknameErrorCode.DUPLICATE_NICKNAME.getMessage());
-    }
-
-    @Test
-    @DisplayName("닉네임이 2자 미만이면 예외가 발생한다")
-    void setupProfile_nicknameTooShort() {
-        // given
-        givenValidToken();
-        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
-
-        // when & then
-        assertThatThrownBy(() -> profileSetupCommandService.setupProfile(AUTH_HEADER, "환", null, GENDER, BIRTH_DATE))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(NicknameErrorCode.NICKNAME_TOO_SHORT.getMessage());
-    }
-
-    @Test
-    @DisplayName("닉네임이 10자를 초과하면 예외가 발생한다")
-    void setupProfile_nicknameTooLong() {
-        // given
-        givenValidToken();
-        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
-
-        // when & then
-        assertThatThrownBy(() -> profileSetupCommandService.setupProfile(AUTH_HEADER, "환승러환승러환승러환승러", null, GENDER, BIRTH_DATE))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(NicknameErrorCode.NICKNAME_TOO_LONG.getMessage());
-    }
-
-    @Test
-    @DisplayName("닉네임에 허용되지 않은 문자가 포함되면 예외가 발생한다")
-    void setupProfile_nicknameInvalidCharacter() {
-        // given
-        givenValidToken();
-        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
-
-        // when & then
-        assertThatThrownBy(() -> profileSetupCommandService.setupProfile(AUTH_HEADER, "환승러!!", null, GENDER, BIRTH_DATE))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(NicknameErrorCode.NICKNAME_INVALID_CHARACTER.getMessage());
-    }
-
-    @Test
-    @DisplayName("닉네임에 금칙어가 포함되면 예외가 발생한다")
-    void setupProfile_containsBannedWord() {
-        // given
-        givenValidToken();
-        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
-        given(nicknameProfanityFilter.containsBannedWord(anyString())).willReturn(true);
-
-        // when & then
-        assertThatThrownBy(() -> profileSetupCommandService.setupProfile(AUTH_HEADER, NICKNAME, null, GENDER, BIRTH_DATE))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD.getMessage());
-    }
-
-    @Test
-    @DisplayName("닉네임에 예약어가 포함되거나 일치하면 예외가 발생한다")
-    void setupProfile_containsReservedWord() {
-        // given
-        givenValidToken();
-        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
-        given(nicknameReservedWordsFilter.isReservedWord(anyString())).willReturn(true);
-
-        // when & then
-        assertThatThrownBy(() -> profileSetupCommandService.setupProfile(AUTH_HEADER, "운영자1", null, GENDER, BIRTH_DATE))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(NicknameErrorCode.NICKNAME_CONTAINS_RESERVED_WORD.getMessage());
     }
 }

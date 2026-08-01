@@ -9,8 +9,7 @@ import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
-import com.cotato.nextstation.domain.member.util.NicknameProfanityFilter;
-import com.cotato.nextstation.domain.member.util.NicknameReservedWordsFilter;
+import com.cotato.nextstation.domain.member.util.NicknameValidator;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import io.jsonwebtoken.Claims;
@@ -25,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.LocalDate;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -33,25 +31,18 @@ public class ProfileSetupCommandService {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private static final int NICKNAME_MIN_LENGTH = 2;
-    private static final int NICKNAME_MAX_LENGTH = 10;
-    private static final Pattern NICKNAME_ALLOWED_PATTERN = Pattern.compile("^[가-힣a-zA-Z0-9]+$");
-
     private final MemberRepository memberRepository;
-    private final NicknameProfanityFilter nicknameProfanityFilter;
-    private final NicknameReservedWordsFilter nicknameReservedWordsFilter;
+    private final NicknameValidator nicknameValidator;
     private final JwtProvider jwtProvider;
     private final String expectedProfileImageHost;
 
     public ProfileSetupCommandService(MemberRepository memberRepository,
-                                       NicknameProfanityFilter nicknameProfanityFilter,
-                                       NicknameReservedWordsFilter nicknameReservedWordsFilter,
+                                       NicknameValidator nicknameValidator,
                                        JwtProvider jwtProvider,
                                        @Value("${aws.s3.bucket-name}") String bucketName,
                                        @Value("${spring.cloud.aws.region.static}") String region) {
         this.memberRepository = memberRepository;
-        this.nicknameProfanityFilter = nicknameProfanityFilter;
-        this.nicknameReservedWordsFilter = nicknameReservedWordsFilter;
+        this.nicknameValidator = nicknameValidator;
         this.jwtProvider = jwtProvider;
         this.expectedProfileImageHost = "%s.s3.%s.amazonaws.com".formatted(bucketName, region);
     }
@@ -65,7 +56,7 @@ public class ProfileSetupCommandService {
                 .orElseThrow(() -> new CustomException(AuthErrorCode.MEMBER_NOT_FOUND));
 
         validateProfileNotAlreadyCompleted(member);
-        validateNickname(nickname);
+        nicknameValidator.validate(nickname);
         validateProfileImageUrl(profileImageUrl, memberId);
 
         member.completeProfile(nickname, profileImageUrl, gender, birthDate);
@@ -115,28 +106,6 @@ public class ProfileSetupCommandService {
     private void validateProfileNotAlreadyCompleted(Member member) {
         if (member.getStatus() != MemberStatus.PENDING) {
             throw new CustomException(AuthErrorCode.PROFILE_ALREADY_COMPLETED);
-        }
-    }
-
-    // 길이 -> 허용 문자 -> 금칙어 -> 중복 순으로 검증
-    private void validateNickname(String nickname) {
-        if (nickname.length() < NICKNAME_MIN_LENGTH) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_TOO_SHORT);
-        }
-        if (nickname.length() > NICKNAME_MAX_LENGTH) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_TOO_LONG);
-        }
-        if (!NICKNAME_ALLOWED_PATTERN.matcher(nickname).matches()) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_INVALID_CHARACTER);
-        }
-        if (nicknameReservedWordsFilter.isReservedWord(nickname)) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_CONTAINS_RESERVED_WORD);
-        }
-        if (nicknameProfanityFilter.containsBannedWord(nickname)) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD);
-        }
-        if (memberRepository.existsByNickname(nickname)) {
-            throw new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME);
         }
     }
 
