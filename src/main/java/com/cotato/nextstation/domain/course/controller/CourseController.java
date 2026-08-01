@@ -46,15 +46,18 @@ public class CourseController {
                     - 코스 이름은 최대 20자
                     - placeIds 순서대로 order_num이 부여된다
                     - journalId는 여행일지 작성 시, conceptTourId는 관리자 큐레이션으로 추후 채워진다
+                    - stationId는 뽑기 대상 역(`is_drawable=true`)만 허용된다
                     """
     )
     @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "생성 성공"),
             @ApiResponse(responseCode = "400", description = """
-                    요청 값 검증 실패 (`GlobalErrorCode.VALIDATION_ERROR`)
-                    또는 같은 장소 중복 선택 (`CourseErrorCode.DUPLICATE_COURSE_PLACES`)"""),
+                    요청 값 검증 실패 (`GlobalErrorCode.VALIDATION_ERROR`),
+                    같은 장소 중복 선택 (`CourseErrorCode.DUPLICATE_COURSE_PLACES`)
+                    또는 코스를 만들 수 없는 역 (`CourseErrorCode.STATION_NOT_DRAWABLE`)"""),
             @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 역 (`CourseErrorCode.STATION_NOT_FOUND`)"),
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
