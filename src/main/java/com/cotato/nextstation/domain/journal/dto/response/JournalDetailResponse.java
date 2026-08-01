@@ -24,8 +24,17 @@ public record JournalDetailResponse(
         @Schema(description = "역 이름", example = "보문역")
         String stationName,
 
+        @Schema(description = "코스 ID. 본인 코스면 '내 코스로 만들기' 호출에 쓰지 않는다")
+        Long courseId,
+
         @Schema(description = "코스 이름", example = "보문에 살어리랏다")
         String courseName,
+
+        @Schema(description = "본인이 작성한 여행일지인지 여부. 프론트가 하트/⋮/하단 버튼을 분기하는 데 쓴다")
+        boolean isMine,
+
+        @Schema(description = "이 코스에 좋아요를 눌러 뒀는지 여부")
+        boolean isLiked,
 
         @Schema(description = "태그 상위 3개")
         List<String> tags,
@@ -53,6 +62,13 @@ public record JournalDetailResponse(
             int orderNum,
             Long placeId,
             String placeName,
+
+            @Schema(description = "x좌표", example = "127.123")
+            Double xCoordinate,
+
+            @Schema(description = "y좌표", example = "37.456")
+            Double yCoordinate,
+
             String review,
             String imageUrl
     ) {}

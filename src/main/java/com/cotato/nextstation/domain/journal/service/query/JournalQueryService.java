@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.journal.service.query;
 
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.converter.JournalConverter;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
@@ -41,6 +42,7 @@ public class JournalQueryService {
 
     private final MemberStampQueryService memberStampQueryService;
     private final CourseQueryService courseQueryService;
+    private final CourseCommandService courseCommandService;
     private final PlaceInfoQueryService placeInfoQueryService;
     private final StationQueryService stationQueryService;
 
@@ -187,37 +189,27 @@ public class JournalQueryService {
                         (a, b) -> a  // 기획상 1개만이라 중복 시 첫 번째 사용
                 ));
 
-        // 11. 방문 장소 목록 조합 (orderNum 순서 유지)
-        List<JournalDetailResponse.VisitedPlaceResponse> visitedPlaces = coursePlaces.stream()
-                .map(cp -> {
-                    PlaceInfoResponse placeInfo = placeInfoMap.get(cp.placeId());
-                    PlaceReview review = reviewByPlaceId.get(cp.placeId());
-                    String reviewImageUrl = review != null
-                            ? imageUrlByReviewId.get(review.getId())
-                            : null;
-
-                    return new JournalDetailResponse.VisitedPlaceResponse(
-                            cp.orderNum(),
-                            cp.placeId(),
-                            placeInfo != null ? placeInfo.placeName() : null,
-                            review != null ? review.getReview() : null,
-                            reviewImageUrl
-                    );
-                })
-                .toList();
-
-        String profileImageUrl = journal.getMember().getProfileImageUrl();
-        String writerProfileImageUrl = (profileImageUrl == null || profileImageUrl.isBlank())
-                ? null
-                : profileImageUrl;
+        // 11. 조회수 반영 (본인 조회는 CourseCommandService 내부에서 제외) + 좋아요 여부
+        //
+        // increaseViewCount가 반환하는 값을 그대로 써야 한다. 이 트랜잭션(readOnly)에서 courseInfo를
+        // 다시 조회해도 REPEATABLE READ 스냅샷 때문에 증가 전 값이 보인다 — REQUIRES_NEW로 증가를 수행한
+        // 그 트랜잭션 안에서 읽은 값만 증가분을 반영하고 있다. 실패(또는 본인 조회로 no-op)했으면
+        // null이 오므로 4번에서 조회해 둔 courseInfo의 값으로 대체한다.
+        Integer updatedViewCount = courseCommandService.increaseViewCount(courseId, memberId);
+        boolean isLiked = courseQueryService.isLikedByMember(courseId, memberId);
+        int viewCount = updatedViewCount != null ? updatedViewCount : courseInfo.viewCount();
 
         return journalConverter.toJournalDetailResponse(
-                journal, line, stationName, courseInfo, tags, imageUrls,
+                journal, line, stationName, courseInfo, viewCount, isOwner, isLiked, tags, imageUrls,
                 coursePlaces, placeInfoMap, reviewByPlaceId, imageUrlByReviewId);
     }
 
     // Course 도메인이 코스 카드의 소요시간(travel_duration) 표시를 위함
     public TravelDuration getTravelDuration(Long journalId) {
+        // course.journal_id가 nullable이라 journalId가 null로 들어올 수 있다. findById(null)은 예외라 먼저 막는다.
+        if (journalId == null) {
+            return null;
+        }
         return journalRepository.findById(journalId)
                 .map(Journal::getTravelDuration)
                 .orElse(null);  // 일지 없거나 미작성이면 null (장소 수로 추정)

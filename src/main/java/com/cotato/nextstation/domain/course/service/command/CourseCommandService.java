@@ -42,12 +42,17 @@ public class CourseCommandService {
      * <p>
      * 증가에 실패해도 조회 응답은 그대로 나가야 하므로 예외를 삼킨다. 조회수는 부가 정보인데
      * 잠금 경합 같은 이유로 실패했다고 화면 전체가 안 뜨면 손해가 크다.
+     * <p>
+     * 증가된 최신 조회수를 반환한다({@code null}이면 실패했거나 본인 조회라 증가하지 않은 경우).
+     * 호출부가 이미 들고 있는 코스 정보를 이 값으로 갈아끼워야 응답에 증가분이 반영된다 —
+     * 호출부의 트랜잭션에서 코스를 다시 조회해도 REPEATABLE READ 스냅샷 때문에 증가 전 값이 보인다.
      */
-    public void increaseViewCount(Long courseId, Long viewerMemberId) {
+    public Integer increaseViewCount(Long courseId, Long viewerMemberId) {
         try {
-            courseViewCountUpdater.increaseViewCount(courseId, viewerMemberId);
+            return courseViewCountUpdater.increaseViewCount(courseId, viewerMemberId);
         } catch (Exception e) {
             log.warn("조회수 증가 실패: courseId={}, viewerMemberId={}", courseId, viewerMemberId, e);
+            return null;
         }
     }
 
