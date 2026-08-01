@@ -7,7 +7,11 @@ import com.cotato.nextstation.domain.place.entity.PlaceTagMapping;
 import com.cotato.nextstation.domain.place.enums.CategoryCode;
 import com.cotato.nextstation.domain.place.enums.PlaceTagName;
 import com.cotato.nextstation.domain.place.repository.CategoryRepository;
+import com.cotato.nextstation.domain.place.repository.PlaceImageRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceRepository;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewLikeRepository;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceTagMappingRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceTagRepository;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
@@ -54,9 +58,18 @@ class PlaceSeedWriter {
     private final PlaceTagRepository placeTagRepository;
     private final PlaceRepository placeRepository;
     private final PlaceTagMappingRepository placeTagMappingRepository;
+    private final PlaceReviewImageRepository placeReviewImageRepository;
+    private final PlaceReviewLikeRepository placeReviewLikeRepository;
+    private final PlaceReviewRepository placeReviewRepository;
+    private final PlaceImageRepository placeImageRepository;
 
     @Transactional
     public void write(List<PlaceSeedRow> rows) {
+        // place를 참조하는 자식(place_image, place_review_image/like -> place_review -> place) 먼저 정리해야 FK 위반 없이 재시딩된다.
+        placeImageRepository.deleteAllInBatch();
+        placeReviewImageRepository.deleteAllInBatch();
+        placeReviewLikeRepository.deleteAllInBatch();
+        placeReviewRepository.deleteAllInBatch();
         placeTagMappingRepository.deleteAllInBatch();
         placeRepository.deleteAllInBatch();
 
