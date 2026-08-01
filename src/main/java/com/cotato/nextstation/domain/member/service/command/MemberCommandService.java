@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -56,13 +58,37 @@ public class MemberCommandService {
             throw new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME);
         }
 
-        // DB 반영이 끝난 뒤에 이전 S3 이미지를 정리한다. 순서를 바꾸면 저장 실패 시 이미지만 먼저 지워져 깨진 링크가 남는다.
+        // 이전 S3 이미지 삭제는 트랜잭션 커밋 이후로 미룬다. saveAndFlush 뒤라도 메서드가 끝나기 전엔 커밋 전이라,
+        // 여기서 바로 호출하면 S3 오류 하나로 이미 반영된 닉네임/이미지 변경까지 롤백되고 커넥션도 그만큼 오래 붙잡힌다.
         if (previousProfileImageUrl != null && !previousProfileImageUrl.equals(member.getProfileImageUrl())) {
-            imageCommandService.deleteImage(previousProfileImageUrl, memberId);
+            scheduleOldImageDeletion(previousProfileImageUrl, memberId);
         }
 
         log.info("프로필 수정 완료: memberId={}", memberId);
         return memberConverter.toProfileResponse(member);
+    }
+
+    private void scheduleOldImageDeletion(String imageUrl, Long memberId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // 트랜잭션 밖에서 호출된 경우(예: 테스트)를 위한 폴백 — 정상 흐름에서는 항상 @Transactional 안이라 아래 분기를 탄다
+            deleteOldImage(imageUrl, memberId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                deleteOldImage(imageUrl, memberId);
+            }
+        });
+    }
+
+    private void deleteOldImage(String imageUrl, Long memberId) {
+        try {
+            imageCommandService.deleteImage(imageUrl, memberId);
+        } catch (Exception e) {
+            // 커밋 이후 실행이라 실패해도 프로필 수정 자체는 이미 성공한 상태 — 로그만 남기고 무시한다 (S3에 orphan 파일만 남음)
+            log.warn("이전 프로필 이미지 삭제 실패(무시): memberId={}", memberId, e);
+        }
     }
 
     private void applyProfileImageUrl(Member member, String profileImageUrl) {
