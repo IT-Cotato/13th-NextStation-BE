@@ -134,7 +134,7 @@ public class StationQueryService {
 
     // 비어 있으면 그대로 두고, 값이 있으면 중복을 접고 PlaceTagName에 존재하는지만 검증한다.
     // 이 파라미터는 맞춤추천 화면에서 직전 단계 선택값을 그대로 넘겨받는 표시용 힌트라
-    // 개수 제약(3개)까지 강제하지는 않는다.
+    // 맞춤추천 요청(1~3개)과 달리 개수 제약을 강제하지는 않는다.
     private List<String> normalizeTravelStyles(List<String> travelStyles) {
         if (travelStyles == null || travelStyles.isEmpty()) {
             return List.of();
