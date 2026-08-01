@@ -57,6 +57,9 @@ class PlaceSeedWriter {
 
     @Transactional
     public void write(List<PlaceSeedRow> rows) {
+        placeTagMappingRepository.deleteAllInBatch();
+        placeRepository.deleteAllInBatch();
+
         Map<String, Category> categoryCache = new HashMap<>();
         Map<PlaceTagName, PlaceTag> tagCache = new HashMap<>();
         int placeCount = 0;
