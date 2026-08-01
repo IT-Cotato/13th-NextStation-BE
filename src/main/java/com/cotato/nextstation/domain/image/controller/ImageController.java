@@ -80,6 +80,9 @@ public class ImageController {
             throw new CustomException(GlobalErrorCode.INVALID_TOKEN);
         }
         String token = authorizationHeader.substring(BEARER_PREFIX.length()).trim();
+        if (token.isEmpty()) {
+            throw new CustomException(GlobalErrorCode.INVALID_TOKEN);
+        }
 
         Claims claims;
         try {
