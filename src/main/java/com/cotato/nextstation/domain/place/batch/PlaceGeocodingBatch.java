@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +59,9 @@ public final class PlaceGeocodingBatch {
     private static final Path SERVICE_ACCOUNT_KEY_PATH = Path.of("credentials/google-sheets-service-account.json");
     private static final long REQUEST_INTERVAL_MILLIS = 150;
     private static final int MAX_RETRY = 3;
-    private static final int NEARBY_SEARCH_RADIUS_METERS = 50;
+
+    // 주소 검색 좌표(행정구역 중심)와 실제 카카오맵 POI 좌표(공원/유적 등은 입구·중심에 찍힘) 사이 거리가 50m를 넘는 경우가 많아(실측 77~255m) 1000m로 넉넉히 잡음.
+    private static final int NEARBY_SEARCH_RADIUS_METERS = 1000;
 
     private static final String PROGRESS_STATUS_DONE = "검수 완료";
     private static final int HEADER_ROW_NUMBER = 1;
@@ -377,11 +380,12 @@ public final class PlaceGeocodingBatch {
         if (documents == null || documents.isEmpty()) {
             return null;
         }
+        // 카카오 키워드 검색은 기본이 관련도순 정렬이라(거리순 아님), 같은 이름이 여러 구간에 걸쳐
+        // 있는 경우(하천 등) 이름이 정확히 일치하는 것 중 실제로 가장 가까운 것을 직접 골라야 한다.
         List<JsonNode> exactMatches = findExactNameMatches(documents, placeName);
-        if (exactMatches.size() == 1) {
-            return exactMatches.get(0);
-        }
-        return documents.size() == 1 ? documents.get(0) : null;
+        return exactMatches.stream()
+                .min(Comparator.comparingInt(doc -> doc.path("distance").asInt(Integer.MAX_VALUE)))
+                .orElse(null);
     }
 
     // 주소/좌표는 수동 입력 주소 검색 결과(정확)를, 전화번호/카카오맵 URL은 반경 검색으로 찾은 실제 업체(있으면)를 합친다.
@@ -473,7 +477,7 @@ public final class PlaceGeocodingBatch {
     }
 
     private static ValueRange toReviewNoteValueRange(String sheetTitle, int rowNumber, String reason, List<String> candidates) {
-        // P열 "배치 매칭 메모(BE)" 전용 — 사람이 쓰는 검수메모(O열)와 분리해서 덮어쓰지 않는다.
+        // P열 "배치 매칭 메모(BE)" 전용 — 사람이 쓰는 검수메모(J열)와 분리해서 덮어쓰지 않는다.
         String note = candidates.isEmpty() ? reason : reason + ": " + String.join(" | ", candidates);
         return new ValueRange()
                 .setRange(sheetTitle + "!P" + rowNumber)
