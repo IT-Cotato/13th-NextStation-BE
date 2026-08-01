@@ -1,14 +1,17 @@
 package com.cotato.nextstation.domain.station.controller;
 
+import com.cotato.nextstation.domain.place.enums.PlaceTagName;
 import com.cotato.nextstation.domain.station.dto.response.StationPlacesResponse;
 import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
 import com.cotato.nextstation.domain.station.service.query.StationQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
+import com.cotato.nextstation.global.validation.EnumNames;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +22,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@Validated
 @RequestMapping("/api/v1/stations")
 public class StationController {
 
@@ -70,7 +74,7 @@ public class StationController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공 (장소가 없으면 빈 목록)"),
-            @ApiResponse(responseCode = "400", description = "존재하지 않는 여행 스타일 태그 (`GlobalErrorCode.VALIDATION_ERROR`)"),
+            @ApiResponse(responseCode = "400", description = "존재하지 않거나 중복된 여행 스타일 태그 (`GlobalErrorCode.VALIDATION_ERROR`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 역 (`StationErrorCode.STATION_NOT_FOUND`)"),
     })
     @GetMapping("/{stationId}/places")
@@ -79,7 +83,9 @@ public class StationController {
             @PathVariable Long stationId,
             @Parameter(description = "맞춤추천에서 고른 여행 스타일 태그(선택). 있으면 카테고리별 후보를 태그 매칭 우선으로 정렬한다.",
                     example = "NATURE,BUDGET,EXPERIENCE")
-            @RequestParam(required = false) List<String> travelStyles) {
+            @RequestParam(required = false)
+            @EnumNames(value = PlaceTagName.class, message = "존재하지 않는 여행 스타일입니다.")
+            List<String> travelStyles) {
         return CommonResponse.success(stationQueryService.getStationPlaces(stationId, travelStyles));
     }
 }
