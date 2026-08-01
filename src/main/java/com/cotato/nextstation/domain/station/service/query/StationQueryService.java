@@ -1,7 +1,6 @@
 package com.cotato.nextstation.domain.station.service.query;
 
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
-import com.cotato.nextstation.domain.place.enums.PlaceTagName;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.place.service.query.PlaceQueryService;
 import com.cotato.nextstation.domain.station.converter.LineConverter;
@@ -16,7 +15,6 @@ import com.cotato.nextstation.domain.station.repository.StationLineRepository;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineView;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
-import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -62,8 +60,12 @@ public class StationQueryService {
      * @param travelStyles 비어 있으면(랜덤뽑기 등 일반 진입) 호출할 때마다 같은 결과가 나오도록 id 순으로 고정한다.
      *                     값이 있으면(맞춤추천 결과 화면 진입) 카테고리 안에서 선택한 태그와 매칭되는 개수가
      *                     많은 장소부터 우선 노출하고, 매칭 개수가 같으면 무작위로 섞는다.
+     *                     값의 유효성·중복은 컨트롤러에서 걸러져 들어온다.
      */
     public StationPlacesResponse getStationPlaces(Long stationId, List<String> travelStyles) {
+        // 선택 파라미터라 안 보내면 null로 들어온다. 이후 분기를 하나로 두려고 빈 목록으로 맞춘다.
+        List<String> selectedStyles = (travelStyles == null) ? List.of() : travelStyles;
+
         Station station = stationRepository.findById(stationId)
                 .orElseThrow(() -> new CustomException(StationErrorCode.STATION_NOT_FOUND));
 
@@ -75,8 +77,7 @@ public class StationQueryService {
         Map<String, List<PlaceInfoResponse>> placesByCategory = allPlaces.stream()
                 .collect(Collectors.groupingBy(PlaceInfoResponse::categoryCode));
 
-        List<String> normalizedTravelStyles = normalizeTravelStyles(travelStyles);
-        Map<Long, List<String>> tagNamesByPlaceId = normalizedTravelStyles.isEmpty()
+        Map<Long, List<String>> tagNamesByPlaceId = selectedStyles.isEmpty()
                 ? Map.of()
                 : placeInfoQueryService.getTagNamesByPlace(allPlaces.stream().map(PlaceInfoResponse::placeId).toList());
 
@@ -86,7 +87,7 @@ public class StationQueryService {
             if (places.isEmpty()) {
                 continue;
             }
-            List<PlaceInfoResponse> selected = selectCategoryPlaces(places, normalizedTravelStyles, tagNamesByPlaceId);
+            List<PlaceInfoResponse> selected = selectCategoryPlaces(places, selectedStyles, tagNamesByPlaceId);
             // 카테고리 표시명은 카테고리의 속성이지만 별도 조회 창구가 없어 같은 그룹의 장소에서 가져온다.
             // 한 그룹의 장소는 모두 같은 카테고리이므로 어느 것을 써도 값은 같다.
             categories.add(stationConverter.toPlaceCategoryResponse(
@@ -130,25 +131,6 @@ public class StationQueryService {
             }
         }
         return count;
-    }
-
-    // 비어 있으면 그대로 두고, 값이 있으면 중복을 접고 PlaceTagName에 존재하는지만 검증한다.
-    // 이 파라미터는 맞춤추천 화면에서 직전 단계 선택값을 그대로 넘겨받는 표시용 힌트라
-    // 맞춤추천 요청(1~3개)과 달리 개수 제약을 강제하지는 않는다.
-    private List<String> normalizeTravelStyles(List<String> travelStyles) {
-        if (travelStyles == null || travelStyles.isEmpty()) {
-            return List.of();
-        }
-
-        Set<String> distinct = new LinkedHashSet<>(travelStyles);
-        for (String travelStyle : distinct) {
-            try {
-                PlaceTagName.valueOf(travelStyle);
-            } catch (IllegalArgumentException e) {
-                throw new CustomException(GlobalErrorCode.VALIDATION_ERROR);
-            }
-        }
-        return List.copyOf(distinct);
     }
 
     // 역 대표 태그 = 그 역 장소들의 태그를 집계한 상위 3개
