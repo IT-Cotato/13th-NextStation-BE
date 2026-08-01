@@ -59,6 +59,7 @@ public class ImageController {
             @ApiResponse(responseCode = "403", description = "본인의 여행일지에만 이미지를 업로드할 수 있습니다"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
+    @SecurityRequirement(name = "signupTokenAuth")
     @PostMapping("/presigned-url")
     public CommonResponse<PresignedUrlResponse> getPresignedUrl(
             @Parameter(hidden = true) @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
