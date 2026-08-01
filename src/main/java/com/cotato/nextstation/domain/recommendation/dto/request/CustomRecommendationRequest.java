@@ -19,9 +19,9 @@ public record CustomRecommendationRequest(
         @NotNull(message = "이동 가능 시간은 필수입니다.")
         TravelTime travelTime,
 
-        @Schema(description = "여행 스타일 태그 (정확히 3개)", example = "[\"NATURE\", \"BUDGET\", \"EXPERIENCE\"]")
+        @Schema(description = "여행 스타일 태그 (최소 1개, 최대 3개)", example = "[\"NATURE\", \"BUDGET\", \"EXPERIENCE\"]")
         @NotNull(message = "여행 스타일은 필수입니다.")
-        @Size(min = 3, max = 3, message = "여행 스타일은 3개를 선택해야 합니다.")
+        @Size(min = 1, max = 3, message = "여행 스타일은 1개 이상 3개 이하로 선택해야 합니다.")
         List<String> travelStyles
 ) {
 }
