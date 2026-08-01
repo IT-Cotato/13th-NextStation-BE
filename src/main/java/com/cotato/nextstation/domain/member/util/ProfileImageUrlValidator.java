@@ -38,7 +38,8 @@ public class ProfileImageUrlValidator {
                 && uri.getRawPath().startsWith(expectedPathPrefix);
 
         if (!isAllowed) {
-            log.warn("허용되지 않은 프로필 이미지 URL: memberId={}, profileImageUrl={}", memberId, profileImageUrl);
+            // 거부된 URL 원문은 로그에 남기지 않는다 (사용자 입력값 그대로 기록하지 않기 위함)
+            log.warn("허용되지 않은 프로필 이미지 URL: memberId={}", memberId);
             throw new CustomException(MemberErrorCode.INVALID_PROFILE_IMAGE_URL);
         }
     }
