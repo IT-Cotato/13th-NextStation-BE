@@ -74,7 +74,7 @@ class StationControllerTest {
     @Test
     @DisplayName("역별 장소 목록은 200과 카테고리별 장소를 반환한다")
     void getStationPlaces_success() throws Exception {
-        given(stationQueryService.getStationPlaces(6L)).willReturn(
+        given(stationQueryService.getStationPlaces(6L, null)).willReturn(
                 new StationPlacesResponse(6L, "보문역", "성북천을 따라 걷기 좋은 역",
                         new LineSummaryResponse(6L, "6호선", LineCode.LINE_6),
                         List.of(new LineSummaryResponse(6L, "6호선", LineCode.LINE_6),
@@ -100,7 +100,7 @@ class StationControllerTest {
     @Test
     @DisplayName("장소가 없는 역은 200과 빈 카테고리 목록을 반환한다")
     void getStationPlaces_noPlaces() throws Exception {
-        given(stationQueryService.getStationPlaces(300L))
+        given(stationQueryService.getStationPlaces(300L, null))
                 .willReturn(new StationPlacesResponse(300L, "서울역", null, null,
                         List.of(new LineSummaryResponse(1L, "1호선", LineCode.LINE_1), new LineSummaryResponse(4L, "4호선", LineCode.LINE_4)), List.of(), "서울역 환승여행 코스", List.of()));
 
@@ -115,7 +115,7 @@ class StationControllerTest {
     @Test
     @DisplayName("존재하지 않는 역이면 404를 반환한다")
     void getStationPlaces_notFound() throws Exception {
-        given(stationQueryService.getStationPlaces(999L))
+        given(stationQueryService.getStationPlaces(999L, null))
                 .willThrow(new CustomException(StationErrorCode.STATION_NOT_FOUND));
 
         mockMvc.perform(get("/api/v1/stations/{stationId}/places", 999L))
