@@ -54,6 +54,10 @@ public class JwtPrincipalArgumentResolver implements HandlerMethodArgumentResolv
         }
 
         String token = extractToken(authorizationHeader);
+        if (token.isEmpty()) {
+            log.warn("빈 Bearer 토큰으로 요청");
+            throw new CustomException(GlobalErrorCode.INVALID_TOKEN);
+        }
 
         Claims claims;
         try {

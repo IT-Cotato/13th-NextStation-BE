@@ -48,12 +48,15 @@ class ImageControllerTest {
     JwtProvider jwtProvider;
 
     private static final String TOKEN = "access-token";
+    private static final String SIGNUP_TOKEN = "signup-token";
 
     @BeforeEach
     void authenticateAsMember1() {
         // 이미지 API는 accessToken 인증이 적용돼 있어 토큰 없이 호출하면 401이다
         given(jwtProvider.parseClaims(TOKEN)).willReturn(
                 Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+        given(jwtProvider.parseClaims(SIGNUP_TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "SIGNUP").build());
     }
 
     @Test
@@ -166,6 +169,63 @@ class ImageControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(ImageErrorCode.MISSING_JOURNAL_ID.getCode()));
+    }
+
+    @Test
+    @DisplayName("folder가 PROFILE이면 signupToken으로도 200을 반환한다 (회원가입 프로필 설정 단계)")
+    void getPresignedUrl_profileFolder_signupTokenAllowed() throws Exception {
+        PresignedUrlRequest request = new PresignedUrlRequest(S3Folder.PROFILE, null, "profile.jpg");
+        PresignedUrlResponse response = new PresignedUrlResponse(
+                "https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid.jpg?X-Amz-Signature=abc",
+                "https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid.jpg",
+                "image/jpeg"
+        );
+        given(imageCommandService.getPresignedUrl(S3Folder.PROFILE, 1L, null, "profile.jpg")).willReturn(response);
+
+        mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + SIGNUP_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.imageUrl").value(response.imageUrl()));
+    }
+
+    @Test
+    @DisplayName("folder가 JOURNAL이면 signupToken으로는 401을 반환한다")
+    void getPresignedUrl_journalFolder_signupTokenRejected() throws Exception {
+        PresignedUrlRequest request = new PresignedUrlRequest(S3Folder.JOURNAL, null, "photo.jpg");
+
+        mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer " + SIGNUP_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_INVALID_TOKEN"));
+    }
+
+    @Test
+    @DisplayName("Authorization 헤더 없이 요청하면 401을 반환한다")
+    void getPresignedUrl_noAuthorizationHeader() throws Exception {
+        PresignedUrlRequest request = new PresignedUrlRequest(S3Folder.PROFILE, null, "profile.jpg");
+
+        mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("빈 Bearer 토큰이면 500이 아닌 401을 반환한다")
+    void getPresignedUrl_emptyBearerToken() throws Exception {
+        PresignedUrlRequest request = new PresignedUrlRequest(S3Folder.PROFILE, null, "profile.jpg");
+
+        mockMvc.perform(post("/api/v1/images/presigned-url")
+                        .header("Authorization", "Bearer ")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_INVALID_TOKEN"));
     }
 
     @Test

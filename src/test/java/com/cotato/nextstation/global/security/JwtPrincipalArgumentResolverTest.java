@@ -98,6 +98,18 @@ class JwtPrincipalArgumentResolverTest {
     }
 
     @Test
+    @DisplayName("빈 Bearer 토큰이면 500이 아닌 INVALID_TOKEN 예외가 발생한다")
+    void resolveArgument_emptyBearerToken() {
+        // given
+        given(webRequest.getHeader("Authorization")).willReturn("Bearer ");
+
+        // when & then
+        assertThatThrownBy(() -> resolver.resolveArgument(annotatedParameter(), null, webRequest, null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(GlobalErrorCode.INVALID_TOKEN.getMessage());
+    }
+
+    @Test
     @DisplayName("purpose가 ACCESS가 아니면 예외가 발생한다")
     void resolveArgument_wrongPurpose() {
         // given
