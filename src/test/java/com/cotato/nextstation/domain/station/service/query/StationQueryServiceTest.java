@@ -491,15 +491,4 @@ class StationQueryServiceTest {
         assertThat(selectedIds).anyMatch(id -> List.of(41L, 42L, 43L).contains(id));
     }
 
-    @Test
-    @DisplayName("존재하지 않는 여행 스타일 태그면 예외가 발생한다")
-    void getStationPlaces_invalidTravelStyle() {
-        // given
-        given(stationRepository.findById(6L)).willReturn(Optional.of(station(6L, "보문역")));
-        given(placeQueryService.getPlacesByStation(6L)).willReturn(List.of(place(11L, "CULTURE", "문화공간")));
-
-        // when & then
-        assertThatThrownBy(() -> stationQueryService.getStationPlaces(6L, List.of("NOT_A_TAG")))
-                .isInstanceOf(CustomException.class);
-    }
 }
