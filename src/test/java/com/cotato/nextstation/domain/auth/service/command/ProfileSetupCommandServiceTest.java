@@ -7,7 +7,9 @@ import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
 import com.cotato.nextstation.domain.member.util.NicknameValidator;
+import com.cotato.nextstation.domain.member.util.ProfileImageUrlValidator;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import io.jsonwebtoken.Claims;
@@ -43,6 +45,9 @@ class ProfileSetupCommandServiceTest {
     private NicknameValidator nicknameValidator;
 
     @Mock
+    private ProfileImageUrlValidator profileImageUrlValidator;
+
+    @Mock
     private JwtProvider jwtProvider;
 
     private static final Long MEMBER_ID = 1L;
@@ -54,11 +59,10 @@ class ProfileSetupCommandServiceTest {
     private static final String VALID_PROFILE_IMAGE_URL =
             "https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid.jpg";
 
-    // @Value 생성자 파라미터는 목으로 대체할 수 없어 직접 값을 넣어 생성한다
     @BeforeEach
     void setUp() {
         profileSetupCommandService = new ProfileSetupCommandService(
-                memberRepository, nicknameValidator, jwtProvider, "test-bucket", "ap-northeast-2");
+                memberRepository, nicknameValidator, profileImageUrlValidator, jwtProvider);
     }
 
     private Member pendingMember() {
@@ -96,18 +100,22 @@ class ProfileSetupCommandServiceTest {
         assertThat(member.getProfileImageUrl()).isEqualTo(VALID_PROFILE_IMAGE_URL);
     }
 
+    // 프로필 이미지 URL 자체의 검증 규칙은 ProfileImageUrlValidator가 담당하므로,
+    // 여기서는 검증 실패 시 그 예외가 그대로 전파되는지만 확인한다.
     @Test
-    @DisplayName("본인 S3 버킷 경로가 아닌 프로필 이미지 URL이면 예외가 발생한다")
+    @DisplayName("프로필 이미지 URL 검증에서 예외가 발생하면 그대로 전파된다")
     void setupProfile_invalidProfileImageUrl() {
         // given
         givenValidToken();
         given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
+        doThrow(new CustomException(MemberErrorCode.INVALID_PROFILE_IMAGE_URL))
+                .when(profileImageUrlValidator).validate("https://evil.com/xss.svg", MEMBER_ID);
 
         // when & then
         assertThatThrownBy(() -> profileSetupCommandService.setupProfile(
                 AUTH_HEADER, NICKNAME, "https://evil.com/xss.svg", GENDER, BIRTH_DATE))
                 .isInstanceOf(CustomException.class)
-                .hasMessageContaining(AuthErrorCode.INVALID_PROFILE_IMAGE_URL.getMessage());
+                .hasMessageContaining(MemberErrorCode.INVALID_PROFILE_IMAGE_URL.getMessage());
     }
 
     @Test
