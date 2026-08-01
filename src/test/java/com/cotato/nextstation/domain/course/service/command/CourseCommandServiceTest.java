@@ -9,6 +9,8 @@ import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
+import com.cotato.nextstation.domain.station.entity.Station;
+import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.DisplayName;
@@ -48,8 +50,15 @@ class CourseCommandServiceTest {
     @Mock
     private CourseViewCountUpdater courseViewCountUpdater;
 
+    @Mock
+    private StationRepository stationRepository;
+
     private Course course(String name) {
         return Course.builder().memberId(1L).stationId(100L).name(name).build();
+    }
+
+    private Station station(boolean isDrawable) {
+        return Station.builder().stationName("성수역").isDrawable(isDrawable).build();
     }
 
     private CoursePlace coursePlace(Long placeId, int orderNum) {
@@ -63,6 +72,7 @@ class CourseCommandServiceTest {
         CourseCreateRequest request = new CourseCreateRequest("성수 코스", 100L, List.of(10L, 20L, 30L));
         Course saved = course("성수 코스");
         List<CoursePlace> places = List.of(coursePlace(10L, 1), coursePlace(20L, 2), coursePlace(30L, 3));
+        given(stationRepository.findById(100L)).willReturn(Optional.of(station(true)));
         given(courseConverter.toCourse(1L, request)).willReturn(saved);
         given(courseRepository.save(saved)).willReturn(saved);
         given(courseConverter.toCoursePlaces(saved.getId(), request.placeIds())).willReturn(places);
@@ -86,6 +96,36 @@ class CourseCommandServiceTest {
         assertThatThrownBy(() -> courseCommandService.createCourse(1L, request))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(CourseErrorCode.DUPLICATE_COURSE_PLACES.getMessage());
+        verify(courseRepository, never()).save(any());
+        verify(coursePlaceRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 역으로 코스를 생성하면 예외가 발생하고 저장하지 않는다")
+    void createCourse_stationNotFound() {
+        // given
+        CourseCreateRequest request = new CourseCreateRequest("성수 코스", 999L, List.of(10L, 20L, 30L));
+        given(stationRepository.findById(999L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> courseCommandService.createCourse(1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.STATION_NOT_FOUND.getMessage());
+        verify(courseRepository, never()).save(any());
+        verify(coursePlaceRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("뽑기 대상이 아닌 역으로 코스를 생성하면 예외가 발생하고 저장하지 않는다")
+    void createCourse_stationNotDrawable() {
+        // given
+        CourseCreateRequest request = new CourseCreateRequest("성수 코스", 100L, List.of(10L, 20L, 30L));
+        given(stationRepository.findById(100L)).willReturn(Optional.of(station(false)));
+
+        // when & then
+        assertThatThrownBy(() -> courseCommandService.createCourse(1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.STATION_NOT_DRAWABLE.getMessage());
         verify(courseRepository, never()).save(any());
         verify(coursePlaceRepository, never()).saveAll(any());
     }
