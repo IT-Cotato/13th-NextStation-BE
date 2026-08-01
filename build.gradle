@@ -48,6 +48,10 @@ dependencies {
     // place 데이터 파이프라인 1회성 배치 스크립트용 CSV 파서
     implementation 'org.apache.commons:commons-csv:1.11.0'
 
+    // place 데이터 파이프라인 배치 스크립트에서 구글 시트에 보강 결과를 직접 써넣기 위한 Sheets API
+    implementation 'com.google.apis:google-api-services-sheets:v4-rev20250603-2.0.0'
+    implementation 'com.google.auth:google-auth-library-oauth2-http:1.48.0'
+
     // S3 presigned URL 발급
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:4.0.0'
 
@@ -69,5 +73,12 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+tasks.register('placeGeocodingBatch', JavaExec) {
+	group = 'application'
+	description = '2차 수집 장소 데이터를 카카오 API로 보강하는 1회성 배치 (KAKAO_REST_API_KEY, PLACE_SHEET_CSV_URL 필요)'
+	mainClass = 'com.cotato.nextstation.domain.place.batch.PlaceGeocodingBatch'
+	classpath = sourceSets.main.runtimeClasspath
 }
 
