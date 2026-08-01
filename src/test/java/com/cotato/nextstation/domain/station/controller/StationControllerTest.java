@@ -22,7 +22,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -121,5 +124,38 @@ class StationControllerTest {
         mockMvc.perform(get("/api/v1/stations/{stationId}/places", 999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_STATION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 여행 스타일이면 400을 반환하고 조회하지 않는다")
+    void getStationPlaces_invalidTravelStyle() throws Exception {
+        mockMvc.perform(get("/api/v1/stations/{stationId}/places", 6L)
+                        .param("travelStyles", "NOT_A_TAG"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.reasons.travelStyles").value("존재하지 않는 여행 스타일입니다."));
+        verify(stationQueryService, never()).getStationPlaces(any(), any());
+    }
+
+    @Test
+    @DisplayName("여행 스타일이 중복되면 400을 반환하고 조회하지 않는다")
+    void getStationPlaces_duplicateTravelStyle() throws Exception {
+        mockMvc.perform(get("/api/v1/stations/{stationId}/places", 6L)
+                        .param("travelStyles", "NATURE", "NATURE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.reasons.travelStyles").value("중복된 값은 넣을 수 없습니다."));
+        verify(stationQueryService, never()).getStationPlaces(any(), any());
+    }
+
+    @Test
+    @DisplayName("여행 스타일 검증이 역 조회보다 먼저라 없는 역이어도 400을 반환한다")
+    void getStationPlaces_invalidTravelStyleTakesPrecedenceOverMissingStation() throws Exception {
+        // 검증이 조회보다 늦으면 없는 역이 404로 먼저 걸려 400이 가려진다
+        mockMvc.perform(get("/api/v1/stations/{stationId}/places", 999L)
+                        .param("travelStyles", "NOT_A_TAG"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"));
+        verify(stationQueryService, never()).getStationPlaces(any(), any());
     }
 }
