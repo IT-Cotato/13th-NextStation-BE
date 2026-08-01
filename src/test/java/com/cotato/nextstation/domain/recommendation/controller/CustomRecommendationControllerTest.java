@@ -126,6 +126,38 @@ class CustomRecommendationControllerTest {
     }
 
     @Test
+    @DisplayName("여행 스타일이 중복되면 400을 반환하고 서비스를 호출하지 않는다")
+    void recommendCustom_duplicateTravelStyles() throws Exception {
+        CustomRecommendationRequest invalid = new CustomRecommendationRequest(
+                1L, TravelTime.ANY, List.of("NATURE", "NATURE", "BUDGET"));
+
+        mockMvc.perform(post("/api/v1/recommendations/custom")
+                        .header("Authorization", "Bearer " + TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.reasons.travelStyles").value("중복된 값은 넣을 수 없습니다."));
+        verify(recommendationCommandService, never()).recommendCustom(any(), any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 여행 스타일이면 400을 반환하고 서비스를 호출하지 않는다")
+    void recommendCustom_invalidTravelStyle() throws Exception {
+        CustomRecommendationRequest invalid = new CustomRecommendationRequest(
+                1L, TravelTime.ANY, List.of("NATURE", "BUDGET", "NOT_A_TAG"));
+
+        mockMvc.perform(post("/api/v1/recommendations/custom")
+                        .header("Authorization", "Bearer " + TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.reasons.travelStyles").value("존재하지 않는 여행 스타일입니다."));
+        verify(recommendationCommandService, never()).recommendCustom(any(), any());
+    }
+
+    @Test
     @DisplayName("여행 스타일이 1~2개여도 정상 추천된다")
     void recommendCustom_allowsFewerThanThreeTravelStyles() throws Exception {
         CustomRecommendationRequest oneStyle = new CustomRecommendationRequest(1L, TravelTime.ANY, List.of("NATURE"));
