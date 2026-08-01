@@ -2,6 +2,8 @@ package com.cotato.nextstation.global.exception;
 
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Path;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +38,33 @@ public class GlobalExceptionHandler {
 
         CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.VALIDATION_ERROR, reasons);
         return ResponseEntity.status(GlobalErrorCode.VALIDATION_ERROR.getHttpStatus()).body(response);
+    }
+
+    /**
+     * 쿼리 파라미터·경로 변수 검증 에러 (ConstraintViolationException) -> 400 Bad Request 반환
+     * <p>
+     * {@code @Validated}가 붙은 컨트롤러의 메서드 파라미터 제약이 깨졌을 때 발생한다.
+     * 요청 본문 검증과 달리 MethodArgumentNotValidException이 아니라 이 예외가 오므로 따로 받는다.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<CommonResponse<Void>> handleConstraintViolationException(ConstraintViolationException ex) {
+        Map<String, Object> reasons = new HashMap<>();
+        ex.getConstraintViolations().forEach(violation ->
+                reasons.put(extractFieldName(violation.getPropertyPath()), violation.getMessage())
+        );
+
+        CommonResponse<Void> response = CommonResponse.error(GlobalErrorCode.VALIDATION_ERROR, reasons);
+        return ResponseEntity.status(GlobalErrorCode.VALIDATION_ERROR.getHttpStatus()).body(response);
+    }
+
+    /**
+     * 파라미터 검증 실패의 경로는 "메서드명.파라미터명" 형태다.
+     * 마지막 마디만 남겨 요청 본문 검증(필드명만 담는다)과 reasons의 키 모양을 맞춘다.
+     */
+    private String extractFieldName(Path propertyPath) {
+        String path = propertyPath.toString();
+        int lastSeparator = path.lastIndexOf('.');
+        return (lastSeparator < 0) ? path : path.substring(lastSeparator + 1);
     }
 
     /**
