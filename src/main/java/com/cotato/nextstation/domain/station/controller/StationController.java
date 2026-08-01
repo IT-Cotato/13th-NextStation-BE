@@ -59,7 +59,10 @@ public class StationController {
                     코스 만들기 화면에서 고를 수 있는 장소 후보를 카테고리별로 묶어 반환한다.
                     - 카테고리 노출 순서: 문화공간 → 식당 → 카페 → 산책포인트
                     - 카테고리당 최대 3개다. 후보가 더 많으면 잘라내고, 적으면 있는 만큼 내려준다.
-                    - 호출할 때마다 같은 결과가 나오도록 순서를 고정한다.
+                    - `travelStyles`를 안 보내면(랜덤뽑기 등) 호출할 때마다 같은 결과가 나오도록 id 순으로 고정한다.
+                    - `travelStyles`를 보내면(맞춤추천 결과 화면) 카테고리 안에서 선택한 태그와 겹치는 개수가
+                      많은 장소부터 우선 노출한다. 매칭 개수가 같은 장소끼리는 무작위로 섞인다.
+                      (예: #가성비 #체험 2개가 겹치는 장소 → #가성비만 겹치는 장소 → 하나도 안 겹치는 장소 순)
                     - 장소가 없는 카테고리는 응답에서 빠진다.
                     - 뽑기 대상이 아닌 역은 장소가 없어 빈 목록으로 응답한다.
                     - `defaultCourseName`은 코스 저장 시 기본으로 채울 이름이며 사용자가 수정할 수 있다.
@@ -67,12 +70,16 @@ public class StationController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공 (장소가 없으면 빈 목록)"),
+            @ApiResponse(responseCode = "400", description = "존재하지 않는 여행 스타일 태그 (`GlobalErrorCode.VALIDATION_ERROR`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 역 (`StationErrorCode.STATION_NOT_FOUND`)"),
     })
     @GetMapping("/{stationId}/places")
     public CommonResponse<StationPlacesResponse> getStationPlaces(
             @Parameter(description = "역 ID", example = "6")
-            @PathVariable Long stationId) {
-        return CommonResponse.success(stationQueryService.getStationPlaces(stationId));
+            @PathVariable Long stationId,
+            @Parameter(description = "맞춤추천에서 고른 여행 스타일 태그(선택). 있으면 카테고리별 후보를 태그 매칭 우선으로 정렬한다.",
+                    example = "NATURE,BUDGET,EXPERIENCE")
+            @RequestParam(required = false) List<String> travelStyles) {
+        return CommonResponse.success(stationQueryService.getStationPlaces(stationId, travelStyles));
     }
 }
