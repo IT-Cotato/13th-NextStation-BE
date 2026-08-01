@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.place.batch;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.sheets.v4.Sheets;
@@ -51,11 +52,13 @@ public final class PlaceGeocodingBatch {
     private static final Logger log = LoggerFactory.getLogger(PlaceGeocodingBatch.class);
 
     private static final String KAKAO_KEYWORD_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/keyword.json";
+    private static final String KAKAO_ADDRESS_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/address.json";
     private static final Path ENRICHED_OUTPUT = Path.of("place-geocoding-output/place_geocoded.csv");
     private static final Path MANUAL_REVIEW_OUTPUT = Path.of("place-geocoding-output/place_manual_review.csv");
     private static final Path SERVICE_ACCOUNT_KEY_PATH = Path.of("credentials/google-sheets-service-account.json");
     private static final long REQUEST_INTERVAL_MILLIS = 150;
     private static final int MAX_RETRY = 3;
+    private static final int NEARBY_SEARCH_RADIUS_METERS = 50;
 
     private static final String PROGRESS_STATUS_DONE = "검수 완료";
     private static final int HEADER_ROW_NUMBER = 1;
@@ -92,6 +95,8 @@ public final class PlaceGeocodingBatch {
 
         int processed = 0;
         int fallbackResolved = 0;
+        int addressResolved = 0;
+        int nearbyUrlResolved = 0;
         for (SheetRow sheetRow : targetRows) {
             CSVRecord row = sheetRow.record();
             String stationName = row.get("역명").trim();
@@ -115,6 +120,27 @@ public final class PlaceGeocodingBatch {
                 }
             }
 
+            String manualAddress = row.get("주소").trim();
+            if (!resolution.confirmed() && !manualAddress.isBlank()) {
+                Thread.sleep(REQUEST_INTERVAL_MILLIS);
+                JsonNode addressMatch = resolveByAddress(httpClient, objectMapper, kakaoApiKey, manualAddress);
+                if (addressMatch != null) {
+                    addressResolved++;
+                    log.info("주소 검색으로 확정됨: {} {} ({}) -> {}",
+                            stationName, placeName, manualAddress, addressMatch.path("address_name").asText(""));
+
+                    Thread.sleep(REQUEST_INTERVAL_MILLIS);
+                    JsonNode nearbyPlace = findNearbyPlaceUrl(httpClient, objectMapper, kakaoApiKey,
+                            placeName, addressMatch.path("x").asText(""), addressMatch.path("y").asText(""));
+                    if (nearbyPlace != null) {
+                        nearbyUrlResolved++;
+                        log.info("카카오맵 URL 추가 보강됨: {} {} -> {}",
+                                stationName, placeName, nearbyPlace.path("place_url").asText(""));
+                    }
+                    resolution = new Resolution(true, mergeAddressAndNearby(addressMatch, nearbyPlace), null, List.of());
+                }
+            }
+
             if (resolution.confirmed()) {
                 enrichedRows.add(toEnrichedRow(row, resolution.match()));
                 sheetUpdates.add(toAddressValueRange(sheetTitle, sheetRow.rowNumber(), row, resolution.match()));
@@ -132,6 +158,8 @@ public final class PlaceGeocodingBatch {
             Thread.sleep(REQUEST_INTERVAL_MILLIS);
         }
         log.info("역명 없이 재검색해서 추가로 확정된 건수: {}", fallbackResolved);
+        log.info("수동 입력 주소로 확정된 건수: {}", addressResolved);
+        log.info("주소 확정 건 중 카카오맵 URL까지 보강된 건수: {}", nearbyUrlResolved);
 
         writeCsv(ENRICHED_OUTPUT, OUTPUT_HEADERS, enrichedRows);
         writeCsv(MANUAL_REVIEW_OUTPUT,
@@ -251,8 +279,35 @@ public final class PlaceGeocodingBatch {
 
     private static JsonNode searchKakaoKeyword(HttpClient httpClient, ObjectMapper objectMapper,
                                                 String kakaoApiKey, String query) throws InterruptedException {
+        return searchKakao(httpClient, objectMapper, kakaoApiKey,
+                buildSearchUri(KAKAO_KEYWORD_SEARCH_URL, query, null, null), query);
+    }
+
+    private static JsonNode searchKakaoAddress(HttpClient httpClient, ObjectMapper objectMapper,
+                                                String kakaoApiKey, String query) throws InterruptedException {
+        return searchKakao(httpClient, objectMapper, kakaoApiKey,
+                buildSearchUri(KAKAO_ADDRESS_SEARCH_URL, query, null, null), query);
+    }
+
+    // 주소 검색으로 얻은 좌표 반경 내에서 장소명을 다시 찾아 place_url(카카오맵 URL)만 보강하기 위한 검색
+    private static JsonNode searchKakaoNearbyKeyword(HttpClient httpClient, ObjectMapper objectMapper,
+                                                       String kakaoApiKey, String query, String x, String y)
+            throws InterruptedException {
+        return searchKakao(httpClient, objectMapper, kakaoApiKey,
+                buildSearchUri(KAKAO_KEYWORD_SEARCH_URL, query, x, y), query);
+    }
+
+    private static URI buildSearchUri(String baseUrl, String query, String x, String y) {
         String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
-        URI uri = URI.create(KAKAO_KEYWORD_SEARCH_URL + "?query=" + encodedQuery + "&size=15&page=1");
+        String uriString = baseUrl + "?query=" + encodedQuery + "&size=15&page=1";
+        if (x != null && y != null) {
+            uriString += "&x=" + x + "&y=" + y + "&radius=" + NEARBY_SEARCH_RADIUS_METERS;
+        }
+        return URI.create(uriString);
+    }
+
+    private static JsonNode searchKakao(HttpClient httpClient, ObjectMapper objectMapper,
+                                         String kakaoApiKey, URI uri, String query) throws InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .header("Authorization", "KakaoAK " + kakaoApiKey)
                 .GET()
@@ -309,6 +364,43 @@ public final class PlaceGeocodingBatch {
             return new Resolution(false, null, "NO_EXACT_MATCH", toCandidateList(documents));
         }
         return new Resolution(false, null, "AMBIGUOUS(" + exactMatches.size() + ")", toCandidateList(exactMatches));
+    }
+
+    // 주소 검색 결과(place_url 없음) 반경 내에서 장소명으로 실제 업체를 찾아 카카오맵 URL을 보강한다.
+    // 못 찾으면(하천/공원 등 실제 업체가 아닌 경우) null 반환 — 이때는 URL 없이 둔다.
+    private static JsonNode findNearbyPlaceUrl(HttpClient httpClient, ObjectMapper objectMapper, String kakaoApiKey,
+                                                String placeName, String x, String y) throws InterruptedException {
+        if (x.isBlank() || y.isBlank()) {
+            return null;
+        }
+        JsonNode documents = searchKakaoNearbyKeyword(httpClient, objectMapper, kakaoApiKey, placeName, x, y);
+        if (documents == null || documents.isEmpty()) {
+            return null;
+        }
+        List<JsonNode> exactMatches = findExactNameMatches(documents, placeName);
+        if (exactMatches.size() == 1) {
+            return exactMatches.get(0);
+        }
+        return documents.size() == 1 ? documents.get(0) : null;
+    }
+
+    // 주소/좌표는 수동 입력 주소 검색 결과(정확)를, 전화번호/카카오맵 URL은 반경 검색으로 찾은 실제 업체(있으면)를 합친다.
+    private static JsonNode mergeAddressAndNearby(JsonNode addressMatch, JsonNode nearbyPlace) {
+        ObjectNode merged = addressMatch.deepCopy();
+        if (nearbyPlace != null) {
+            merged.put("phone", nearbyPlace.path("phone").asText(""));
+            merged.put("place_url", nearbyPlace.path("place_url").asText(""));
+        }
+        return merged;
+    }
+
+    private static JsonNode resolveByAddress(HttpClient httpClient, ObjectMapper objectMapper,
+                                              String kakaoApiKey, String address) throws InterruptedException {
+        JsonNode documents = searchKakaoAddress(httpClient, objectMapper, kakaoApiKey, address);
+        if (documents == null || documents.isEmpty()) {
+            return null;
+        }
+        return documents.get(0);
     }
 
     private static List<JsonNode> findExactNameMatches(JsonNode documents, String placeName) {
