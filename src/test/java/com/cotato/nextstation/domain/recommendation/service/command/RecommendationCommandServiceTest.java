@@ -383,30 +383,33 @@ class RecommendationCommandServiceTest {
     }
 
     @Test
-    @DisplayName("태그 점수가 최고점의 90% 미만인 역은 후보에서 빠진다(가중치 10)")
-    void recommendCustom_filtersByScoreRatio() {
-        // given: A는 1개 태그만 겹쳐 점수 11(=1+10), B는 3개 태그가 모두 겹쳐 점수 45(=15+30)
-        // 임계값 = 45*0.9 = 40.5 → A는 탈락하고 B만 남아 결과가 B로 고정된다
+    @DisplayName("태그 점수 상위 5개 역만 후보로 남고, 그보다 낮은 점수의 역은 후보에서 빠진다")
+    void recommendCustom_limitsToTopFiveByScore() {
+        // given: 점수는 station6(60) > 5(50) > 4(40) > 3(30) > 2(20) > 1(10) 순.
+        // 상위 5개(2~6)만 후보군에 남아야 한다. 그중 2~5를 가본 역으로 처리해 6만 남긴다.
+        // station1은 가장 낮은 점수라 애초에 후보에서 잘려야 하므로 가본 역으로 만들지 않는다 —
+        // top-5 컷이 깨져 station1까지 후보에 남으면 무작위 선택 결과가 흔들려 아래 반복 검증에서 드러난다.
         givenDeparture(1L);
-        List<ReachableStationView> routes = List.of(reachableView(1L, 10), reachableView(2L, 20));
+        List<ReachableStationView> routes = java.util.stream.LongStream.rangeClosed(1, 6)
+                .mapToObj(id -> reachableView(id, 10))
+                .toList();
         given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(routes);
-        given(stationRepository.findAllById(any())).willReturn(List.of(station(1L, "A역"), station(2L, "B역")));
-        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(Map.of(
-                1L, Map.of("NATURE", 1L),
-                2L, Map.of("NATURE", 5L, "BUDGET", 5L, "EXPERIENCE", 5L)
-        ));
+        given(stationRepository.findAllById(any())).willReturn(java.util.stream.LongStream.rangeClosed(1, 6)
+                .mapToObj(id -> station(id, id + "역"))
+                .toList());
+        Map<Long, Map<String, Long>> counts = new java.util.HashMap<>();
+        for (long id = 1; id <= 6; id++) {
+            counts.put(id, Map.of("NATURE", id * 10L));
+        }
+        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(counts);
+        given(courseRepository.findVisitedStationIds(1L)).willReturn(List.of(2L, 3L, 4L, 5L));
 
-        // when
-        CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
-                customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
-
-        // then
-        assertThat(response.station().stationId()).isEqualTo(2L);
-        assertThat(response.travelDurationMinutes()).isEqualTo(20);
-        ArgumentCaptor<RecommendationLog> captor = ArgumentCaptor.forClass(RecommendationLog.class);
-        verify(recommendationLogRepository).save(captor.capture());
-        assertThat(captor.getValue().getResultStationId()).isEqualTo(2L);
-        assertThat(captor.getValue().isRandom()).isFalse();
+        // when & then: 반복해도 항상 station6만 나온다
+        for (int i = 0; i < 20; i++) {
+            CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
+                    customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
+            assertThat(response.station().stationId()).isEqualTo(6L);
+        }
     }
 
     @Test
