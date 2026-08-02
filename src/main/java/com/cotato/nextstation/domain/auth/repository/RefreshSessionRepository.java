@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.auth.repository;
 
 import com.cotato.nextstation.global.jwt.AuthTokenClaims;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -12,6 +13,7 @@ import java.util.List;
 
 // refreshToken rotation의 세션 상태(familyId -> 현재 유효한 jti)를 Redis Hash로 관리한다.
 // 조회/비교/교체를 Lua로 원자화해 동시 요청이 서로의 갱신을 덮어쓰지 않게 한다.
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class RefreshSessionRepository {
@@ -109,10 +111,28 @@ public class RefreshSessionRepository {
                 memberId.toString()
         );
 
+        return toRotateResult(familyId, result);
+    }
+
+    /**
+     * 스크립트 반환값이 예상과 다르면 세션이 없는 것으로 보고 재로그인을 유도한다.
+     * 그대로 valueOf를 태우면 IllegalArgumentException이 500으로 나가고, 그 세션은 TTL 만료까지 복구되지 않는다.
+     * 정상 흐름에서는 발생할 수 없으므로 원인 추적을 위해 error로 남긴다.
+     */
+    private RotateResult toRotateResult(String familyId, List<?> result) {
         if (result == null || result.size() != 2) {
+            log.error("rotate 스크립트 반환 형태가 예상과 다름: familyId={}, result={}", familyId, result);
             return new RotateResult(RotateStatus.NOT_FOUND, null);
         }
-        return new RotateResult(RotateStatus.valueOf((String) result.get(0)), (String) result.get(1));
+
+        String status = String.valueOf(result.get(0));
+        Object jti = result.get(1);
+        try {
+            return new RotateResult(RotateStatus.valueOf(status), jti == null ? null : jti.toString());
+        } catch (IllegalArgumentException e) {
+            log.error("rotate 스크립트가 알 수 없는 상태를 반환(스크립트-enum 불일치): familyId={}, status={}", familyId, status);
+            return new RotateResult(RotateStatus.NOT_FOUND, null);
+        }
     }
 
     public void delete(String familyId) {
