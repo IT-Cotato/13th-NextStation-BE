@@ -11,6 +11,10 @@ public final class AuthTokenClaims {
     public static final String ACCESS_PURPOSE = "ACCESS";
     public static final String REFRESH_PURPOSE = "REFRESH";
 
+    // refreshToken 전용 claim: rotation + reuse detection에 쓰인다
+    public static final String FAMILY_ID_KEY = "familyId";
+    public static final String JTI_KEY = "jti";
+
     public static final Duration ACCESS_TOKEN_EXPIRATION = Duration.ofHours(1);
     public static final Duration REFRESH_TOKEN_EXPIRATION = Duration.ofDays(14);
 
