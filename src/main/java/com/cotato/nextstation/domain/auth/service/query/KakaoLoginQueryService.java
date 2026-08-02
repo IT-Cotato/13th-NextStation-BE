@@ -4,6 +4,8 @@ import com.cotato.nextstation.domain.auth.client.KakaoOAuthClient;
 import com.cotato.nextstation.domain.auth.client.dto.KakaoTokenResponse;
 import com.cotato.nextstation.domain.auth.client.dto.KakaoUserInfoResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
+import com.cotato.nextstation.domain.auth.service.AuthTokenIssuer;
+import com.cotato.nextstation.domain.auth.service.IssuedTokens;
 import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResult;
 import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResultType;
 import com.cotato.nextstation.domain.auth.util.KakaoSignupTokenClaims;
@@ -15,7 +17,6 @@ import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.domain.member.repository.MemberSocialAccountRepository;
 import com.cotato.nextstation.global.exception.CustomException;
-import com.cotato.nextstation.global.jwt.AuthTokenClaims;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class KakaoLoginQueryService {
     private final MemberRepository memberRepository;
     private final MemberSocialAccountRepository memberSocialAccountRepository;
     private final JwtProvider jwtProvider;
+    private final AuthTokenIssuer authTokenIssuer;
 
     // 인가코드로 토큰교환 + 사용자 조회 후 신규/PENDING/기존 회원 3분기 판별, Member 생성은 여기서 하지 않는다(KakaoSignupCommandService 담당)
     public KakaoLoginResult login(String code) {
@@ -72,10 +74,9 @@ public class KakaoLoginQueryService {
         }
 
         log.info("카카오 로그인 성공: memberId={}", member.getId());
-        String accessToken = issueAuthToken(member.getId(), AuthTokenClaims.ACCESS_PURPOSE, AuthTokenClaims.ACCESS_TOKEN_EXPIRATION);
-        String refreshToken = issueAuthToken(member.getId(), AuthTokenClaims.REFRESH_PURPOSE, AuthTokenClaims.REFRESH_TOKEN_EXPIRATION);
+        IssuedTokens tokens = authTokenIssuer.issue(member.getId());
 
-        return new KakaoLoginResult(KakaoLoginResultType.LOGIN_SUCCESS, member.getId(), accessToken, refreshToken,
+        return new KakaoLoginResult(KakaoLoginResultType.LOGIN_SUCCESS, member.getId(), tokens.accessToken(), tokens.refreshToken(),
                 null, null, null, null);
     }
 
@@ -104,10 +105,6 @@ public class KakaoLoginQueryService {
         );
         return new KakaoLoginResult(KakaoLoginResultType.PENDING_PROFILE, member.getId(), null, null,
                 signupToken, null, null, null);
-    }
-
-    private String issueAuthToken(Long memberId, String purpose, Duration expiration) {
-        return jwtProvider.generateToken(memberId.toString(), Map.of(AuthTokenClaims.PURPOSE_KEY, purpose), expiration);
     }
 
     private String orEmpty(String value) {
