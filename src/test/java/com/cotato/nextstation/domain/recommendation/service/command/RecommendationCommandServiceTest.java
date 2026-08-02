@@ -385,10 +385,8 @@ class RecommendationCommandServiceTest {
     @Test
     @DisplayName("태그 점수 상위 5개 역만 후보로 남고, 그보다 낮은 점수의 역은 후보에서 빠진다")
     void recommendCustom_limitsToTopFiveByScore() {
-        // given: 점수는 station6(60) > 5(50) > 4(40) > 3(30) > 2(20) > 1(10) 순.
-        // 상위 5개(2~6)만 후보군에 남아야 한다. 그중 2~5를 가본 역으로 처리해 6만 남긴다.
-        // station1은 가장 낮은 점수라 애초에 후보에서 잘려야 하므로 가본 역으로 만들지 않는다 —
-        // top-5 컷이 깨져 station1까지 후보에 남으면 무작위 선택 결과가 흔들려 아래 반복 검증에서 드러난다.
+        // given: 점수는 station6(60) > 5(50) > 4(40) > 3(30) > 2(20) > 1(10) 순. 방문 이력은 없다.
+        // 상위 5개(2~6)만 후보군에 남고 station1은 잘려야 한다.
         givenDeparture(1L);
         List<ReachableStationView> routes = java.util.stream.LongStream.rangeClosed(1, 6)
                 .mapToObj(id -> reachableView(id, 10))
@@ -402,39 +400,60 @@ class RecommendationCommandServiceTest {
             counts.put(id, Map.of("NATURE", id * 10L));
         }
         given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(counts);
-        given(courseRepository.findVisitedStationIds(1L)).willReturn(List.of(2L, 3L, 4L, 5L));
 
-        // when & then: 반복해도 항상 station6만 나온다
-        for (int i = 0; i < 20; i++) {
+        // when: 반복 추천해 나온 역 id를 모은다
+        java.util.Set<Long> pickedIds = new java.util.HashSet<>();
+        for (int i = 0; i < 30; i++) {
             CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
                     customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
-            assertThat(response.station().stationId()).isEqualTo(6L);
+            pickedIds.add(response.station().stationId());
         }
+
+        // then: 최하위 station1은 한 번도 나오지 않고, 상위 5개(2~6) 안에서는 매번 같은 역만 나오지 않는다
+        assertThat(pickedIds).doesNotContain(1L);
+        assertThat(pickedIds).hasSizeGreaterThan(1);
     }
 
     @Test
-    @DisplayName("동점 후보 중 안 가본 역이 있으면 가본 역은 제외된다")
-    void recommendCustom_excludesVisitedStation() {
-        // given: A·B 동점 후보, A는 이미 가본 역
+    @DisplayName("가본 역은 감점되어 컷 경계에서 밀려날 수 있다")
+    void recommendCustom_visitedStationIsPenalizedAtCutBoundary() {
+        // given: 감점 전 점수는 station1(60)>2(50)>3(40)>4(30)>5(22)>6(20) 순 — 상위 5개는 1~5, station6은 컷 밖.
+        // station5(가본 역, 점수 22)는 감점(4점)되면 18이 돼 station6(20)보다 낮아져 컷 경계에서 역전된다.
+        // 즉 감점 없이는 station5가 후보에 남고, 감점이 제대로 반영되면 station5는 빠지고 station6이 그 자리를 채운다.
         givenDeparture(1L);
-        List<ReachableStationView> routes = List.of(reachableView(1L, 10), reachableView(2L, 10));
+        List<ReachableStationView> routes = java.util.stream.LongStream.rangeClosed(1, 6)
+                .mapToObj(id -> reachableView(id, 10))
+                .toList();
         given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(routes);
-        given(stationRepository.findAllById(any())).willReturn(List.of(station(1L, "A역"), station(2L, "B역")));
-        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(Map.of());
-        given(courseRepository.findVisitedStationIds(1L)).willReturn(List.of(1L));
+        given(stationRepository.findAllById(any())).willReturn(java.util.stream.LongStream.rangeClosed(1, 6)
+                .mapToObj(id -> station(id, id + "역"))
+                .toList());
+        Map<Long, Map<String, Long>> counts = new java.util.HashMap<>();
+        counts.put(1L, Map.of("NATURE", 50L));
+        counts.put(2L, Map.of("NATURE", 40L));
+        counts.put(3L, Map.of("NATURE", 30L));
+        counts.put(4L, Map.of("NATURE", 20L));
+        counts.put(5L, Map.of("NATURE", 12L));
+        counts.put(6L, Map.of("NATURE", 10L));
+        given(stationTagCountReader.getPlaceCountsByStationForTags(TRAVEL_STYLES)).willReturn(counts);
+        given(courseRepository.findVisitedStationIds(1L)).willReturn(List.of(5L));
 
         // when
-        CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
-                customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
+        java.util.Set<Long> pickedIds = new java.util.HashSet<>();
+        for (int i = 0; i < 30; i++) {
+            CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
+                    customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
+            pickedIds.add(response.station().stationId());
+        }
 
-        // then
-        assertThat(response.station().stationId()).isEqualTo(2L);
+        // then: 감점으로 컷 밖으로 밀려난 station5는 한 번도 나오지 않는다
+        assertThat(pickedIds).doesNotContain(5L);
     }
 
     @Test
-    @DisplayName("후보 전부 가본 역이면 안 가본 역 조건은 적용하지 않는다")
-    void recommendCustom_allVisitedFallsBackToAll() {
-        // given
+    @DisplayName("후보가 가본 역뿐이어도 감점만 받을 뿐 추천에서 제외되지 않는다")
+    void recommendCustom_visitedOnlyStationIsStillRecommended() {
+        // given: 도달 가능한 역이 station1 하나뿐이고 이미 가본 역이다.
         givenDeparture(1L);
         List<ReachableStationView> routes = List.of(reachableView(1L, 10));
         given(stationRouteRepository.findAllFromDeparture(1L)).willReturn(routes);
@@ -446,7 +465,7 @@ class RecommendationCommandServiceTest {
         CustomRecommendationResponse response = recommendationCommandService.recommendCustom(1L,
                 customRequest(1L, TravelTime.ANY, TRAVEL_STYLES));
 
-        // then: 후보가 A뿐이라 결국 A가 나온다
+        // then: 감점되어도 유일한 후보이므로 그대로 추천된다
         assertThat(response.station().stationId()).isEqualTo(1L);
     }
 
