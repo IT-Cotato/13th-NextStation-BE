@@ -23,6 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,10 +41,12 @@ public class RecommendationCommandService {
     private static final List<String> CATEGORY_DISPLAY_ORDER = List.of("CULTURE", "FOOD", "CAFE", "WALK");
 
     // 맞춤추천 점수 = 선택 태그별 장소 수 합 + (충족 태그 수 × TAG_MATCH_WEIGHT)
-    // 실데이터에서 후보군이 지나치게 넓어지는 경향이 있어 튜닝 대상이라 상수로 분리해 둔다.
+    // 2026-08-03 실데이터(place_0730) 시뮬레이션 결과 10 이상이면 순위가 포화되어(더 올려도 결과 동일) 그대로 둔다.
     private static final int TAG_MATCH_WEIGHT = 10;
-    // 최고 점수 대비 이 비율 이상이면 후보군에 포함한다.
-    private static final double CANDIDATE_SCORE_RATIO = 0.9;
+    // 점수 상위 이 개수만 후보군으로 남긴다. 동점은 무작위로 섞는다.
+    // 기존 퍼센트 컷(최고점의 90%)은 가중치를 올리면 컷 폭도 같이 늘어나 후보군 크기가 가중치에 종속됐다.
+    // 개수 고정으로 바꿔 가중치·후보군 크기를 독립적으로 튜닝할 수 있게 했다(2026-08-03).
+    private static final int CANDIDATE_POOL_SIZE = 5;
 
     private final StationRepository stationRepository;
     private final StationLineRepository stationLineRepository;
@@ -68,7 +72,7 @@ public class RecommendationCommandService {
     /**
      * 맞춤추천. 다음 순서로 역을 좁혀 그중 하나를 무작위로 고른다.
      * 1. 출발역에서 이동 가능 시간 내 도달 가능한 뽑기 대상 역
-     * 2. 선택한 여행 스타일 태그 점수가 최고점의 90% 이상인 역(후보군)
+     * 2. 선택한 여행 스타일 태그 점수 상위 CANDIDATE_POOL_SIZE개 역(후보군)
      * 3. (있다면) 안 가본 역만 남기기 — 전부 가본 역이면 이 단계는 건너뛴다
      * 4. (로그인 시) 직전 추천 역 제외 — 제외하면 후보가 비면 이 단계도 건너뛴다
      */
@@ -117,22 +121,16 @@ public class RecommendationCommandService {
         return durationByStationId;
     }
 
-    // 최고 점수의 CANDIDATE_SCORE_RATIO 이상인 역만 후보군으로 남긴다.
+    // 점수 상위 CANDIDATE_POOL_SIZE개 역만 후보군으로 남긴다. 동점 역은 무작위로 섞어 매번 다르게 채운다.
     private List<Station> selectScoreCandidates(List<Station> stations, List<String> travelStyles) {
         Map<Long, Map<String, Long>> countsByStationId = stationTagCountReader.getPlaceCountsByStationForTags(travelStyles);
 
-        Map<Long, Long> scoreByStationId = new HashMap<>();
-        long maxScore = 0;
-        for (Station station : stations) {
-            long score = calculateScore(countsByStationId.get(station.getId()), travelStyles);
-            scoreByStationId.put(station.getId(), score);
-            maxScore = Math.max(maxScore, score);
-        }
-
-        // 어느 역도 태그에 걸리지 않으면 도달 가능한 역 전체를 후보로 둔다.
-        double threshold = maxScore * CANDIDATE_SCORE_RATIO;
-        return stations.stream()
-                .filter(station -> scoreByStationId.get(station.getId()) >= threshold)
+        List<Station> shuffled = new ArrayList<>(stations);
+        Collections.shuffle(shuffled, ThreadLocalRandom.current());
+        return shuffled.stream()
+                .sorted(Comparator.comparingLong(
+                        (Station station) -> calculateScore(countsByStationId.get(station.getId()), travelStyles)).reversed())
+                .limit(CANDIDATE_POOL_SIZE)
                 .toList();
     }
 
