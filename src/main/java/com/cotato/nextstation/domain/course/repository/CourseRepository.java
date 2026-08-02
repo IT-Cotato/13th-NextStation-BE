@@ -152,6 +152,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                                                 @Param("courseId") Long courseId,
                                                 Pageable pageable);
 
+    // 맞춤추천 "안 가본 역" 우선순위용. 회원이 완료(스탬프)한 코스들의 역을 distinct로 가져온다.
+    // MemberStamp는 courseId만 들고 있어(연관관계 미매핑) Course를 id로 ad-hoc 조인한다.
+    @Query("SELECT DISTINCT c.stationId FROM MemberStamp ms " +
+            "JOIN Course c ON c.id = ms.courseId " +
+            "WHERE ms.memberId = :memberId")
+    List<Long> findVisitedStationIds(@Param("memberId") Long memberId);
+
     // 내 코스가 하나라도 있는 호선. 코스 없는 호선 칩을 비활성화하는 데 쓴다.
     // 현재 필터와 무관하게 전체 기준으로 조회해야 필터를 바꿔 끼울 수 있다.
     // 페이징으로는 전체 목록을 볼 수 없어 서버가 따로 알려준다.
