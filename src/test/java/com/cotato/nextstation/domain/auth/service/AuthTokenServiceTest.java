@@ -1,11 +1,11 @@
-package com.cotato.nextstation.domain.auth.service.query;
+package com.cotato.nextstation.domain.auth.service;
 
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.repository.RefreshSessionRepository;
 import com.cotato.nextstation.domain.auth.service.AuthTokenIssuer;
 import com.cotato.nextstation.domain.auth.service.IssuedTokens;
-import com.cotato.nextstation.domain.auth.service.query.result.LoginResult;
-import com.cotato.nextstation.domain.auth.service.query.result.ReissueResult;
+import com.cotato.nextstation.domain.auth.service.result.LoginResult;
+import com.cotato.nextstation.domain.auth.service.result.ReissueResult;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
@@ -38,10 +38,10 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
-class LoginQueryServiceTest {
+class AuthTokenServiceTest {
 
     @InjectMocks
-    private LoginQueryService loginQueryService;
+    private AuthTokenService authTokenService;
 
     @Mock
     private MemberRepository memberRepository;
@@ -83,7 +83,7 @@ class LoginQueryServiceTest {
         given(authTokenIssuer.issue(1L)).willReturn(new IssuedTokens("access-token", "refresh-token"));
 
         // when
-        LoginResult result = loginQueryService.login(EMAIL, PASSWORD);
+        LoginResult result = authTokenService.login(EMAIL, PASSWORD);
 
         // then
         assertThat(result.memberId()).isEqualTo(1L);
@@ -98,7 +98,7 @@ class LoginQueryServiceTest {
         given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.login(EMAIL, PASSWORD))
+        assertThatThrownBy(() -> authTokenService.login(EMAIL, PASSWORD))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_CREDENTIALS.getMessage());
     }
@@ -110,7 +110,7 @@ class LoginQueryServiceTest {
         given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(pendingMember()));
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.login(EMAIL, PASSWORD))
+        assertThatThrownBy(() -> authTokenService.login(EMAIL, PASSWORD))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_CREDENTIALS.getMessage());
     }
@@ -123,7 +123,7 @@ class LoginQueryServiceTest {
         given(passwordEncoder.matches(PASSWORD, "encoded")).willReturn(false);
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.login(EMAIL, PASSWORD))
+        assertThatThrownBy(() -> authTokenService.login(EMAIL, PASSWORD))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_CREDENTIALS.getMessage());
     }
@@ -150,7 +150,7 @@ class LoginQueryServiceTest {
                 .willReturn("new-access-token", "new-refresh-token");
 
         // when
-        ReissueResult result = loginQueryService.reissue("refresh-token");
+        ReissueResult result = authTokenService.reissue("refresh-token");
 
         // then
         assertThat(result.memberId()).isEqualTo(1L);
@@ -171,7 +171,7 @@ class LoginQueryServiceTest {
                 .willReturn("new-access-token", "current-refresh-token");
 
         // when
-        ReissueResult result = loginQueryService.reissue("refresh-token");
+        ReissueResult result = authTokenService.reissue("refresh-token");
 
         // then
         assertThat(result.accessToken()).isEqualTo("new-access-token");
@@ -189,7 +189,7 @@ class LoginQueryServiceTest {
                 .willReturn(new RefreshSessionRepository.RotateResult(RefreshSessionRepository.RotateStatus.MEMBER_MISMATCH, null));
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("refresh-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("refresh-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_REFRESH_TOKEN.getMessage());
     }
@@ -204,7 +204,7 @@ class LoginQueryServiceTest {
         given(jwtProvider.parseClaims("refresh-token")).willReturn(claims);
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("refresh-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("refresh-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_REFRESH_TOKEN.getMessage());
     }
@@ -220,7 +220,7 @@ class LoginQueryServiceTest {
                 .willReturn(new RefreshSessionRepository.RotateResult(RefreshSessionRepository.RotateStatus.NOT_FOUND, null));
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("refresh-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("refresh-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_REFRESH_TOKEN.getMessage());
     }
@@ -236,7 +236,7 @@ class LoginQueryServiceTest {
                 .willReturn(new RefreshSessionRepository.RotateResult(RefreshSessionRepository.RotateStatus.REUSE_DETECTED, null));
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("refresh-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("refresh-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.REFRESH_TOKEN_REUSE_DETECTED.getMessage());
     }
@@ -249,7 +249,7 @@ class LoginQueryServiceTest {
                 .willThrow(new ExpiredJwtException(null, null, "expired"));
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("refresh-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("refresh-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.REFRESH_TOKEN_EXPIRED.getMessage());
     }
@@ -262,7 +262,7 @@ class LoginQueryServiceTest {
                 .willThrow(new JwtException("invalid signature"));
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("refresh-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("refresh-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_REFRESH_TOKEN.getMessage());
     }
@@ -276,7 +276,7 @@ class LoginQueryServiceTest {
         given(jwtProvider.parseClaims("access-token")).willReturn(claims);
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("access-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("access-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_REFRESH_TOKEN.getMessage());
     }
@@ -291,7 +291,7 @@ class LoginQueryServiceTest {
         given(jwtProvider.parseClaims("refresh-token")).willReturn(claims);
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("refresh-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("refresh-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_REFRESH_TOKEN.getMessage());
     }
@@ -305,7 +305,7 @@ class LoginQueryServiceTest {
         given(memberRepository.findById(999L)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("refresh-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("refresh-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.MEMBER_NOT_FOUND.getMessage());
     }
@@ -319,7 +319,7 @@ class LoginQueryServiceTest {
         given(memberRepository.findById(1L)).willReturn(Optional.of(pendingMember()));
 
         // when & then
-        assertThatThrownBy(() -> loginQueryService.reissue("refresh-token"))
+        assertThatThrownBy(() -> authTokenService.reissue("refresh-token"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_REFRESH_TOKEN.getMessage());
     }
@@ -334,7 +334,7 @@ class LoginQueryServiceTest {
         given(jwtProvider.parseClaims("refresh-token")).willReturn(claims);
 
         // when
-        loginQueryService.logout("refresh-token");
+        authTokenService.logout("refresh-token");
 
         // then
         org.mockito.Mockito.verify(refreshSessionRepository).delete("family-1");
@@ -352,7 +352,7 @@ class LoginQueryServiceTest {
         given(jwtProvider.parseClaims("refresh-token")).willThrow(expiredJwtException);
 
         // when
-        loginQueryService.logout("refresh-token");
+        authTokenService.logout("refresh-token");
 
         // then
         org.mockito.Mockito.verify(refreshSessionRepository).delete("family-1");
@@ -367,7 +367,7 @@ class LoginQueryServiceTest {
         given(jwtProvider.parseClaims("access-token")).willReturn(claims);
 
         // when & then
-        loginQueryService.logout("access-token");
+        authTokenService.logout("access-token");
         org.mockito.Mockito.verify(refreshSessionRepository, org.mockito.Mockito.never()).delete(anyString());
     }
 
@@ -378,7 +378,7 @@ class LoginQueryServiceTest {
         given(jwtProvider.parseClaims("bad-token")).willThrow(new JwtException("invalid signature"));
 
         // when & then (예외를 던지지 않아야 한다)
-        loginQueryService.logout("bad-token");
+        authTokenService.logout("bad-token");
         org.mockito.Mockito.verify(refreshSessionRepository, org.mockito.Mockito.never()).delete(anyString());
     }
 
@@ -392,7 +392,7 @@ class LoginQueryServiceTest {
         given(jwtProvider.parseClaims("legacy-refresh-token")).willReturn(claims);
 
         // when & then
-        loginQueryService.logout("legacy-refresh-token");
+        authTokenService.logout("legacy-refresh-token");
         org.mockito.Mockito.verify(refreshSessionRepository, org.mockito.Mockito.never()).delete(anyString());
     }
 }

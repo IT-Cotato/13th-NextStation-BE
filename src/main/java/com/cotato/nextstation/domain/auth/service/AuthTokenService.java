@@ -1,11 +1,9 @@
-package com.cotato.nextstation.domain.auth.service.query;
+package com.cotato.nextstation.domain.auth.service;
 
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.repository.RefreshSessionRepository;
-import com.cotato.nextstation.domain.auth.service.AuthTokenIssuer;
-import com.cotato.nextstation.domain.auth.service.IssuedTokens;
-import com.cotato.nextstation.domain.auth.service.query.result.LoginResult;
-import com.cotato.nextstation.domain.auth.service.query.result.ReissueResult;
+import com.cotato.nextstation.domain.auth.service.result.LoginResult;
+import com.cotato.nextstation.domain.auth.service.result.ReissueResult;
 import com.cotato.nextstation.domain.auth.util.EmailMasker;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
@@ -25,11 +23,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 로그인 세션(access/refresh token)의 발급·회전·폐기를 담당한다.
+ * 부수효과: DB는 조회만 하지만, Redis의 refresh 세션 상태는 변경한다.
+ *  - login()   세션 생성
+ *  - reissue() 세션의 jti 회전
+ *  - logout()  세션 삭제
+ * 상태 변경이 DB 트랜잭션 밖에서 일어나므로 Command/Query 접미사 대신 여기에 명시한다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class LoginQueryService {
+public class AuthTokenService {
 
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
@@ -63,33 +69,13 @@ public class LoginQueryService {
         return new LoginResult(member.getId(), tokens.accessToken(), tokens.refreshToken());
     }
 
-    // refreshToken 검증 -> rotation(reuse detection 포함) -> accessToken/refreshToken 재발급
+    /**
+     * refreshToken 검증 -> rotation(reuse detection 포함) -> accessToken/refreshToken 재발급
+     */
     public ReissueResult reissue(String refreshToken) {
 
-        Claims claims;
-        try {
-            claims = jwtProvider.parseClaims(refreshToken);
-        } catch (ExpiredJwtException e) {
-            log.warn("만료된 refreshToken으로 accessToken 재발급 시도");
-            throw new CustomException(AuthErrorCode.REFRESH_TOKEN_EXPIRED);
-        } catch (JwtException e) {
-            log.warn("위변조되었거나 형식이 잘못된 refreshToken으로 accessToken 재발급 시도");
-            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
-        }
-
-        // purpose로 accessToken/signupToken을 refreshToken 자리에 잘못 흘려넣는 걸 막는다 (AuthTokenClaims 참고)
-        if (!AuthTokenClaims.REFRESH_PURPOSE.equals(claims.get(AuthTokenClaims.PURPOSE_KEY, String.class))) {
-            log.warn("purpose가 REFRESH가 아닌 토큰으로 accessToken 재발급 시도");
-            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
-        }
-
-        Long memberId;
-        try {
-            memberId = Long.valueOf(claims.getSubject());
-        } catch (NumberFormatException e) {
-            log.warn("subject가 memberId 형식이 아닌 refreshToken으로 accessToken 재발급 시도");
-            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
-        }
+        Claims claims = parseRefreshClaims(refreshToken);
+        Long memberId = extractMemberId(claims);
 
         String familyId = claims.get(AuthTokenClaims.FAMILY_ID_KEY, String.class);
         String jti = claims.get(AuthTokenClaims.JTI_KEY, String.class);
@@ -111,26 +97,7 @@ public class LoginQueryService {
             throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
-        RefreshSessionRepository.RotateResult rotateResult =
-                refreshSessionRepository.rotate(familyId, jti, UUID.randomUUID().toString(), memberId);
-
-        switch (rotateResult.status()) {
-            case NOT_FOUND -> {
-                log.warn("이미 로그아웃되었거나 만료된 세션의 refreshToken으로 accessToken 재발급 시도: memberId={}, familyId={}", memberId, familyId);
-                throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
-            }
-            case REUSE_DETECTED -> {
-                log.error("refreshToken 재사용 탐지(탈취 의심) - 세션 강제 종료: memberId={}, familyId={}", memberId, familyId);
-                throw new CustomException(AuthErrorCode.REFRESH_TOKEN_REUSE_DETECTED);
-            }
-            case MEMBER_MISMATCH -> {
-                // 서명이 유효한 토큰의 subject와 세션 소유자가 다른 경우 - 정상 흐름에서는 발생할 수 없다.
-                log.error("refreshToken subject와 세션 소유자 불일치 - 세션 강제 종료: memberId={}, familyId={}", memberId, familyId);
-                throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
-            }
-            case GRACE -> log.info("동시 reissue 요청으로 판단해 현재 세션 토큰을 그대로 재사용: memberId={}, familyId={}", memberId, familyId);
-            case OK -> log.info("refreshToken rotate 성공: memberId={}, familyId={}", memberId, familyId);
-        }
+        String rotatedJti = rotateSession(familyId, jti, memberId);
 
         String accessToken = jwtProvider.generateToken(
                 member.getId().toString(),
@@ -142,7 +109,7 @@ public class LoginQueryService {
                 Map.of(
                         AuthTokenClaims.PURPOSE_KEY, AuthTokenClaims.REFRESH_PURPOSE,
                         AuthTokenClaims.FAMILY_ID_KEY, familyId,
-                        AuthTokenClaims.JTI_KEY, rotateResult.jti()
+                        AuthTokenClaims.JTI_KEY, rotatedJti
                 ),
                 AuthTokenClaims.REFRESH_TOKEN_EXPIRATION
         );
@@ -151,7 +118,10 @@ public class LoginQueryService {
         return new ReissueResult(member.getId(), accessToken, newRefreshToken);
     }
 
-    // 로그아웃 - refreshToken의 familyId로 세션을 삭제한다. 항상 성공(멱등)하며, 실패해도 예외를 던지지 않는다.
+    /**
+     * 로그아웃 - refreshToken의 familyId로 세션을 삭제한다.
+     * 항상 성공(멱등)하며, 토큰이 만료·위변조되었더라도 예외를 던지지 않는다.
+     */
     public void logout(String refreshToken) {
 
         Claims claims;
@@ -179,5 +149,65 @@ public class LoginQueryService {
 
         refreshSessionRepository.delete(familyId);
         log.info("로그아웃 성공: familyId={}", familyId);
+    }
+
+    /**
+     * 서명·만료 검증에 더해 purpose가 REFRESH인지까지 확인한다.
+     * purpose 검증은 accessToken/signupToken을 refreshToken 자리에 잘못 흘려넣는 걸 막는다 (AuthTokenClaims 참고).
+     */
+    private Claims parseRefreshClaims(String refreshToken) {
+        Claims claims;
+        try {
+            claims = jwtProvider.parseClaims(refreshToken);
+        } catch (ExpiredJwtException e) {
+            log.warn("만료된 refreshToken으로 accessToken 재발급 시도");
+            throw new CustomException(AuthErrorCode.REFRESH_TOKEN_EXPIRED);
+        } catch (JwtException e) {
+            log.warn("위변조되었거나 형식이 잘못된 refreshToken으로 accessToken 재발급 시도");
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        if (!AuthTokenClaims.REFRESH_PURPOSE.equals(claims.get(AuthTokenClaims.PURPOSE_KEY, String.class))) {
+            log.warn("purpose가 REFRESH가 아닌 토큰으로 accessToken 재발급 시도");
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        return claims;
+    }
+
+    private Long extractMemberId(Claims claims) {
+        try {
+            return Long.valueOf(claims.getSubject());
+        } catch (NumberFormatException e) {
+            log.warn("subject가 memberId 형식이 아닌 refreshToken으로 accessToken 재발급 시도");
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+    }
+
+    /**
+     * 세션의 jti를 회전시키고 이번 요청이 사용할 jti를 반환한다.
+     * 회전할 수 없는 상태(세션 없음·재사용 탐지·소유자 불일치)면 예외를 던진다.
+     */
+    private String rotateSession(String familyId, String jti, Long memberId) {
+        RefreshSessionRepository.RotateResult result =
+                refreshSessionRepository.rotate(familyId, jti, UUID.randomUUID().toString(), memberId);
+
+        switch (result.status()) {
+            case NOT_FOUND -> {
+                log.warn("이미 로그아웃되었거나 만료된 세션의 refreshToken으로 accessToken 재발급 시도: memberId={}, familyId={}", memberId, familyId);
+                throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+            }
+            case REUSE_DETECTED -> {
+                log.error("refreshToken 재사용 탐지(탈취 의심) - 세션 강제 종료: memberId={}, familyId={}", memberId, familyId);
+                throw new CustomException(AuthErrorCode.REFRESH_TOKEN_REUSE_DETECTED);
+            }
+            case MEMBER_MISMATCH -> {
+                // 서명이 유효한 토큰의 subject와 세션 소유자가 다른 경우 - 정상 흐름에서는 발생할 수 없다.
+                log.error("refreshToken subject와 세션 소유자 불일치 - 세션 강제 종료: memberId={}, familyId={}", memberId, familyId);
+                throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+            }
+            case GRACE -> log.info("동시 reissue 요청으로 판단해 현재 세션 토큰을 그대로 재사용: memberId={}, familyId={}", memberId, familyId);
+            case OK -> log.info("refreshToken rotate 성공: memberId={}, familyId={}", memberId, familyId);
+        }
+        return result.jti();
     }
 }

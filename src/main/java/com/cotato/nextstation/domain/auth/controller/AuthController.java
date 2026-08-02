@@ -16,9 +16,9 @@ import com.cotato.nextstation.domain.auth.service.command.EmailVerificationComma
 import com.cotato.nextstation.domain.auth.service.command.PasswordResetCommandService;
 import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
-import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
-import com.cotato.nextstation.domain.auth.service.query.result.LoginResult;
-import com.cotato.nextstation.domain.auth.service.query.result.ReissueResult;
+import com.cotato.nextstation.domain.auth.service.AuthTokenService;
+import com.cotato.nextstation.domain.auth.service.result.LoginResult;
+import com.cotato.nextstation.domain.auth.service.result.ReissueResult;
 import com.cotato.nextstation.domain.auth.util.RefreshTokenCookieFactory;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import com.cotato.nextstation.global.exception.CustomException;
@@ -52,7 +52,7 @@ public class AuthController {
     private final EmailVerificationCommandService emailVerificationCommandService;
     private final SignupCommandService signupCommandService;
     private final ProfileSetupCommandService profileSetupCommandService;
-    private final LoginQueryService loginQueryService;
+    private final AuthTokenService authTokenService;
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
     private final PasswordResetCommandService passwordResetCommandService;
 
@@ -188,7 +188,7 @@ public class AuthController {
     })
     @PostMapping("/login")
     public CommonResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse httpResponse) {
-        LoginResult result = loginQueryService.login(request.email(), request.password());
+        LoginResult result = authTokenService.login(request.email(), request.password());
 
         ResponseCookie refreshTokenCookie = refreshTokenCookieFactory.create(result.refreshToken());
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
@@ -224,7 +224,7 @@ public class AuthController {
         if (isBlank(refreshToken)) {
             throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
-        ReissueResult result = loginQueryService.reissue(refreshToken);
+        ReissueResult result = authTokenService.reissue(refreshToken);
 
         ResponseCookie refreshTokenCookie = refreshTokenCookieFactory.create(result.refreshToken());
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
@@ -251,7 +251,7 @@ public class AuthController {
             @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshToken,
             HttpServletResponse httpResponse) {
         if (!isBlank(refreshToken)) {
-            loginQueryService.logout(refreshToken);
+            authTokenService.logout(refreshToken);
         }
 
         ResponseCookie expiredCookie = refreshTokenCookieFactory.createExpired();

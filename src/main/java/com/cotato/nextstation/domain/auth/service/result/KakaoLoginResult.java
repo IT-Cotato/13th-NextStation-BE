@@ -1,4 +1,4 @@
-package com.cotato.nextstation.domain.auth.service.query.result;
+package com.cotato.nextstation.domain.auth.service.result;
 
 // KakaoLoginQueryService -> AuthController 전달 전용, resultType에 따라 유효한 필드가 다르다.
 public record KakaoLoginResult(
