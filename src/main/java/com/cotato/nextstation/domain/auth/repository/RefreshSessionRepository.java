@@ -42,7 +42,9 @@ public class RefreshSessionRepository {
             end
 
             local now = tonumber(ARGV[3])
-            local absoluteExpiry = tonumber(redis.call('HGET', KEYS[1], 'absoluteExpiry'))
+            -- 필드가 없으면 HGET이 false를 반환해 비교에서 런타임 오류(=500)가 난다.
+            -- or 0으로 떨어뜨려 손상된 세션을 만료로 간주하고 정리한다.
+            local absoluteExpiry = tonumber(redis.call('HGET', KEYS[1], 'absoluteExpiry') or 0)
             if now >= absoluteExpiry then
                 redis.call('DEL', KEYS[1])
                 return {'NOT_FOUND', ''}
@@ -63,7 +65,8 @@ public class RefreshSessionRepository {
                 -- 이미 rotate된 직전 jti가 grace 안에 다시 왔다면 동시 요청으로 보고, rotate 없이 현재 토큰을 그대로 돌려준다.
                 -- (여기서 또 rotate하면 같은 jti를 든 세 번째 요청부터 다시 어긋난다)
                 local previousJti = redis.call('HGET', KEYS[1], 'previousJti')
-                if previousJti == ARGV[1] and now < tonumber(redis.call('HGET', KEYS[1], 'previousJtiUntil')) then
+                local previousJtiUntil = tonumber(redis.call('HGET', KEYS[1], 'previousJtiUntil') or 0)
+                if previousJti == ARGV[1] and now < previousJtiUntil then
                     redis.call('PEXPIRE', KEYS[1], ttl)
                     return {'GRACE', currentJti}
                 end
