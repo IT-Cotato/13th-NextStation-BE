@@ -40,14 +40,17 @@ com.cotato.nextstation
 │   │   ├── service
 │   │   │   ├── command
 │   │   │   │   └── MemberCommandService
-│   │   │   └── query
-│   │   │       └── MemberQueryService
+│   │   │   ├── query
+│   │   │   │   └── MemberQueryService
+│   │   │   └── result        // 서비스 -> 컨트롤러 전달용 결과 record (응답 DTO와 별개)
 │   │   ├── repository
 │   │   ├── entity
 │   │   ├── dto
 │   │   │   ├── request
 │   │   │   └── response
 │   │   ├── converter
+│   │   ├── client            // 외부 API 클라이언트 (필요한 도메인만)
+│   │   ├── util              // 해당 도메인 전용 헬퍼·상수 (필요한 도메인만)
 │   │   └── exception
 │   └── order
 │       └── ...
@@ -57,12 +60,15 @@ com.cotato.nextstation
     │   └── response      // CommonResponse 등 공통 응답
     ├── entity            // BaseEntity, BaseTimeEntity 등
     ├── exception         // 공통 예외, GlobalExceptionHandler
+    ├── jwt               // JwtProvider, 토큰 claim 상수
     ├── security
     └── util
 ```
 
 - 도메인 간 직접 의존은 최소화하고, 불가피할 경우 인터페이스 또는 이벤트를 통해 결합도를 낮춘다.
 - 공통으로 재사용되는 코드는 `global` 하위로 분리한다.
+- `service/result`의 record는 **서비스가 컨트롤러에 넘기는 중간 결과**다. 응답 body에 그대로 나가지 않는 값(예: 쿠키로 내려갈 refreshToken)이 섞이므로 `dto/response`와 분리한다.
+- `command`/`query`에 넣지 않는 서비스도 있다. [접미사를 강제하지 않는 경우](#접미사를-강제하지-않는-경우) 참고.
 
 ---
 
@@ -210,6 +216,31 @@ public class MemberQueryService {
 - Service 간 호출이 필요한 경우, 순환 참조가 발생하지 않도록 주의한다.
 - Entity를 직접 노출하지 않고 DTO로 변환하여 반환한다.
 
+### 접미사를 강제하지 않는 경우
+
+Command/Query 구분은 **DB 트랜잭션 경계**를 기준으로 한다. 따라서 상태가 DB 밖(Redis, 외부 API, 메일 등)에 있는 서비스에는 이 이분법이 들어맞지 않는다.
+
+- **DB 트랜잭션 밖에서 상태가 바뀌는 서비스**는 `CommandService`/`QueryService` 접미사를 강제하지 않는다. 대신 **클래스 주석에 부수효과를 명시**한다.
+- 이 경우 `service` 패키지 바로 아래에 역할이 드러나는 이름으로 둔다. (`{도메인}{역할}` — `Issuer`, `Writer`, `Cleaner`, `Sender` 등)
+- DB 조회만 하는 서비스는 여전히 `@Transactional(readOnly = true)`를 유지한다. 외부 저장소 쓰기가 있다고 해서 이를 `@Transactional`로 바꾸지 않는다. (읽기 최적화를 잃을 뿐, 외부 저장소는 어차피 롤백 대상이 아니다)
+
+```java
+/**
+ * 로그인 세션(access/refresh token)의 발급·회전·폐기를 담당한다.
+ * 부수효과: DB는 조회만 하지만, Redis의 refresh 세션 상태는 변경한다.
+ *  - login()   세션 생성
+ *  - reissue() 세션의 jti 회전
+ *  - logout()  세션 삭제
+ * 상태 변경이 DB 트랜잭션 밖에서 일어나므로 Command/Query 접미사 대신 여기에 명시한다.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class AuthTokenService { ... }
+```
+
+해당 예: `AuthTokenService`, `AuthTokenIssuer`, `EmailVerificationWriter`, `EmailVerificationCleaner`, `VerificationMailSender`
+
 ---
 
 ## 6. Repository 컨벤션
@@ -233,6 +264,36 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 - N+1 문제를 유발하는 연관 조회는 `fetch join` 또는 `@EntityGraph`로 해결한다.
 - 페이징이 필요한 목록 조회는 `Pageable`을 사용한다.
 - Repository 계층에는 비즈니스 로직을 두지 않는다.
+
+### Redis 리포지토리
+
+Redis에 저장하는 데이터도 영속성 계층이므로 Repository로 분리한다. 단 JPA가 아니므로 인터페이스가 아닌 **클래스**로 작성한다.
+
+- `@Repository` + `@RequiredArgsConstructor` 클래스로 만들고 `RedisTemplate<String, String>`을 주입받는다.
+- 키는 `private static final String {용도}_KEY_FORMAT` 상수로 두고 `String.formatted(...)`로 조립한다. 키 문자열을 메서드 안에 흩어놓지 않는다.
+- **TTL 없는 키가 남지 않도록 주의한다.** 값 저장과 만료 설정이 분리되면 그 사이에 프로세스가 죽었을 때 키가 영구히 남는다. 원자성이 필요하면 Lua 스크립트로 묶는다.
+- 여러 필드를 함께 읽고 비교해 갱신하는 경우(compare-and-swap 등)도 Lua로 원자화한다.
+
+```java
+@Repository
+@RequiredArgsConstructor
+public class EmailVerificationRateLimitRepository {
+
+    private static final String HOURLY_COUNT_KEY_FORMAT = "email:verify:count:hour:%s:%s";
+
+    private final RedisTemplate<String, String> redisTemplate;
+
+    public long incrementHourlyCount(VerificationType type, String email) {
+        return increment(hourlyCountKey(type, email), Duration.ofHours(1));
+    }
+
+    private String hourlyCountKey(VerificationType type, String email) {
+        return HOURLY_COUNT_KEY_FORMAT.formatted(type, email);
+    }
+}
+```
+
+해당 예: `EmailVerificationRateLimitRepository`, `RefreshSessionRepository`
 
 ---
 
@@ -744,9 +805,13 @@ class MemberQueryServiceTest {
 - 비밀번호는 반드시 단방향 해시(BCrypt 등)로 저장한다. 평문 저장 금지.
 - 민감 정보(DB 비밀번호, 시크릿 키 등)는 코드에 하드코딩하지 않고 환경변수/설정 파일로 분리한다.
 - 응답 DTO에 비밀번호, 토큰 등 민감 필드를 포함하지 않는다.
+    - 예외적으로 토큰 발급이 목적인 인증 API(`/login`, `/reissue` 등)는 accessToken을 body로 내려준다.
+    - refreshToken은 body에 담지 않고 **httpOnly 쿠키로만** 내려준다. 프론트 JS가 값을 읽을 수 없어야 한다.
 - SQL Injection 방지를 위해 문자열 연결 쿼리 대신 파라미터 바인딩을 사용한다.
-- 인증/인가는 Spring Security 필터/설정에서 처리하고, 권한 체크 로직을 도메인 곳곳에 분산시키지 않는다.
-- 로그에 개인정보/민감정보를 남기지 않는다.
+- 인증은 커스텀 `HandlerMethodArgumentResolver`(`JwtPrincipalArgumentResolver`)로 처리한다. **Spring Security 필터체인은 현재 사용하지 않는다**(`spring-boot-starter-security` 미적용, BCrypt용 `spring-security-crypto`만 사용). 인가(role 기반 권한)가 필요해지는 시점에 재도입을 검토한다.
+    - 인증이 필요한 API는 컨트롤러 파라미터에 `@AuthenticationPrincipal JwtPrincipal`을 선언한다. **이 파라미터가 없으면 인증 없이 열리므로** 새 API 추가 시 반드시 확인한다.
+    - 권한 체크 로직을 도메인 곳곳에 분산시키지 않는다.
+- 로그에 개인정보/민감정보를 남기지 않는다. 토큰 값 자체는 로그에 남기지 않고 memberId·familyId 등 식별자만 남긴다.
 
 ---
 
