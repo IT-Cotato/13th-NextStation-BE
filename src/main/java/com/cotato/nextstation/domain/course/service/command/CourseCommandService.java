@@ -11,6 +11,8 @@ import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
+import com.cotato.nextstation.domain.station.entity.Station;
+import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,7 @@ public class CourseCommandService {
     private final CoursePlaceRepository coursePlaceRepository;
     private final CourseConverter courseConverter;
     private final CourseViewCountUpdater courseViewCountUpdater;
+    private final StationRepository stationRepository;
 
     /**
      * 코스 상세를 열었을 때 조회수를 올린다. 다른 도메인이 코스 상세 화면을 그릴 때 호출한다.
@@ -58,6 +61,7 @@ public class CourseCommandService {
 
     public CourseCreateResponse createCourse(Long memberId, CourseCreateRequest request) {
         validateDistinctPlaces(request.placeIds());
+        validateDrawableStation(request.stationId());
 
         Course savedCourse = courseRepository.save(courseConverter.toCourse(memberId, request));
         coursePlaceRepository.saveAll(courseConverter.toCoursePlaces(savedCourse.getId(), request.placeIds()));
@@ -105,6 +109,15 @@ public class CourseCommandService {
     private void validateDistinctPlaces(List<Long> placeIds) {
         if (new HashSet<>(placeIds).size() != placeIds.size()) {
             throw new CustomException(CourseErrorCode.DUPLICATE_COURSE_PLACES);
+        }
+    }
+
+    // 코스는 뽑기 대상 역(is_drawable=true)에만 붙는다.
+    private void validateDrawableStation(Long stationId) {
+        Station station = stationRepository.findById(stationId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.STATION_NOT_FOUND));
+        if (!station.isDrawable()) {
+            throw new CustomException(CourseErrorCode.STATION_NOT_DRAWABLE);
         }
     }
 
