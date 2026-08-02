@@ -47,6 +47,11 @@ public class RecommendationCommandService {
     // 기존 퍼센트 컷(최고점의 90%)은 가중치를 올리면 컷 폭도 같이 늘어나 후보군 크기가 가중치에 종속됐다.
     // 개수 고정으로 바꿔 가중치·후보군 크기를 독립적으로 튜닝할 수 있게 했다(2026-08-03).
     private static final int CANDIDATE_POOL_SIZE = 5;
+    // 가본 역 감점 점수. 안 가본 역을 하드 필터링하지 않고 점수만 깎아 후보군 진입 여부에만 영향을 준다.
+    // 실데이터 시뮬레이션 결과 TAG_MATCH_WEIGHT(10)에 근접한 값은 하드 제외와 다를 바 없어져(top-5 내 가본역 비율 1%대) 4로 정했다(2026-08-03).
+    // 단, top-5 안에 든 이후의 최종 무작위 선택은 점수와 무관하게 균등 랜덤이라, 감점은 "후보군 진입 여부"에만 영향을 주고
+    // 이미 진입한 역들 사이의 선택 확률에는 영향을 주지 않는다 — 도달 가능 역이 5개 이하면 감점이 사실상 무효화된다.
+    private static final int VISITED_PENALTY = 4;
 
     private final StationRepository stationRepository;
     private final StationLineRepository stationLineRepository;
@@ -72,9 +77,8 @@ public class RecommendationCommandService {
     /**
      * 맞춤추천. 다음 순서로 역을 좁혀 그중 하나를 무작위로 고른다.
      * 1. 출발역에서 이동 가능 시간 내 도달 가능한 뽑기 대상 역
-     * 2. 선택한 여행 스타일 태그 점수 상위 CANDIDATE_POOL_SIZE개 역(후보군)
-     * 3. (있다면) 안 가본 역만 남기기 — 전부 가본 역이면 이 단계는 건너뛴다
-     * 4. (로그인 시) 직전 추천 역 제외 — 제외하면 후보가 비면 이 단계도 건너뛴다
+     * 2. 선택한 여행 스타일 태그 점수 상위 CANDIDATE_POOL_SIZE개 역(후보군) — 가본 역은 VISITED_PENALTY만큼 감점한 뒤 순위를 매긴다
+     * 3. 직전 추천 역 제외 — 제외하면 후보가 비면 이 단계는 건너뛴다
      */
     public CustomRecommendationResponse recommendCustom(Long memberId, CustomRecommendationRequest request) {
         validateDepartureStation(request.departureStationId());
@@ -91,9 +95,9 @@ public class RecommendationCommandService {
             throw new CustomException(RecommendationErrorCode.NO_REACHABLE_STATION);
         }
 
-        List<Station> scoreCandidates = selectScoreCandidates(reachableStations, request.travelStyles());
-        List<Station> unvisited = excludeVisited(scoreCandidates, memberId);
-        List<Station> finalCandidates = excludeLastRecommended(unvisited, memberId);
+        Set<Long> visitedStationIds = Set.copyOf(courseRepository.findVisitedStationIds(memberId));
+        List<Station> scoreCandidates = selectScoreCandidates(reachableStations, request.travelStyles(), visitedStationIds);
+        List<Station> finalCandidates = excludeLastRecommended(scoreCandidates, memberId);
 
         Station picked = pickRandom(finalCandidates);
         recordLog(memberId, picked.getId(), false);
@@ -121,20 +125,26 @@ public class RecommendationCommandService {
         return durationByStationId;
     }
 
-    // 점수 상위 CANDIDATE_POOL_SIZE개 역만 후보군으로 남긴다. 동점 역은 무작위로 섞어 매번 다르게 채운다.
-    private List<Station> selectScoreCandidates(List<Station> stations, List<String> travelStyles) {
+    // 점수 상위 CANDIDATE_POOL_SIZE개 역만 후보군으로 남긴다. 가본 역은 감점 후 순위를 매기고, 동점 역은 무작위로 섞어 매번 다르게 채운다.
+    private List<Station> selectScoreCandidates(List<Station> stations, List<String> travelStyles, Set<Long> visitedStationIds) {
         Map<Long, Map<String, Long>> countsByStationId = stationTagCountReader.getPlaceCountsByStationForTags(travelStyles);
 
         List<Station> shuffled = new ArrayList<>(stations);
         Collections.shuffle(shuffled, ThreadLocalRandom.current());
         return shuffled.stream()
                 .sorted(Comparator.comparingLong(
-                        (Station station) -> calculateScore(countsByStationId.get(station.getId()), travelStyles)).reversed())
+                        (Station station) -> calculateScore(station, countsByStationId, travelStyles, visitedStationIds)).reversed())
                 .limit(CANDIDATE_POOL_SIZE)
                 .toList();
     }
 
-    private long calculateScore(Map<String, Long> countsByTag, List<String> travelStyles) {
+    private long calculateScore(Station station, Map<Long, Map<String, Long>> countsByStationId, List<String> travelStyles,
+                                 Set<Long> visitedStationIds) {
+        long score = calculateTagScore(countsByStationId.get(station.getId()), travelStyles);
+        return visitedStationIds.contains(station.getId()) ? score - VISITED_PENALTY : score;
+    }
+
+    private long calculateTagScore(Map<String, Long> countsByTag, List<String> travelStyles) {
         if (countsByTag == null) {
             return 0;
         }
@@ -149,23 +159,6 @@ public class RecommendationCommandService {
             }
         }
         return placeCountSum + (long) matchedTagCount * TAG_MATCH_WEIGHT;
-    }
-
-    // 안 가본 역만 남긴다. 전부 가본 역이면 걸러내지 않는다.
-    private List<Station> excludeVisited(List<Station> stations, Long memberId) {
-        if (memberId == null) {
-            return stations;
-        }
-
-        Set<Long> visitedStationIds = Set.copyOf(courseRepository.findVisitedStationIds(memberId));
-        if (visitedStationIds.isEmpty()) {
-            return stations;
-        }
-
-        List<Station> filtered = stations.stream()
-                .filter(station -> !visitedStationIds.contains(station.getId()))
-                .toList();
-        return filtered.isEmpty() ? stations : filtered;
     }
 
     private Station pickDrawableStation(Long memberId) {
