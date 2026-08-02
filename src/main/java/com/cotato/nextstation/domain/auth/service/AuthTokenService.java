@@ -20,7 +20,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -98,24 +97,10 @@ public class AuthTokenService {
         }
 
         String rotatedJti = rotateSession(familyId, jti, memberId);
-
-        String accessToken = jwtProvider.generateToken(
-                member.getId().toString(),
-                Map.of(AuthTokenClaims.PURPOSE_KEY, AuthTokenClaims.ACCESS_PURPOSE),
-                AuthTokenClaims.ACCESS_TOKEN_EXPIRATION
-        );
-        String newRefreshToken = jwtProvider.generateToken(
-                member.getId().toString(),
-                Map.of(
-                        AuthTokenClaims.PURPOSE_KEY, AuthTokenClaims.REFRESH_PURPOSE,
-                        AuthTokenClaims.FAMILY_ID_KEY, familyId,
-                        AuthTokenClaims.JTI_KEY, rotatedJti
-                ),
-                AuthTokenClaims.REFRESH_TOKEN_EXPIRATION
-        );
+        IssuedTokens tokens = authTokenIssuer.reissue(member.getId(), familyId, rotatedJti);
 
         log.info("accessToken 재발급 성공: memberId={}, familyId={}", member.getId(), familyId);
-        return new ReissueResult(member.getId(), accessToken, newRefreshToken);
+        return new ReissueResult(member.getId(), tokens.accessToken(), tokens.refreshToken());
     }
 
     /**

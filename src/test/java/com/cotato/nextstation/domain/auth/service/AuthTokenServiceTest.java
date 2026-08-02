@@ -2,8 +2,6 @@ package com.cotato.nextstation.domain.auth.service;
 
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.repository.RefreshSessionRepository;
-import com.cotato.nextstation.domain.auth.service.AuthTokenIssuer;
-import com.cotato.nextstation.domain.auth.service.IssuedTokens;
 import com.cotato.nextstation.domain.auth.service.result.LoginResult;
 import com.cotato.nextstation.domain.auth.service.result.ReissueResult;
 import com.cotato.nextstation.domain.member.entity.Gender;
@@ -24,14 +22,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.Duration;
 import java.time.LocalDate;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -146,8 +141,8 @@ class AuthTokenServiceTest {
         given(memberRepository.findById(1L)).willReturn(Optional.of(activeMember()));
         given(refreshSessionRepository.rotate(eq("family-1"), eq("jti-1"), anyString(), eq(1L)))
                 .willReturn(new RefreshSessionRepository.RotateResult(RefreshSessionRepository.RotateStatus.OK, "jti-2"));
-        given(jwtProvider.generateToken(eq("1"), any(Map.class), any(Duration.class)))
-                .willReturn("new-access-token", "new-refresh-token");
+        given(authTokenIssuer.reissue(1L, "family-1", "jti-2"))
+                .willReturn(new IssuedTokens("new-access-token", "new-refresh-token"));
 
         // when
         ReissueResult result = authTokenService.reissue("refresh-token");
@@ -167,8 +162,9 @@ class AuthTokenServiceTest {
         given(memberRepository.findById(1L)).willReturn(Optional.of(activeMember()));
         given(refreshSessionRepository.rotate(eq("family-1"), eq("jti-1"), anyString(), eq(1L)))
                 .willReturn(new RefreshSessionRepository.RotateResult(RefreshSessionRepository.RotateStatus.GRACE, "jti-2"));
-        given(jwtProvider.generateToken(eq("1"), any(Map.class), any(Duration.class)))
-                .willReturn("new-access-token", "current-refresh-token");
+        // grace에서는 rotate하지 않으므로 세션의 현재 jti(jti-2)로 발급되어야 한다
+        given(authTokenIssuer.reissue(1L, "family-1", "jti-2"))
+                .willReturn(new IssuedTokens("new-access-token", "current-refresh-token"));
 
         // when
         ReissueResult result = authTokenService.reissue("refresh-token");

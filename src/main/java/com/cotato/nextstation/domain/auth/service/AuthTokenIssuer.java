@@ -9,8 +9,11 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.UUID;
 
-// 로그인 성공 시 access/refresh token을 발급하고 refresh 세션을 Redis에 생성한다.
-// 로컬 로그인/카카오 로그인이 이 로직을 공유해야 두 경로 모두 reuse detection 대상이 된다. (한쪽만 빠뜨리면 그 경로는 탈취돼도 탐지 못함)
+/**
+ * access/refresh token 발급을 한 곳에 모은다. claim 구성이 여기에만 있어야 claim 추가 시 수정 지점이 하나로 유지된다.
+ * 로컬 로그인·카카오 로그인이 {@link #issue}를 공유해야 두 경로 모두 reuse detection 대상이 된다
+ * (한쪽만 빠뜨리면 그 경로는 탈취돼도 탐지되지 않음).
+ */
 @Component
 @RequiredArgsConstructor
 public class AuthTokenIssuer {
@@ -18,15 +21,29 @@ public class AuthTokenIssuer {
     private final JwtProvider jwtProvider;
     private final RefreshSessionRepository refreshSessionRepository;
 
+    /**
+     * 로그인용 — 새 세션(familyId)을 만들어 Redis에 기록하고 토큰을 발급한다.
+     */
     public IssuedTokens issue(Long memberId) {
+        String familyId = UUID.randomUUID().toString();
+        String jti = UUID.randomUUID().toString();
+
+        // 세션 기록이 실패하면 토큰도 나가지 않도록 발급을 먼저 끝낸다.
+        IssuedTokens tokens = reissue(memberId, familyId, jti);
+        refreshSessionRepository.create(familyId, memberId, jti);
+        return tokens;
+    }
+
+    /**
+     * 재발급용 — 이미 존재하는 세션의 토큰만 다시 발급한다. 세션 상태는 건드리지 않으므로
+     * 호출 전에 {@code RefreshSessionRepository.rotate()}로 회전 여부가 판정돼 있어야 한다.
+     */
+    public IssuedTokens reissue(Long memberId, String familyId, String jti) {
         String accessToken = jwtProvider.generateToken(
                 memberId.toString(),
                 Map.of(AuthTokenClaims.PURPOSE_KEY, AuthTokenClaims.ACCESS_PURPOSE),
                 AuthTokenClaims.ACCESS_TOKEN_EXPIRATION
         );
-
-        String familyId = UUID.randomUUID().toString();
-        String jti = UUID.randomUUID().toString();
         String refreshToken = jwtProvider.generateToken(
                 memberId.toString(),
                 Map.of(
@@ -36,8 +53,6 @@ public class AuthTokenIssuer {
                 ),
                 AuthTokenClaims.REFRESH_TOKEN_EXPIRATION
         );
-
-        refreshSessionRepository.create(familyId, memberId, jti);
         return new IssuedTokens(accessToken, refreshToken);
     }
 }
