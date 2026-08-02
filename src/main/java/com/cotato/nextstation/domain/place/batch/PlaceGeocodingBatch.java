@@ -147,6 +147,7 @@ public final class PlaceGeocodingBatch {
             if (resolution.confirmed()) {
                 enrichedRows.add(toEnrichedRow(row, resolution.match()));
                 sheetUpdates.add(toAddressValueRange(sheetTitle, sheetRow.rowNumber(), row, resolution.match()));
+                sheetUpdates.add(toClearReviewNoteValueRange(sheetTitle, sheetRow.rowNumber()));
             } else {
                 manualReviewRows.add(toManualReviewRow(row, resolution.reason(), resolution.candidates()));
                 sheetUpdates.add(toReviewNoteValueRange(sheetTitle, sheetRow.rowNumber(),
@@ -482,6 +483,13 @@ public final class PlaceGeocodingBatch {
         return new ValueRange()
                 .setRange(sheetTitle + "!P" + rowNumber)
                 .setValues(List.of(List.of(note)));
+    }
+
+    private static ValueRange toClearReviewNoteValueRange(String sheetTitle, int rowNumber) {
+        // 확정된 행은 예전 미확정 사유가 남아있으면 헷갈릴 수 있어 P열을 비운다.
+        return new ValueRange()
+                .setRange(sheetTitle + "!P" + rowNumber)
+                .setValues(List.of(List.of("")));
     }
 
     private static void writeBackToSheet(Sheets sheetsService, String spreadsheetId, List<ValueRange> updates)
