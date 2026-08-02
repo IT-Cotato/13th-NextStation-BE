@@ -36,6 +36,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -221,7 +222,8 @@ public class AuthController {
             @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshToken,
             HttpServletResponse httpResponse) {
         // 로그아웃 응답이 쿠키 값을 빈 문자열로 덮으므로, 만료를 무시하고 되돌려보내는 클라이언트가 있으면 빈 값이 들어온다.
-        if (isBlank(refreshToken)) {
+        // JWT 파서는 빈 문자열에 JwtException이 아닌 IllegalArgumentException을 던져 500이 되므로 여기서 걸러낸다.
+        if (!StringUtils.hasText(refreshToken)) {
             throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
         ReissueResult result = authTokenService.reissue(refreshToken);
@@ -250,7 +252,8 @@ public class AuthController {
             @Parameter(hidden = true)
             @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshToken,
             HttpServletResponse httpResponse) {
-        if (!isBlank(refreshToken)) {
+        // 값이 빈 쿠키는 보내지 않은 것과 같게 취급한다 (빈 문자열은 JWT 파서에서 IllegalArgumentException -> 500).
+        if (StringUtils.hasText(refreshToken)) {
             authTokenService.logout(refreshToken);
         }
 
@@ -258,11 +261,6 @@ public class AuthController {
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
 
         return CommonResponse.success(null);
-    }
-
-    // 값이 빈 쿠키는 보내지 않은 것과 같게 취급한다. JWT 파서는 빈 문자열에 JwtException이 아닌 IllegalArgumentException을 던져 500이 된다.
-    private boolean isBlank(String refreshToken) {
-        return refreshToken == null || refreshToken.isBlank();
     }
 
     @Tag(name = "비밀번호 재설정")
