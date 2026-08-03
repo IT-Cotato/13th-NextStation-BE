@@ -28,7 +28,7 @@ import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.Like
 import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
 import com.cotato.nextstation.domain.journal.service.query.JournalCardQueryService;
 import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
-import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.member.service.query.MemberExistenceQueryService;
 import com.cotato.nextstation.domain.course.dto.response.MemberCourseListResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
@@ -93,7 +93,7 @@ class CourseQueryServiceTest {
     private JournalCardQueryService journalCardQueryService;
 
     @Mock
-    private MemberRepository memberRepository;
+    private MemberExistenceQueryService memberExistenceQueryService;
 
     @Mock
     private CourseConverter courseConverter;
@@ -1136,7 +1136,7 @@ class CourseQueryServiceTest {
     @DisplayName("존재하지 않는 회원의 공개 코스를 조회하면 예외가 발생하고 조회하지 않는다")
     void getMemberPublicCourses_memberNotFound() {
         // given
-        given(memberRepository.existsById(2L)).willReturn(false);
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(false);
 
         // when & then
         assertThatThrownBy(() -> courseQueryService.getMemberPublicCourses(2L, null, null))
@@ -1149,7 +1149,7 @@ class CourseQueryServiceTest {
     @DisplayName("첫 페이지는 memberId로 공개 코스를 조회해 카드로 변환한다")
     void getMemberPublicCourses_firstPage() {
         // given
-        given(memberRepository.existsById(2L)).willReturn(true);
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
         given(courseRepository.findPublicCoursesByMemberId(eq(2L), any(Pageable.class))).willReturn(List.of());
         MemberCourseListResponse expected = new MemberCourseListResponse(List.of(), null, false);
         given(courseConverter.toMemberCourseListResponse(List.of(), null, false)).willReturn(expected);
@@ -1168,7 +1168,7 @@ class CourseQueryServiceTest {
         // given: size 1 요청 → 2개 조회되어 다음 페이지 있음
         LocalDateTime createdAt = LocalDateTime.of(2026, 7, 23, 12, 0);
         List<MyCourseView> views = List.of(myView(3L, createdAt), myView(2L, createdAt));
-        given(memberRepository.existsById(2L)).willReturn(true);
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
         given(courseRepository.findPublicCoursesByMemberId(eq(2L), any(Pageable.class))).willReturn(views);
 
         // when
@@ -1188,7 +1188,7 @@ class CourseQueryServiceTest {
         // given
         LocalDateTime createdAt = LocalDateTime.of(2026, 7, 23, 12, 0);
         String cursor = new CursorData(5L, null, createdAt).encode();
-        given(memberRepository.existsById(2L)).willReturn(true);
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
         given(courseRepository.findPublicCoursesByMemberIdAfterCursor(
                 eq(2L), eq(createdAt), eq(5L), any(Pageable.class))).willReturn(List.of());
 

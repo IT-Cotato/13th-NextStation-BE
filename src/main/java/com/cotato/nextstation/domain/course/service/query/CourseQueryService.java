@@ -32,7 +32,7 @@ import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoRespons
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.journal.service.query.JournalCardQueryService;
 import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
-import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.member.service.query.MemberExistenceQueryService;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
@@ -89,7 +89,7 @@ public class CourseQueryService {
     private final PlaceInfoQueryService placeInfoQueryService;
     private final MemberStampQueryService memberStampQueryService;
     private final JournalCardQueryService journalCardQueryService;
-    private final MemberRepository memberRepository;
+    private final MemberExistenceQueryService memberExistenceQueryService;
     private final CourseConverter courseConverter;
 
     /**
@@ -607,7 +607,7 @@ public class CourseQueryService {
      * 프로필 조회와 달리 독립된 API라 여기서 직접 회원 존재를 검증한다.
      */
     public MemberCourseListResponse getMemberPublicCourses(Long memberId, String cursor, Integer size) {
-        if (!memberRepository.existsById(memberId)) {
+        if (!memberExistenceQueryService.existsMember(memberId)) {
             throw new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
         }
 

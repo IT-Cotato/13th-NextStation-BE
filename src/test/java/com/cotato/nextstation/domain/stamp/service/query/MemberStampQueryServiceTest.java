@@ -1,7 +1,7 @@
 package com.cotato.nextstation.domain.stamp.service.query;
 
 import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
-import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.member.service.query.MemberExistenceQueryService;
 import com.cotato.nextstation.domain.stamp.dto.response.MemberStampListResponse;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
@@ -37,7 +37,7 @@ class MemberStampQueryServiceTest {
     private MemberStampRepository memberStampRepository;
 
     @Mock
-    private MemberRepository memberRepository;
+    private MemberExistenceQueryService memberExistenceQueryService;
 
     @Mock
     private StationQueryService stationQueryService;
@@ -99,7 +99,7 @@ class MemberStampQueryServiceTest {
         // given
         StationSummaryResponse station = new StationSummaryResponse(6L, "보문역",
                 List.of(new LineSummaryResponse(6L, "6호선", LineCode.LINE_6)));
-        given(memberRepository.existsById(2L)).willReturn(true);
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
         given(memberStampRepository.findVisitedStationIdsOrderByLastVisitedDesc(2L)).willReturn(List.of(6L));
         given(stationQueryService.getStationSummaries(List.of(6L))).willReturn(List.of(station));
 
@@ -115,7 +115,7 @@ class MemberStampQueryServiceTest {
     @DisplayName("존재하지 않는 회원의 스탬프 목록을 조회하면 예외가 발생한다")
     void getMemberStamps_memberNotFound() {
         // given
-        given(memberRepository.existsById(2L)).willReturn(false);
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(false);
 
         // when & then
         assertThatThrownBy(() -> memberStampQueryService.getMemberStamps(2L))

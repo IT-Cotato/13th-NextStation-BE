@@ -491,4 +491,56 @@ class StationQueryServiceTest {
         assertThat(selectedIds).anyMatch(id -> List.of(41L, 42L, 43L).contains(id));
     }
 
+    // ---------- 역 요약 배치 조회 (다른 회원 스탬프 목록) ----------
+
+    @Test
+    @DisplayName("역 id 목록 순서를 그대로 유지해 역 요약을 반환한다")
+    void getStationSummaries_keepsGivenOrder() {
+        // given: findAllById는 순서를 보장하지 않으므로, 리포지토리가 6L보다 42L을 먼저 돌려줘도
+        // 서비스는 입력 순서(42L, 6L)를 유지해야 한다.
+        Station station42 = station(42L, "왕십리역");
+        Station station6 = station(6L, "보문역");
+        given(stationRepository.findAllById(List.of(42L, 6L))).willReturn(List.of(station6, station42));
+        given(stationLineRepository.findLinesByStationIdIn(List.of(42L, 6L))).willReturn(List.of());
+
+        StationSummaryResponse summary42 = new StationSummaryResponse(42L, "왕십리역", List.of());
+        StationSummaryResponse summary6 = new StationSummaryResponse(6L, "보문역", List.of());
+        given(stationConverter.toSummaryResponse(eq(station42), any())).willReturn(summary42);
+        given(stationConverter.toSummaryResponse(eq(station6), any())).willReturn(summary6);
+
+        // when
+        List<StationSummaryResponse> result = stationQueryService.getStationSummaries(List.of(42L, 6L));
+
+        // then
+        assertThat(result).containsExactly(summary42, summary6);
+    }
+
+    @Test
+    @DisplayName("조회되지 않는 역 id는 결과에서 조용히 빠진다")
+    void getStationSummaries_skipsMissingStations() {
+        // given
+        given(stationRepository.findAllById(List.of(6L, 999L))).willReturn(List.of(station(6L, "보문역")));
+        given(stationLineRepository.findLinesByStationIdIn(List.of(6L, 999L))).willReturn(List.of());
+
+        StationSummaryResponse summary6 = new StationSummaryResponse(6L, "보문역", List.of());
+        given(stationConverter.toSummaryResponse(any(), any())).willReturn(summary6);
+
+        // when
+        List<StationSummaryResponse> result = stationQueryService.getStationSummaries(List.of(6L, 999L));
+
+        // then
+        assertThat(result).containsExactly(summary6);
+    }
+
+    @Test
+    @DisplayName("역 id 목록이 비어 있으면 조회하지 않고 빈 목록을 반환한다")
+    void getStationSummaries_emptyInputSkipsQuery() {
+        // when
+        List<StationSummaryResponse> result = stationQueryService.getStationSummaries(List.of());
+
+        // then
+        assertThat(result).isEmpty();
+        verify(stationRepository, never()).findAllById(any());
+    }
+
 }
