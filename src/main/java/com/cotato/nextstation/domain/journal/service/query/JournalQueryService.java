@@ -7,13 +7,16 @@ import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.converter.JournalConverter;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
+import com.cotato.nextstation.domain.journal.dto.response.MyJournalListResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.entity.JournalImage;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.journal.exception.JournalErrorCode;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
+import com.cotato.nextstation.domain.journal.repository.JournalImageRepository.JournalImageView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
@@ -130,6 +133,23 @@ public class JournalQueryService {
                 uncompletedStamps, courseInfoMap, stationNameMap, tagsByCourse);
     }
 
+
+    // 내 여행일지 목록 조회 (최신순)
+    public MyJournalListResponse getMyJournals(Long memberId) {
+        List<MyJournalCardView> myJournalCards = journalRepository.findMyJournalCards(memberId);
+        if (myJournalCards.isEmpty()) {
+            return journalConverter.toMyJournalListResponse(List.of(), Map.of());
+        }
+
+        List<Long> journalIds = myJournalCards.stream().map(MyJournalCardView::getJournalId).toList();
+        Map<Long, String> thumbnailUrlByJournalId = journalImageRepository.findImagesByJournalIds(journalIds).stream()
+                .collect(Collectors.toMap(
+                        JournalImageView::getJournalId,
+                        JournalImageView::getImageUrl,
+                        (first, next) -> first));
+
+        return journalConverter.toMyJournalListResponse(myJournalCards, thumbnailUrlByJournalId);
+    }
 
     // 여행일지 상세 조회
     public JournalDetailResponse getJournalDetail(Long memberId, Long journalId) {
