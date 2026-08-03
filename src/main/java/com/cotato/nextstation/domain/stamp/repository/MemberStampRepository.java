@@ -36,4 +36,19 @@ public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> 
     List<MemberStamp> findByMemberIdAndIdNotInOrderByCreatedAtDesc(
             Long memberId, Set<Long> completedStampIds);
 
+    // 다른 회원 프로필 - 방문한(스탬프를 찍은) 서로 다른 역의 개수.
+    // MemberStamp는 courseId만 들고 있어(연관관계 미매핑) Course를 id로 ad-hoc 조인한다.
+    @Query("SELECT COUNT(DISTINCT c.stationId) FROM MemberStamp ms " +
+            "JOIN Course c ON c.id = ms.courseId " +
+            "WHERE ms.memberId = :memberId")
+    long countVisitedStations(@Param("memberId") Long memberId);
+
+    // 다른 회원의 스탬프 탭 - 방문한 역을 최근 방문순으로 중복 없이 조회한다(역 하나당 스탬프 1개).
+    @Query("SELECT c.stationId FROM MemberStamp ms " +
+            "JOIN Course c ON c.id = ms.courseId " +
+            "WHERE ms.memberId = :memberId " +
+            "GROUP BY c.stationId " +
+            "ORDER BY MAX(ms.createdAt) DESC")
+    List<Long> findVisitedStationIdsOrderByLastVisitedDesc(@Param("memberId") Long memberId);
+
 }
