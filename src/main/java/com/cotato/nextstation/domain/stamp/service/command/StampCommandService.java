@@ -50,6 +50,7 @@ public class StampCommandService {
                     MemberStamp.builder()
                             .memberId(memberId)
                             .courseId(courseId)
+                            .stationId(station.getId())
                             .build()
             );
         } catch (DataIntegrityViolationException e) {

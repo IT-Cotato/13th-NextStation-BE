@@ -39,11 +39,12 @@ public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> 
 
     // 내 스탬프 목록 조회. 역별 중복 제거 시 최초 획득분을 남겨야 해서 오름차순으로 조회하고,
     // 카드에 필요한 역/대표 호선까지 한 번에 가져온다(스탬프마다 조회하면 N+1).
+    // MemberStamp에 저장된 stationId 스냅샷으로 Station을 직접 조인한다. Course를 거치면
+    // Course의 @SQLRestriction 때문에 코스가 삭제된 스탬프까지 목록에서 사라진다.
     @Query("SELECT s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM MemberStamp ms " +
-            "JOIN Course c ON c.id = ms.courseId " +
-            "JOIN Station s ON s.id = c.stationId " +
+            "JOIN Station s ON s.id = ms.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE ms.memberId = :memberId " +
             "ORDER BY ms.createdAt ASC")
