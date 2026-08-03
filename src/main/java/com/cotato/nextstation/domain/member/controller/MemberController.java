@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.member.controller;
 
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
+import com.cotato.nextstation.domain.member.dto.response.OtherMemberProfileResponse;
 import com.cotato.nextstation.domain.member.service.query.MemberQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import com.cotato.nextstation.global.security.AuthenticationPrincipal;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,5 +41,29 @@ public class MemberController {
     public CommonResponse<MemberProfileResponse> getMyProfile(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal) {
         return CommonResponse.success(memberQueryService.getMyProfile(principal.memberId()));
+    }
+
+    @Operation(
+            summary = "다른 회원 프로필 조회",
+            description = """
+                    다른 회원의 프로필(닉네임/프로필 이미지/스탬프 개수/공개 코스 개수)을 조회한다.
+                    - accessToken 인증 필요. 우측 상단 자물쇠(Authorize) 버튼을 눌러 로그인 API 응답의 accessToken 값을(Bearer 접두사 없이) 넣으면 된다.
+                    - 프로필 화면 상단 헤더용 정보다. 스탬프 탭 목록은 `GET /members/{memberId}/stamps`, 공개코스 탭 목록은 `GET /members/{memberId}/courses`로 별도 조회한다.
+                    - 스탬프 개수는 방문한(스탬프를 찍은) 서로 다른 역의 개수다. 같은 역에서 여러 코스를 완료해도 1개로 센다.
+                    - 공개 코스 개수는 그 회원이 만든 코스 중 여행일지가 공개된 코스만 센다.
+                    """
+    )
+    @SecurityRequirement(name = "accessTokenAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`MemberErrorCode.MEMBER_NOT_FOUND`)"),
+    })
+    @GetMapping("/{memberId}/profile")
+    public CommonResponse<OtherMemberProfileResponse> getMemberProfile(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            @Parameter(description = "조회할 회원 ID", example = "2")
+            @PathVariable Long memberId) {
+        return CommonResponse.success(memberQueryService.getMemberProfile(memberId));
     }
 }
