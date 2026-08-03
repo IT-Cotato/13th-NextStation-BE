@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.stamp.controller;
 
 import com.cotato.nextstation.domain.stamp.dto.response.CourseCompleteResponse;
+import com.cotato.nextstation.domain.stamp.dto.response.MyStampDetailResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.MyStampListResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.StationPopularCoursesResponse;
 import com.cotato.nextstation.domain.stamp.service.command.StampCommandService;
@@ -88,6 +89,29 @@ public class StampCourseController {
     public CommonResponse<MyStampListResponse> getMyStamps(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal) {
         return CommonResponse.success(memberStampQueryService.getMyStamps(principal.memberId()));
+    }
+
+
+    @Operation(
+            summary = "내 스탬프 상세 조회",
+            description = """
+                    특정 역에 대해 내가 최초로 완료한 스탬프의 상세 정보를 조회한다.
+                    - 같은 역에서 여러 코스를 완료했어도 최초 획득 스탬프 기준으로 조회한다.
+                    - journalId는 그 스탬프에 연결된 여행일지가 없거나 삭제된 경우 null이다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증이 필요함"),
+            @ApiResponse(responseCode = "404", description = "해당 역에 대한 스탬프가 없음 (`StampErrorCode.MEMBER_STAMP_NOT_FOUND`)"),
+    })
+    @SecurityRequirement(name = "accessTokenAuth")
+    @GetMapping("/stamps/{stationId}")
+    public CommonResponse<MyStampDetailResponse> getMyStampDetail(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            @Parameter(description = "역 ID", example = "5")
+            @PathVariable Long stationId) {
+        return CommonResponse.success(memberStampQueryService.getMyStampDetail(principal.memberId(), stationId));
     }
 
 }
