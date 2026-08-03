@@ -194,7 +194,7 @@ public class AuthController {
         ResponseCookie refreshTokenCookie = refreshTokenCookieFactory.create(result.refreshToken());
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
 
-        return CommonResponse.success(new LoginResponse(result.memberId(), result.accessToken()));
+        return CommonResponse.success(new LoginResponse(result.memberId(), result.accessToken(), result.restored()));
     }
 
     @Tag(name = "로그인")

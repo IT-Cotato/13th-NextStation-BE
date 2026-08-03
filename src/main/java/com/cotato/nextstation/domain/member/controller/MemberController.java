@@ -1,7 +1,9 @@
 package com.cotato.nextstation.domain.member.controller;
 
+import com.cotato.nextstation.domain.auth.util.RefreshTokenCookieFactory;
 import com.cotato.nextstation.domain.member.dto.request.MemberProfileUpdateRequest;
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
+import com.cotato.nextstation.domain.member.service.MemberWithdrawService;
 import com.cotato.nextstation.domain.member.service.command.MemberCommandService;
 import com.cotato.nextstation.domain.member.service.query.MemberQueryService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
@@ -12,8 +14,12 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,6 +33,8 @@ public class MemberController {
 
     private final MemberQueryService memberQueryService;
     private final MemberCommandService memberCommandService;
+    private final MemberWithdrawService memberWithdrawService;
+    private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     @Operation(
             summary = "내 프로필 조회",
@@ -73,5 +81,34 @@ public class MemberController {
         MemberProfileResponse response = memberCommandService.updateMyProfile(
                 principal.memberId(), request.nickname(), request.profileImageUrl());
         return CommonResponse.success(response);
+    }
+
+    @Operation(
+            summary = "회원 탈퇴",
+            description = """
+                    로그인한 회원을 탈퇴 처리한다.
+                    - accessToken 인증 필요. 비밀번호 재확인은 요구하지 않는다(소셜 계정은 비밀번호가 없다).
+                    - 모든 기기의 로그인 세션이 무효화되고, refreshToken 쿠키가 즉시 만료된다.
+                    - 이미 탈퇴한 회원이 다시 호출해도 성공(200)한다(멱등).
+                    - accessToken은 이 API로 즉시 무효화되지 않는다. 발급 후 최대 1시간까지 유효하므로 클라이언트가 폐기해야 한다.
+                    - 작성한 여행일지/리뷰는 삭제되지 않는다.
+                    """
+    )
+    @SecurityRequirement(name = "accessTokenAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "탈퇴 성공(이미 탈퇴한 회원이어도 200)"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`MemberErrorCode.MEMBER_NOT_FOUND`)"),
+    })
+    @DeleteMapping("/me")
+    public CommonResponse<Void> withdraw(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            HttpServletResponse httpResponse) {
+        memberWithdrawService.withdraw(principal.memberId());
+
+        ResponseCookie expiredCookie = refreshTokenCookieFactory.createExpired();
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+
+        return CommonResponse.success(null);
     }
 }

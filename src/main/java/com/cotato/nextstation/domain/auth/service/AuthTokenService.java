@@ -42,7 +42,8 @@ public class AuthTokenService {
     private final AuthTokenIssuer authTokenIssuer;
     private final RefreshSessionRepository refreshSessionRepository;
 
-    // 로그인
+    // 로그인 - 탈퇴 유예 기간 내 계정을 복구하는 쓰기가 있어 클래스의 readOnly를 덮어쓴다.
+    @Transactional
     public LoginResult login(String email, String password) {
 
         // 이메일 존재 여부와 비밀번호 불일치를 구분하지 않고 동일한 에러로 응답한다 (계정 존재 여부 노출 방지)
@@ -52,20 +53,28 @@ public class AuthTokenService {
                     return new CustomException(AuthErrorCode.INVALID_CREDENTIALS);
                 });
 
-        if (member.getStatus() != MemberStatus.ACTIVE) {
-            log.warn("ACTIVE 상태가 아닌 회원의 로그인 시도: memberId={}, status={}", member.getId(), member.getStatus());
-            throw new CustomException(AuthErrorCode.INVALID_CREDENTIALS);
-        }
-
+        // 상태 확인보다 먼저 비밀번호를 검증한다. 탈퇴 회원을 복구하려면 본인이라는 게 먼저 증명돼야 한다.
         if (!passwordEncoder.matches(password, member.getPassword())) {
             log.warn("비밀번호 불일치로 로그인 실패: memberId={}", member.getId());
             throw new CustomException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
+        boolean restored = member.isRestorable();
+        if (restored) {
+            member.restore();
+            log.info("탈퇴 유예 기간 내 재로그인으로 계정 복구: memberId={}, restoredStatus={}", member.getId(), member.getStatus());
+        }
+
+        // 복구 결과가 PENDING(프로필 미설정)이면 여기서 막히고 트랜잭션이 롤백돼 복구도 함께 되돌아간다.
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            log.warn("ACTIVE 상태가 아닌 회원의 로그인 시도: memberId={}, status={}", member.getId(), member.getStatus());
+            throw new CustomException(AuthErrorCode.INVALID_CREDENTIALS);
+        }
+
         IssuedTokens tokens = authTokenIssuer.issue(member.getId());
 
-        log.info("로그인 성공: memberId={}", member.getId());
-        return new LoginResult(member.getId(), tokens.accessToken(), tokens.refreshToken());
+        log.info("로그인 성공: memberId={}, restored={}", member.getId(), restored);
+        return new LoginResult(member.getId(), tokens.accessToken(), tokens.refreshToken(), restored);
     }
 
     /**
@@ -133,7 +142,23 @@ public class AuthTokenService {
         }
 
         refreshSessionRepository.delete(familyId);
-        log.info("로그아웃 성공: familyId={}", familyId);
+
+        Long memberId = parseMemberIdOrNull(claims);
+        if (memberId != null) {
+            refreshSessionRepository.removeFromMemberIndex(memberId, familyId);
+        }
+
+        log.info("로그아웃 성공: memberId={}, familyId={}", memberId, familyId);
+    }
+
+    // 로그아웃은 어떤 입력에도 실패하지 않아야 하므로 subject가 깨져 있으면 예외 대신 null을 돌려준다.
+    private Long parseMemberIdOrNull(Claims claims) {
+        try {
+            return Long.valueOf(claims.getSubject());
+        } catch (NumberFormatException | NullPointerException e) {
+            log.warn("subject가 memberId 형식이 아닌 refreshToken으로 로그아웃 시도");
+            return null;
+        }
     }
 
     /**
