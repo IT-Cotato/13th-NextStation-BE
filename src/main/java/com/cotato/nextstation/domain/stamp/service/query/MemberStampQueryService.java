@@ -2,13 +2,16 @@ package com.cotato.nextstation.domain.stamp.service.query;
 
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.domain.stamp.converter.MemberStampConverter;
+import com.cotato.nextstation.domain.stamp.dto.response.MyStampDetailResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.MyStampListResponse;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
+import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampDetailView;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampView;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,6 +79,18 @@ public class MemberStampQueryService {
                 .toList();
 
         return memberStampConverter.toMyStampListResponse(sorted);
+    }
+
+    // 내 스탬프 상세. 해당 역에서 최초로 완료한 스탬프 기준으로 역/노선/획득일과
+    // 그 스탬프에 연결된 여행일지 id(없으면 null)를 보여준다.
+    public MyStampDetailResponse getMyStampDetail(Long memberId, Long stationId) {
+        MyStampDetailView detail = memberStampRepository
+                .findEarliestStampByMemberIdAndStationId(memberId, stationId, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new CustomException(StampErrorCode.MEMBER_STAMP_NOT_FOUND));
+
+        return memberStampConverter.toMyStampDetailResponse(detail);
     }
 
     private static int lineOrder(MyStampView stamp) {

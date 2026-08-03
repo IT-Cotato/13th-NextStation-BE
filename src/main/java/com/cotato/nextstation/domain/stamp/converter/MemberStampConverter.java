@@ -1,7 +1,9 @@
 package com.cotato.nextstation.domain.stamp.converter;
 
+import com.cotato.nextstation.domain.stamp.dto.response.MyStampDetailResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.MyStampListResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.StampResponse;
+import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampDetailView;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampView;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import org.springframework.stereotype.Component;
@@ -16,6 +18,19 @@ public class MemberStampConverter {
                 .map(this::toStampResponse)
                 .toList();
         return new MyStampListResponse(responses.size(), responses);
+    }
+
+    public MyStampDetailResponse toMyStampDetailResponse(MyStampDetailView stamp) {
+        LineSummaryResponse line = stamp.getLineId() == null
+                ? null
+                : new LineSummaryResponse(stamp.getLineId(), stamp.getLineName(), stamp.getLineCode());
+        return new MyStampDetailResponse(
+                stamp.getStationId(),
+                stamp.getStationName(),
+                line,
+                stamp.getAcquiredAt(),
+                stamp.getJournalId()
+        );
     }
 
     private StampResponse toStampResponse(MyStampView stamp) {

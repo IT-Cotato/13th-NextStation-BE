@@ -2,10 +2,12 @@ package com.cotato.nextstation.domain.stamp.repository;
 
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.station.entity.LineCode;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -52,12 +54,39 @@ public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> 
             "WHERE ms.memberId = :memberId")
     List<MyStampView> findMyStampsByMemberId(@Param("memberId") Long memberId);
 
+    // 내 스탬프 상세 조회. 해당 역에서 회원이 완료한 여러 스탬프 중 최초(createdAt 오름차순 1건)
+    // 기준으로 역/노선/획득일과, 그 스탬프에 연결된 여행일지 id를 함께 가져온다.
+    // Journal은 LEFT JOIN이라 일지가 없거나 삭제된 경우(Journal의 @SQLRestriction 및
+    // delete() 시 memberStampId를 null 처리하는 로직) journalId는 자연스럽게 null이 된다.
+    @Query("SELECT s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode, " +
+            "ms.createdAt AS acquiredAt, j.id AS journalId " +
+            "FROM MemberStamp ms " +
+            "JOIN Station s ON s.id = ms.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "LEFT JOIN Journal j ON j.memberStampId = ms.id " +
+            "WHERE ms.memberId = :memberId AND ms.stationId = :stationId " +
+            "ORDER BY ms.createdAt ASC")
+    List<MyStampDetailView> findEarliestStampByMemberIdAndStationId(@Param("memberId") Long memberId,
+                                                                     @Param("stationId") Long stationId,
+                                                                     Pageable pageable);
+
     interface MyStampView {
         Long getStationId();
         String getStationName();
         Long getLineId();
         String getLineName();
         LineCode getLineCode();
+    }
+
+    interface MyStampDetailView {
+        Long getStationId();
+        String getStationName();
+        Long getLineId();
+        String getLineName();
+        LineCode getLineCode();
+        LocalDateTime getAcquiredAt();
+        Long getJournalId();
     }
 
 }
