@@ -1,9 +1,14 @@
 package com.cotato.nextstation.domain.stamp.service.query;
 
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
+import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
+import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.stamp.dto.response.MemberStampListResponse;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
+import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
+import com.cotato.nextstation.domain.station.service.query.StationQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +29,8 @@ public class MemberStampQueryService {
 
     private final MemberStampRepository memberStampRepository;
     private final JournalRepository journalRepository;
+    private final MemberRepository memberRepository;
+    private final StationQueryService stationQueryService;
 
     // 넘긴 코스들 중 회원이 완료한 코스 id 집합. 목록에서 카드별 완료 여부를 판단하는 데 쓴다.
     public Set<Long> getCompletedCourseIds(Long memberId, List<Long> courseIds) {
@@ -59,5 +66,21 @@ public class MemberStampQueryService {
 
         return memberStampRepository.findByMemberIdAndIdNotInOrderByCreatedAtDesc(
                 memberId, completedStampIds);
+    }
+
+    // 다른 회원 프로필의 스탬프 개수(방문한 서로 다른 역의 개수). 호출부(회원 조회)에서 이미 존재 검증을 마쳤다고 가정한다.
+    public long getStampCount(Long memberId) {
+        return memberStampRepository.countVisitedStations(memberId);
+    }
+
+    // 다른 회원의 스탬프 탭. 방문한 역을 최근 방문순으로 조회한다(역 하나당 스탬프 1개).
+    // 프로필 조회와 달리 독립된 API라 여기서 직접 회원 존재를 검증한다.
+    public MemberStampListResponse getMemberStamps(Long memberId) {
+        if (!memberRepository.existsById(memberId)) {
+            throw new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
+        }
+        List<Long> stationIds = memberStampRepository.findVisitedStationIdsOrderByLastVisitedDesc(memberId);
+        List<StationSummaryResponse> stamps = stationQueryService.getStationSummaries(stationIds);
+        return new MemberStampListResponse(stamps.size(), stamps);
     }
 }

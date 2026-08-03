@@ -1,6 +1,14 @@
 package com.cotato.nextstation.domain.stamp.service.query;
 
+import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
+import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.stamp.dto.response.MemberStampListResponse;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
+import com.cotato.nextstation.domain.station.service.query.StationQueryService;
+import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
@@ -26,6 +35,12 @@ class MemberStampQueryServiceTest {
 
     @Mock
     private MemberStampRepository memberStampRepository;
+
+    @Mock
+    private MemberRepository memberRepository;
+
+    @Mock
+    private StationQueryService stationQueryService;
 
     @Test
     @DisplayName("완료한 코스 id만 집합으로 반환한다")
@@ -63,5 +78,48 @@ class MemberStampQueryServiceTest {
         // then
         assertThat(completed).isEmpty();
         verify(memberStampRepository, never()).findCompletedCourseIds(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("방문한 서로 다른 역의 개수를 그대로 반환한다")
+    void getStampCount_returnsVisitedStationCount() {
+        // given
+        given(memberStampRepository.countVisitedStations(1L)).willReturn(12L);
+
+        // when
+        long stampCount = memberStampQueryService.getStampCount(1L);
+
+        // then
+        assertThat(stampCount).isEqualTo(12L);
+    }
+
+    @Test
+    @DisplayName("존재하는 회원이면 최근 방문순 역 목록을 스탬프 목록으로 반환한다")
+    void getMemberStamps_success() {
+        // given
+        StationSummaryResponse station = new StationSummaryResponse(6L, "보문역",
+                List.of(new LineSummaryResponse(6L, "6호선", LineCode.LINE_6)));
+        given(memberRepository.existsById(2L)).willReturn(true);
+        given(memberStampRepository.findVisitedStationIdsOrderByLastVisitedDesc(2L)).willReturn(List.of(6L));
+        given(stationQueryService.getStationSummaries(List.of(6L))).willReturn(List.of(station));
+
+        // when
+        MemberStampListResponse response = memberStampQueryService.getMemberStamps(2L);
+
+        // then
+        assertThat(response.stampCount()).isEqualTo(1);
+        assertThat(response.stamps()).containsExactly(station);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원의 스탬프 목록을 조회하면 예외가 발생한다")
+    void getMemberStamps_memberNotFound() {
+        // given
+        given(memberRepository.existsById(2L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> memberStampQueryService.getMemberStamps(2L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(MemberErrorCode.MEMBER_NOT_FOUND.getMessage());
     }
 }
