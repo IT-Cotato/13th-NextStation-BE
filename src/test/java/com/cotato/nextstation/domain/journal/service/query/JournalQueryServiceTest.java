@@ -23,6 +23,8 @@ import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.domain.station.service.query.StationQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
+import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
+import com.cotato.nextstation.global.util.CursorData;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +38,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -246,13 +250,15 @@ class JournalQueryServiceTest {
         @DisplayName("일지가 없으면 빈 목록을 반환하고 사진 조회는 나가지 않는다")
         void noJournals_returnsEmptyListWithoutImageQuery() {
             // given
-            given(journalRepository.findMyJournalCards(OWNER_ID)).willReturn(List.of());
+            given(journalRepository.findMyJournalCards(eq(OWNER_ID), any())).willReturn(List.of());
 
             // when
-            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID);
+            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID, null, null);
 
             // then
             assertThat(response.journals()).isEmpty();
+            assertThat(response.hasNext()).isFalse();
+            assertThat(response.nextCursor()).isNull();
             verify(journalImageRepository, never()).findImagesByJournalIds(anyList());
         }
 
@@ -263,12 +269,13 @@ class JournalQueryServiceTest {
             MyJournalCardView card = mock(MyJournalCardView.class);
             given(card.getJournalId()).willReturn(JOURNAL_ID);
             given(card.getTitle()).willReturn("보문 골목 산책");
+            given(card.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 8, 12, 0));
             given(card.getLikeCount()).willReturn(54);
             given(card.getStationName()).willReturn("보문역");
             given(card.getLineId()).willReturn(1L);
             given(card.getLineName()).willReturn("6호선");
             given(card.getLineCode()).willReturn(LineCode.LINE_6);
-            given(journalRepository.findMyJournalCards(OWNER_ID)).willReturn(List.of(card));
+            given(journalRepository.findMyJournalCards(eq(OWNER_ID), any())).willReturn(List.of(card));
 
             JournalImageView imageView = mock(JournalImageView.class);
             given(imageView.getJournalId()).willReturn(JOURNAL_ID);
@@ -276,7 +283,7 @@ class JournalQueryServiceTest {
             given(journalImageRepository.findImagesByJournalIds(List.of(JOURNAL_ID))).willReturn(List.of(imageView));
 
             // when
-            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID);
+            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID, null, null);
 
             // then
             assertThat(response.journals()).hasSize(1);
@@ -286,6 +293,8 @@ class JournalQueryServiceTest {
             assertThat(response.journals().get(0).likeCount()).isEqualTo(54);
             assertThat(response.journals().get(0).thumbnailUrl()).isEqualTo("https://s3.../journal/10/uuid1.jpg");
             assertThat(response.journals().get(0).line()).isEqualTo(new LineSummaryResponse(1L, "6호선", LineCode.LINE_6));
+            assertThat(response.hasNext()).isFalse();
+            assertThat(response.nextCursor()).isNull();
         }
 
         @Test
@@ -295,18 +304,96 @@ class JournalQueryServiceTest {
             MyJournalCardView card = mock(MyJournalCardView.class);
             given(card.getJournalId()).willReturn(JOURNAL_ID);
             given(card.getTitle()).willReturn("혼자 걷는 성신여대");
+            given(card.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 8, 12, 0));
             given(card.getLikeCount()).willReturn(0);
             given(card.getStationName()).willReturn("성신여대입구역");
             given(card.getLineId()).willReturn(null);
-            given(journalRepository.findMyJournalCards(OWNER_ID)).willReturn(List.of(card));
+            given(journalRepository.findMyJournalCards(eq(OWNER_ID), any())).willReturn(List.of(card));
             given(journalImageRepository.findImagesByJournalIds(List.of(JOURNAL_ID))).willReturn(List.of());
 
             // when
-            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID);
+            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID, null, null);
 
             // then
             assertThat(response.journals().get(0).line()).isNull();
             assertThat(response.journals().get(0).thumbnailUrl()).isNull();
+        }
+
+        @Test
+        @DisplayName("조회 결과가 요청 size보다 많으면 hasNext=true이고 마지막 항목 기준 nextCursor가 생성된다")
+        void moreThanPageSize_hasNextTrueAndNextCursorGenerated() {
+            // given: size=1 요청 시 서비스는 2개(size+1)를 조회해 다음 페이지 존재 여부를 판단한다
+            MyJournalCardView card1 = mock(MyJournalCardView.class);
+            given(card1.getJournalId()).willReturn(10L);
+            given(card1.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 8, 12, 0));
+            given(card1.getTitle()).willReturn("보문 골목 산책");
+            given(card1.getStationName()).willReturn("보문역");
+
+            MyJournalCardView card2 = mock(MyJournalCardView.class);
+            given(card2.getJournalId()).willReturn(9L);
+            given(card2.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 7, 12, 0));
+            given(card2.getTitle()).willReturn("혼자 걷는 성신여대");
+            given(card2.getStationName()).willReturn("성신여대입구역");
+
+            given(journalRepository.findMyJournalCards(eq(OWNER_ID), any())).willReturn(List.of(card1, card2));
+            given(journalImageRepository.findImagesByJournalIds(List.of(10L))).willReturn(List.of());
+
+            // when
+            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID, null, 1);
+
+            // then: 2번째 카드는 hasNext 판단용으로만 쓰이고 응답에는 담기지 않는다
+            assertThat(response.journals()).hasSize(1);
+            assertThat(response.journals().get(0).journalId()).isEqualTo(10L);
+            assertThat(response.hasNext()).isTrue();
+            assertThat(response.nextCursor()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("cursor가 주어지면 findMyJournalCardsAfterCursor로 다음 페이지를 조회한다")
+        void withCursor_callsFindAfterCursor() {
+            // given
+            LocalDateTime cursorCreatedAt = LocalDateTime.of(2026, 7, 8, 12, 0);
+            CursorData cursorData = new CursorData(10L, null, cursorCreatedAt);
+            String cursor = cursorData.encode();
+
+            given(journalRepository.findMyJournalCardsAfterCursor(eq(OWNER_ID), eq(cursorCreatedAt), eq(10L), any()))
+                    .willReturn(List.of());
+
+            // when
+            journalQueryService.getMyJournals(OWNER_ID, cursor, null);
+
+            // then
+            verify(journalRepository).findMyJournalCardsAfterCursor(eq(OWNER_ID), eq(cursorCreatedAt), eq(10L), any());
+            verify(journalRepository, never()).findMyJournalCards(any(), any());
+        }
+
+        @Test
+        @DisplayName("size가 1~50 범위를 벗어나면 INVALID_PAGE_SIZE 예외를 던진다")
+        void invalidSize_throwsInvalidPageSize() {
+            // when & then
+            assertThatThrownBy(() -> journalQueryService.getMyJournals(OWNER_ID, null, 0))
+                    .isInstanceOf(CustomException.class)
+                    .hasMessageContaining(GlobalErrorCode.INVALID_PAGE_SIZE.getMessage());
+
+            assertThatThrownBy(() -> journalQueryService.getMyJournals(OWNER_ID, null, 51))
+                    .isInstanceOf(CustomException.class)
+                    .hasMessageContaining(GlobalErrorCode.INVALID_PAGE_SIZE.getMessage());
+
+            verify(journalRepository, never()).findMyJournalCards(any(), any());
+        }
+
+        @Test
+        @DisplayName("커서에 정렬 기준값(longValue)이 채워져 있으면 INVALID_CURSOR 예외를 던진다")
+        void cursorWithLongValue_throwsInvalidCursor() {
+            // given: 이 목록은 시간순 정렬만 지원하므로, longValue가 채워진 커서는
+            // (courseLikeCount 등 다른 정렬 기준의) 잘못된 커서로 취급해야 한다
+            CursorData cursorData = new CursorData(10L, 5L, LocalDateTime.now());
+            String cursor = cursorData.encode();
+
+            // when & then
+            assertThatThrownBy(() -> journalQueryService.getMyJournals(OWNER_ID, cursor, null))
+                    .isInstanceOf(CustomException.class)
+                    .hasMessageContaining(GlobalErrorCode.INVALID_CURSOR.getMessage());
         }
     }
 

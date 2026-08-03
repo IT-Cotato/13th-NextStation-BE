@@ -71,7 +71,9 @@ public class JournalConverter {
 
     public MyJournalListResponse toMyJournalListResponse(
             List<MyJournalCardView> myJournalCards,
-            Map<Long, String> thumbnailUrlByJournalId
+            Map<Long, String> thumbnailUrlByJournalId,
+            String nextCursor,
+            boolean hasNext
     ) {
         List<MyJournalResponse> journals = myJournalCards.stream()
                 .map(card -> {
@@ -90,7 +92,7 @@ public class JournalConverter {
                 })
                 .toList();
 
-        return new MyJournalListResponse(journals);
+        return new MyJournalListResponse(journals, nextCursor, hasNext);
     }
 
     public JournalDetailResponse toJournalDetailResponse(

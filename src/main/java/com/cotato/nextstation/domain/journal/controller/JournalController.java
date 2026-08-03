@@ -120,15 +120,24 @@ public class JournalController {
         return CommonResponse.success(null);
     }
 
-    @Operation(summary = "내 여행일지 목록 조회", description = "본인이 작성한 여행일지를 최신순으로 조회한다.")
+    @Operation(summary = "내 여행일지 목록 조회",
+            description = """
+                    본인이 작성한 여행일지를 최신순으로 조회한다.
+                    - `nextCursor`를 그대로 `cursor`에 넣어 다음 페이지를 요청한다.
+                    """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "size 범위를 벗어남 (`GlobalErrorCode.INVALID_PAGE_SIZE`) 또는 커서가 잘못됨 (`GlobalErrorCode.INVALID_CURSOR`)"),
             @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
     @GetMapping("/members/me/journals")
     public CommonResponse<MyJournalListResponse> getMyJournals(
-            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal) {
-        return CommonResponse.success(journalQueryService.getMyJournals(principal.memberId()));
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            @Parameter(description = "다음 페이지 커서 (첫 페이지는 생략)")
+            @RequestParam(required = false) String cursor,
+            @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")
+            @RequestParam(required = false) Integer size) {
+        return CommonResponse.success(journalQueryService.getMyJournals(principal.memberId(), cursor, size));
     }
 }
