@@ -81,8 +81,9 @@ public class MemberStampQueryService {
         return memberStampConverter.toMyStampListResponse(sorted);
     }
 
-    // 내 스탬프 상세. 해당 역에서 최초로 완료한 스탬프 기준으로 역/노선/획득일과
-    // 그 스탬프에 연결된 여행일지 id(없으면 null)를 보여준다.
+    // 내 스탬프 상세. 역/노선/획득일은 해당 역에서 최초로 완료한 스탬프 기준으로 보여주되,
+    // 여행일지는 최초 완주 건에 한정하지 않고 이 역에서 작성된 일지 중 가장 이른 것을 보여준다
+    // (최초 완주 때는 일지를 안 썼어도 이후 재완주 때 쓴 일지가 있으면 계속 null로 보이는 걸 방지).
     public MyStampDetailResponse getMyStampDetail(Long memberId, Long stationId) {
         MyStampDetailView detail = memberStampRepository
                 .findEarliestStampByMemberIdAndStationId(memberId, stationId, PageRequest.of(0, 1))
@@ -90,7 +91,13 @@ public class MemberStampQueryService {
                 .findFirst()
                 .orElseThrow(() -> new CustomException(StampErrorCode.MEMBER_STAMP_NOT_FOUND));
 
-        return memberStampConverter.toMyStampDetailResponse(detail);
+        Long journalId = memberStampRepository
+                .findEarliestJournalIdByMemberIdAndStationId(memberId, stationId, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .orElse(null);
+
+        return memberStampConverter.toMyStampDetailResponse(detail, journalId);
     }
 
     private static int lineOrder(MyStampView stamp) {

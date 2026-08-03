@@ -20,7 +20,7 @@ public class MemberStampConverter {
         return new MyStampListResponse(responses.size(), responses);
     }
 
-    public MyStampDetailResponse toMyStampDetailResponse(MyStampDetailView stamp) {
+    public MyStampDetailResponse toMyStampDetailResponse(MyStampDetailView stamp, Long journalId) {
         LineSummaryResponse line = stamp.getLineId() == null
                 ? null
                 : new LineSummaryResponse(stamp.getLineId(), stamp.getLineName(), stamp.getLineCode());
@@ -29,7 +29,7 @@ public class MemberStampConverter {
                 stamp.getStationName(),
                 line,
                 stamp.getAcquiredAt(),
-                stamp.getJournalId()
+                journalId
         );
     }
 

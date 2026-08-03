@@ -1,10 +1,14 @@
 package com.cotato.nextstation.domain.stamp.service.query;
 
 import com.cotato.nextstation.domain.stamp.converter.MemberStampConverter;
+import com.cotato.nextstation.domain.stamp.dto.response.MyStampDetailResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.MyStampListResponse;
+import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
+import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampDetailView;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampView;
 import com.cotato.nextstation.domain.station.entity.LineCode;
+import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,13 +16,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -111,6 +118,76 @@ class MemberStampQueryServiceTest {
 
         // then
         assertThat(response).isSameAs(expected);
+    }
+
+    @Test
+    @DisplayName("해당 역의 최초 방문 스탬프 상세와, 이 역에서 가장 이른 여행일지 id를 컨버터로 변환해 반환한다")
+    void getMyStampDetail_success() {
+        // given
+        MyStampDetailView view = mock(MyStampDetailView.class);
+        given(memberStampRepository.findEarliestStampByMemberIdAndStationId(eq(1L), eq(5L), any(Pageable.class)))
+                .willReturn(List.of(view));
+        given(memberStampRepository.findEarliestJournalIdByMemberIdAndStationId(eq(1L), eq(5L), any(Pageable.class)))
+                .willReturn(List.of(42L));
+        MyStampDetailResponse expected = mock(MyStampDetailResponse.class);
+        given(memberStampConverter.toMyStampDetailResponse(view, 42L)).willReturn(expected);
+
+        // when
+        MyStampDetailResponse response = memberStampQueryService.getMyStampDetail(1L, 5L);
+
+        // then
+        assertThat(response).isSameAs(expected);
+    }
+
+    @Test
+    @DisplayName("최초 완주 건에는 일지가 없어도, 이후 재완주 때 쓴 일지가 있으면 그 journalId를 사용한다")
+    void getMyStampDetail_usesJournalFromLaterCompletionWhenFirstHasNone() {
+        // given
+        MyStampDetailView view = mock(MyStampDetailView.class);
+        given(memberStampRepository.findEarliestStampByMemberIdAndStationId(eq(1L), eq(5L), any(Pageable.class)))
+                .willReturn(List.of(view));
+        given(memberStampRepository.findEarliestJournalIdByMemberIdAndStationId(eq(1L), eq(5L), any(Pageable.class)))
+                .willReturn(List.of(99L));
+        MyStampDetailResponse expected = mock(MyStampDetailResponse.class);
+        given(memberStampConverter.toMyStampDetailResponse(view, 99L)).willReturn(expected);
+
+        // when
+        MyStampDetailResponse response = memberStampQueryService.getMyStampDetail(1L, 5L);
+
+        // then
+        assertThat(response).isSameAs(expected);
+    }
+
+    @Test
+    @DisplayName("이 역에서 작성된 여행일지가 하나도 없으면 journalId는 null로 전달된다")
+    void getMyStampDetail_nullJournalIdWhenNoJournalExists() {
+        // given
+        MyStampDetailView view = mock(MyStampDetailView.class);
+        given(memberStampRepository.findEarliestStampByMemberIdAndStationId(eq(1L), eq(5L), any(Pageable.class)))
+                .willReturn(List.of(view));
+        given(memberStampRepository.findEarliestJournalIdByMemberIdAndStationId(eq(1L), eq(5L), any(Pageable.class)))
+                .willReturn(List.of());
+        MyStampDetailResponse expected = mock(MyStampDetailResponse.class);
+        given(memberStampConverter.toMyStampDetailResponse(view, null)).willReturn(expected);
+
+        // when
+        MyStampDetailResponse response = memberStampQueryService.getMyStampDetail(1L, 5L);
+
+        // then
+        assertThat(response).isSameAs(expected);
+    }
+
+    @Test
+    @DisplayName("해당 역에 방문 기록이 없으면 MEMBER_STAMP_NOT_FOUND 예외가 발생한다")
+    void getMyStampDetail_notFound() {
+        // given
+        given(memberStampRepository.findEarliestStampByMemberIdAndStationId(eq(1L), eq(5L), any(Pageable.class)))
+                .willReturn(List.of());
+
+        // when & then
+        assertThatThrownBy(() -> memberStampQueryService.getMyStampDetail(1L, 5L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(StampErrorCode.MEMBER_STAMP_NOT_FOUND.getMessage());
     }
 
     // stationName은 getMyStamps의 정렬 로직이 참조하지 않아 스텁하지 않는다(불필요 스텁 경고 방지).

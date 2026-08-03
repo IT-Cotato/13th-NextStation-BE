@@ -55,21 +55,30 @@ public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> 
     List<MyStampView> findMyStampsByMemberId(@Param("memberId") Long memberId);
 
     // 내 스탬프 상세 조회. 해당 역에서 회원이 완료한 여러 스탬프 중 최초(createdAt 오름차순 1건)
-    // 기준으로 역/노선/획득일과, 그 스탬프에 연결된 여행일지 id를 함께 가져온다.
-    // Journal은 LEFT JOIN이라 일지가 없거나 삭제된 경우(Journal의 @SQLRestriction 및
-    // delete() 시 memberStampId를 null 처리하는 로직) journalId는 자연스럽게 null이 된다.
+    // 기준으로 역/노선/획득일을 가져온다. 여행일지는 이 최초 완주 건에 한정하지 않고
+    // findEarliestJournalIdByMemberIdAndStationId로 별도 조회한다(아래 메서드 주석 참고).
     @Query("SELECT s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode, " +
-            "ms.createdAt AS acquiredAt, j.id AS journalId " +
+            "ms.createdAt AS acquiredAt " +
             "FROM MemberStamp ms " +
             "JOIN Station s ON s.id = ms.stationId " +
             "LEFT JOIN s.drawLine l " +
-            "LEFT JOIN Journal j ON j.memberStampId = ms.id " +
             "WHERE ms.memberId = :memberId AND ms.stationId = :stationId " +
             "ORDER BY ms.createdAt ASC")
     List<MyStampDetailView> findEarliestStampByMemberIdAndStationId(@Param("memberId") Long memberId,
                                                                      @Param("stationId") Long stationId,
                                                                      Pageable pageable);
+
+    // 해당 역에서 회원이 작성한 여행일지 중 완주 시점이 가장 이른 것의 id.
+    // 최초 완주 건에는 일지가 없어도 이후 재완주 때 쓴 일지가 있으면 그걸 상세 화면에 보여주기 위해,
+    // 최초 완주 스탬프가 아니라 회원이 이 역에서 완료한 스탬프 전체를 대상으로 조회한다.
+    @Query("SELECT j.id FROM Journal j " +
+            "JOIN MemberStamp ms ON ms.id = j.memberStampId " +
+            "WHERE ms.memberId = :memberId AND ms.stationId = :stationId " +
+            "ORDER BY ms.createdAt ASC")
+    List<Long> findEarliestJournalIdByMemberIdAndStationId(@Param("memberId") Long memberId,
+                                                            @Param("stationId") Long stationId,
+                                                            Pageable pageable);
 
     interface MyStampView {
         Long getStationId();
@@ -86,7 +95,6 @@ public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> 
         String getLineName();
         LineCode getLineCode();
         LocalDateTime getAcquiredAt();
-        Long getJournalId();
     }
 
 }
