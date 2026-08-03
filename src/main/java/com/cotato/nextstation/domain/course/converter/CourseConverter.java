@@ -9,6 +9,7 @@ import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreStationResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
+import com.cotato.nextstation.domain.course.dto.response.MemberCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
@@ -156,6 +157,20 @@ public class CourseConverter {
                 .map(line -> new LineSummaryResponse(line.getLineId(), line.getLineName(), line.getLineCode()))
                 .toList();
         return new MyCourseListResponse(lineFilters, cards, nextCursor, hasNext);
+    }
+
+    // 다른 회원의 공개코스 탭 카드. 좋아요한 코스 카드(CourseCardResponse)와 모양이 같아 그대로 재사용한다.
+    public MemberCourseListResponse toMemberCourseListResponse(List<MyCourseView> courses,
+                                                                String nextCursor, boolean hasNext) {
+        List<CourseCardResponse> cards = courses.stream()
+                .map(course -> new CourseCardResponse(
+                        course.getCourseId(),
+                        course.getName(),
+                        course.getStationId(),
+                        course.getStationName(),
+                        toLine(course.getLineId(), course.getLineName(), course.getLineCode())))
+                .toList();
+        return new MemberCourseListResponse(cards, nextCursor, hasNext);
     }
 
     // 대표 호선(station.draw_line)은 뽑기 대상이 아닌 역에서 비어 있을 수 있어 LEFT JOIN으로 조회한다.
