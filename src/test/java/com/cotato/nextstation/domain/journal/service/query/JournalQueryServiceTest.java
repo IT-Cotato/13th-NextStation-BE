@@ -6,10 +6,13 @@ import com.cotato.nextstation.domain.course.service.command.CourseCommandService
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.converter.JournalConverter;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
+import com.cotato.nextstation.domain.journal.dto.response.MyJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
+import com.cotato.nextstation.domain.journal.repository.JournalImageRepository.JournalImageView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
@@ -17,6 +20,7 @@ import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.domain.station.service.query.StationQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 
@@ -231,6 +235,78 @@ class JournalQueryServiceTest {
                     .isInstanceOf(CustomException.class);
 
             verify(courseCommandService, never()).increaseViewCount(anyLong(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("getMyJournals")
+    class GetMyJournals {
+
+        @Test
+        @DisplayName("일지가 없으면 빈 목록을 반환하고 사진 조회는 나가지 않는다")
+        void noJournals_returnsEmptyListWithoutImageQuery() {
+            // given
+            given(journalRepository.findMyJournalCards(OWNER_ID)).willReturn(List.of());
+
+            // when
+            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID);
+
+            // then
+            assertThat(response.journals()).isEmpty();
+            verify(journalImageRepository, never()).findImagesByJournalIds(anyList());
+        }
+
+        @Test
+        @DisplayName("대표 호선이 있는 역이면 line을 채우고, 일지별 첫 사진을 썸네일로 담는다")
+        void journalsWithDrawLine_fillsLineAndThumbnail() {
+            // given
+            MyJournalCardView card = mock(MyJournalCardView.class);
+            given(card.getJournalId()).willReturn(JOURNAL_ID);
+            given(card.getTitle()).willReturn("보문 골목 산책");
+            given(card.getLikeCount()).willReturn(54);
+            given(card.getStationName()).willReturn("보문역");
+            given(card.getLineId()).willReturn(1L);
+            given(card.getLineName()).willReturn("6호선");
+            given(card.getLineCode()).willReturn(LineCode.LINE_6);
+            given(journalRepository.findMyJournalCards(OWNER_ID)).willReturn(List.of(card));
+
+            JournalImageView imageView = mock(JournalImageView.class);
+            given(imageView.getJournalId()).willReturn(JOURNAL_ID);
+            given(imageView.getImageUrl()).willReturn("https://s3.../journal/10/uuid1.jpg");
+            given(journalImageRepository.findImagesByJournalIds(List.of(JOURNAL_ID))).willReturn(List.of(imageView));
+
+            // when
+            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID);
+
+            // then
+            assertThat(response.journals()).hasSize(1);
+            assertThat(response.journals().get(0).journalId()).isEqualTo(JOURNAL_ID);
+            assertThat(response.journals().get(0).title()).isEqualTo("보문 골목 산책");
+            assertThat(response.journals().get(0).stationName()).isEqualTo("보문역");
+            assertThat(response.journals().get(0).likeCount()).isEqualTo(54);
+            assertThat(response.journals().get(0).thumbnailUrl()).isEqualTo("https://s3.../journal/10/uuid1.jpg");
+            assertThat(response.journals().get(0).line()).isEqualTo(new LineSummaryResponse(1L, "6호선", LineCode.LINE_6));
+        }
+
+        @Test
+        @DisplayName("대표 호선이 없는 역이면 line은 null이고, 사진이 없으면 썸네일도 null이다")
+        void journalWithoutDrawLineOrImage_leavesLineAndThumbnailNull() {
+            // given
+            MyJournalCardView card = mock(MyJournalCardView.class);
+            given(card.getJournalId()).willReturn(JOURNAL_ID);
+            given(card.getTitle()).willReturn("혼자 걷는 성신여대");
+            given(card.getLikeCount()).willReturn(0);
+            given(card.getStationName()).willReturn("성신여대입구역");
+            given(card.getLineId()).willReturn(null);
+            given(journalRepository.findMyJournalCards(OWNER_ID)).willReturn(List.of(card));
+            given(journalImageRepository.findImagesByJournalIds(List.of(JOURNAL_ID))).willReturn(List.of());
+
+            // when
+            MyJournalListResponse response = journalQueryService.getMyJournals(OWNER_ID);
+
+            // then
+            assertThat(response.journals().get(0).line()).isNull();
+            assertThat(response.journals().get(0).thumbnailUrl()).isNull();
         }
     }
 
