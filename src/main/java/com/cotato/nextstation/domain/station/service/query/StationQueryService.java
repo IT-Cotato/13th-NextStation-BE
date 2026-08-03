@@ -212,6 +212,28 @@ public class StationQueryService {
                 .collect(Collectors.toMap(Station::getId, Station::getStationName));
     }
 
+    /**
+     * 주어진 역 id 순서 그대로 역 요약(이름 + 소속 노선)을 조회한다.
+     * <p>
+     * 다른 회원 스탬프 목록처럼 "최근 방문순"으로 이미 정렬된 id 목록을 받아
+     * 그 순서를 유지한 채 역 정보만 채워 넣을 때 쓴다. {@code findAllById}는 순서를 보장하지 않는다.
+     * 삭제 등으로 조회되지 않는 역 id는 결과에서 조용히 빠진다.
+     */
+    public List<StationSummaryResponse> getStationSummaries(List<Long> stationIds) {
+        if (stationIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Station> stationById = stationRepository.findAllById(stationIds).stream()
+                .collect(Collectors.toMap(Station::getId, station -> station));
+        Map<Long, List<LineSummaryResponse>> linesByStationId = groupLines(stationIds);
+
+        return stationIds.stream()
+                .filter(stationById::containsKey)
+                .map(stationId -> stationConverter.toSummaryResponse(
+                        stationById.get(stationId), linesByStationId.getOrDefault(stationId, List.of())))
+                .toList();
+    }
+
     public LineSummaryResponse getLine(Long stationId) {
         return stationRepository.findById(stationId)
                 .map(station -> {
