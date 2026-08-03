@@ -5,6 +5,7 @@ import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
 import com.cotato.nextstation.domain.journal.dto.response.JournalCreateResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
+import com.cotato.nextstation.domain.journal.dto.response.MyJournalListResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.service.command.JournalCommandService;
 import com.cotato.nextstation.domain.journal.service.query.JournalQueryService;
@@ -20,12 +21,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+// "내 여행일지 목록"은 경로가 /members/me/journals라 다른 메서드들과 prefix가 다르다.
+// StampCourseController와 같은 방식으로 클래스 레벨은 "/api/v1"까지만 걸고
+// 메서드마다 나머지 경로를 전부 적어 한 컨트롤러 안에서 두 prefix를 함께 쓴다.
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/journals")
+@RequestMapping("/api/v1")
 public class JournalController {
-
-
 
     private final JournalCommandService journalCommandService;
     private final JournalQueryService journalQueryService;
@@ -36,7 +38,7 @@ public class JournalController {
             @ApiResponse(responseCode = "404", description = "존재하지 않는 스탬프"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
-    @GetMapping("/write-info")
+    @GetMapping("/journals/write-info")
     public CommonResponse<JournalWriteInfoResponse> getWriteInfo(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @RequestParam Long memberStampId) {
@@ -50,7 +52,7 @@ public class JournalController {
             @ApiResponse(responseCode = "404", description = "존재하지 않는 스탬프 또는 장소"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
-    @PostMapping
+    @PostMapping("/journals")
     public CommonResponse<JournalCreateResponse> createJournal(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Valid @RequestBody JournalCreateRequest request) {
@@ -66,7 +68,7 @@ public class JournalController {
             @ApiResponse(responseCode = "404", description = "존재하지 않는 여행일지"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
-    @PatchMapping("/{journalId}")
+    @PatchMapping("/journals/{journalId}")
     public CommonResponse<Void> updateJournal(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long journalId,
@@ -81,7 +83,7 @@ public class JournalController {
             @ApiResponse(responseCode = "404", description = "존재하지 않는 여행일지"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
-    @GetMapping("/{journalId}")
+    @GetMapping("/journals/{journalId}")
     public CommonResponse<JournalDetailResponse> getJournalDetail(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long journalId) {
@@ -95,7 +97,7 @@ public class JournalController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
-    @GetMapping("/uncompleted")
+    @GetMapping("/journals/uncompleted")
     public CommonResponse<UncompletedJournalListResponse> getUncompletedJournals(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal
     ) {
@@ -109,12 +111,24 @@ public class JournalController {
             @ApiResponse(responseCode = "404", description = "존재하지 않는 여행일지"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
-    @DeleteMapping("/{journalId}")
+    @DeleteMapping("/journals/{journalId}")
     public CommonResponse<Void> deleteJournal(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable Long journalId
     ) {
         journalCommandService.deleteJournal(principal.memberId(), journalId);
         return CommonResponse.success(null);
+    }
+
+    @Operation(summary = "내 여행일지 목록 조회", description = "본인이 작성한 여행일지를 최신순으로 조회한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료"),
+    })
+    @SecurityRequirement(name = "accessTokenAuth")
+    @GetMapping("/members/me/journals")
+    public CommonResponse<MyJournalListResponse> getMyJournals(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal) {
+        return CommonResponse.success(journalQueryService.getMyJournals(principal.memberId()));
     }
 }
