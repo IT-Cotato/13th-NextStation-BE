@@ -4,8 +4,11 @@ import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
+import com.cotato.nextstation.domain.journal.dto.response.MyJournalListResponse;
+import com.cotato.nextstation.domain.journal.dto.response.MyJournalResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
@@ -65,6 +68,30 @@ public class JournalConverter {
 
             return new UncompletedJournalListResponse(courses.size(), courses);
         }
+
+    public MyJournalListResponse toMyJournalListResponse(
+            List<MyJournalCardView> myJournalCards,
+            Map<Long, String> thumbnailUrlByJournalId
+    ) {
+        List<MyJournalResponse> journals = myJournalCards.stream()
+                .map(card -> {
+                    LineSummaryResponse line = card.getLineId() == null
+                            ? null
+                            : new LineSummaryResponse(card.getLineId(), card.getLineName(), card.getLineCode());
+
+                    return new MyJournalResponse(
+                            card.getJournalId(),
+                            line,
+                            card.getTitle(),
+                            card.getStationName(),
+                            thumbnailUrlByJournalId.get(card.getJournalId()),
+                            card.getLikeCount()
+                    );
+                })
+                .toList();
+
+        return new MyJournalListResponse(journals);
+    }
 
     public JournalDetailResponse toJournalDetailResponse(
             Journal journal,
