@@ -13,9 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -68,16 +66,12 @@ public class MemberStampQueryService {
                 memberId, completedStampIds);
     }
 
-    // 내 스탬프 목록. 역별로 최초 획득 스탬프 하나만 남기고, 1호선 → 9호선 순으로 정렬한다(대표 호선 없는 역은 맨 뒤).
+    // 내 스탬프 목록. 역별 중복 제거는 리포지토리 쿼리(DISTINCT)가 처리하고,
+    // 여기서는 1호선 → 9호선 순으로 정렬만 한다(대표 호선 없는 역은 맨 뒤).
     public MyStampListResponse getMyStamps(Long memberId) {
-        List<MyStampView> earliestFirst = memberStampRepository.findMyStampsByMemberId(memberId);
+        List<MyStampView> stamps = memberStampRepository.findMyStampsByMemberId(memberId);
 
-        Map<Long, MyStampView> uniqueByStation = new LinkedHashMap<>();
-        for (MyStampView stamp : earliestFirst) {
-            uniqueByStation.putIfAbsent(stamp.getStationId(), stamp);
-        }
-
-        List<MyStampView> sorted = uniqueByStation.values().stream()
+        List<MyStampView> sorted = stamps.stream()
                 .sorted(Comparator.comparing(MemberStampQueryService::lineOrder))
                 .toList();
 

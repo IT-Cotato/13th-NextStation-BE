@@ -75,34 +75,6 @@ class MemberStampQueryServiceTest {
     }
 
     @Test
-    @DisplayName("같은 역의 스탬프는 최초 획득분(오름차순 첫 항목)만 남긴다")
-    void getMyStamps_dedupByStation_keepsEarliest() {
-        // given: 5번역 스탬프가 두 번(먼저 온 게 최초 획득분), 6번역 스탬프가 한 번
-        // secondAtStation5는 dedup 단계에서 걸러져 getLineCode()까지 호출되지 않으므로 stationId만 스텁한다.
-        MyStampView firstAtStation5 = stampView(5L, LineCode.LINE_1);
-        MyStampView secondAtStation5 = mock(MyStampView.class);
-        given(secondAtStation5.getStationId()).willReturn(5L);
-        MyStampView station6 = stampView(6L, LineCode.LINE_6);
-
-        given(memberStampRepository.findMyStampsByMemberId(1L))
-                .willReturn(List.of(firstAtStation5, secondAtStation5, station6));
-        given(memberStampConverter.toMyStampListResponse(any())).willReturn(mock(MyStampListResponse.class));
-
-        // when
-        memberStampQueryService.getMyStamps(1L);
-
-        // then
-        ArgumentCaptor<List<MyStampView>> captor = ArgumentCaptor.forClass(List.class);
-        verify(memberStampConverter).toMyStampListResponse(captor.capture());
-        List<MyStampView> deduped = captor.getValue();
-
-        assertThat(deduped).hasSize(2);
-        assertThat(deduped).extracting(MyStampView::getStationId).containsExactlyInAnyOrder(5L, 6L);
-        assertThat(deduped).contains(firstAtStation5);
-        assertThat(deduped).doesNotContain(secondAtStation5);
-    }
-
-    @Test
     @DisplayName("1호선 → 9호선 순으로 정렬하고, 대표 호선이 없는 역은 맨 뒤로 보낸다")
     void getMyStamps_sortsByLineOrder_nullLineLast() {
         // given: 리포지토리 응답 순서와 무관하게 노선 순으로 재정렬돼야 한다
@@ -141,7 +113,7 @@ class MemberStampQueryServiceTest {
         assertThat(response).isSameAs(expected);
     }
 
-    // stationName은 getMyStamps의 dedup/정렬 로직이 참조하지 않아 스텁하지 않는다(불필요 스텁 경고 방지).
+    // stationName은 getMyStamps의 정렬 로직이 참조하지 않아 스텁하지 않는다(불필요 스텁 경고 방지).
     private MyStampView stampView(Long stationId, LineCode lineCode) {
         MyStampView view = mock(MyStampView.class);
         given(view.getStationId()).willReturn(stationId);

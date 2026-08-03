@@ -37,17 +37,19 @@ public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> 
     List<MemberStamp> findByMemberIdAndIdNotInOrderByCreatedAtDesc(
             Long memberId, Set<Long> completedStampIds);
 
-    // 내 스탬프 목록 조회. 역별 중복 제거 시 최초 획득분을 남겨야 해서 오름차순으로 조회하고,
-    // 카드에 필요한 역/대표 호선까지 한 번에 가져온다(스탬프마다 조회하면 N+1).
+    // 내 스탬프 목록 조회. 카드에 필요한 역/대표 호선까지 한 번에 가져온다(스탬프마다 조회하면 N+1).
     // MemberStamp에 저장된 stationId 스냅샷으로 Station을 직접 조인한다. Course를 거치면
     // Course의 @SQLRestriction 때문에 코스가 삭제된 스탬프까지 목록에서 사라진다.
-    @Query("SELECT s.id AS stationId, s.stationName AS stationName, " +
+    // 같은 역에서 여러 코스를 완료해도 역/노선 정보는 항상 동일하므로 DISTINCT로 DB에서 바로
+    // 역 단위로 접는다. 완료 이력이 아무리 쌓여도 응답 row 수는 방문한 distinct 역 수로 고정된다.
+    // (어떤 스탬프가 최초 획득분인지는 이 목록에서 필요 없다. 필요해지면 역 단위 상세 조회를
+    // 별도로 만든다.)
+    @Query("SELECT DISTINCT s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM MemberStamp ms " +
             "JOIN Station s ON s.id = ms.stationId " +
             "LEFT JOIN s.drawLine l " +
-            "WHERE ms.memberId = :memberId " +
-            "ORDER BY ms.createdAt ASC")
+            "WHERE ms.memberId = :memberId")
     List<MyStampView> findMyStampsByMemberId(@Param("memberId") Long memberId);
 
     interface MyStampView {
