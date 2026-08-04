@@ -121,6 +121,34 @@ class MemberControllerTest {
     }
 
     @Test
+    @DisplayName("다른 회원 프로필 조회 시 memberId가 0이면 400을 반환한다")
+    void getMemberProfile_memberIdZero() throws Exception {
+        // given
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+
+        // when & then
+        mockMvc.perform(get("/api/v1/members/0/profile")
+                        .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.VALIDATION_ERROR.getCode()));
+    }
+
+    @Test
+    @DisplayName("다른 회원 프로필 조회 시 memberId가 음수이면 400을 반환한다")
+    void getMemberProfile_memberIdNegative() throws Exception {
+        // given
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+
+        // when & then
+        mockMvc.perform(get("/api/v1/members/-1/profile")
+                        .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.VALIDATION_ERROR.getCode()));
+    }
+
+    @Test
     @DisplayName("다른 회원 프로필 조회 시 Authorization 헤더가 없으면 401을 반환한다")
     void getMemberProfile_missingAuthorizationHeader() throws Exception {
         mockMvc.perform(get("/api/v1/members/2/profile"))
@@ -160,6 +188,34 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.data.stampCount").value(1))
                 .andExpect(jsonPath("$.data.stamps[0].stationId").value(6L))
                 .andExpect(jsonPath("$.data.stamps[0].stationName").value("보문역"));
+    }
+
+    @Test
+    @DisplayName("다른 회원 스탬프 목록 조회 시 memberId가 0이면 400을 반환한다")
+    void getMemberStamps_memberIdZero() throws Exception {
+        // given
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+
+        // when & then
+        mockMvc.perform(get("/api/v1/members/0/stamps")
+                        .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.VALIDATION_ERROR.getCode()));
+    }
+
+    @Test
+    @DisplayName("다른 회원 스탬프 목록 조회 시 memberId가 음수이면 400을 반환한다")
+    void getMemberStamps_memberIdNegative() throws Exception {
+        // given
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+
+        // when & then
+        mockMvc.perform(get("/api/v1/members/-1/stamps")
+                        .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.VALIDATION_ERROR.getCode()));
     }
 
     @Test
@@ -204,6 +260,34 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.data.courses[0].stationName").value("보문역"))
                 .andExpect(jsonPath("$.data.nextCursor").value("eyJpZCI6MjB9"))
                 .andExpect(jsonPath("$.data.hasNext").value(true));
+    }
+
+    @Test
+    @DisplayName("다른 회원 공개 코스 목록 조회 시 memberId가 0이면 400을 반환한다")
+    void getMemberCourses_memberIdZero() throws Exception {
+        // given
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+
+        // when & then
+        mockMvc.perform(get("/api/v1/members/0/courses")
+                        .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.VALIDATION_ERROR.getCode()));
+    }
+
+    @Test
+    @DisplayName("다른 회원 공개 코스 목록 조회 시 memberId가 음수이면 400을 반환한다")
+    void getMemberCourses_memberIdNegative() throws Exception {
+        // given
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+
+        // when & then
+        mockMvc.perform(get("/api/v1/members/-1/courses")
+                        .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(GlobalErrorCode.VALIDATION_ERROR.getCode()));
     }
 
     @Test

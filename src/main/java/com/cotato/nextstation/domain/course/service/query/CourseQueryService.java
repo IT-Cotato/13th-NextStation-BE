@@ -608,6 +608,7 @@ public class CourseQueryService {
      */
     public MemberCourseListResponse getMemberPublicCourses(Long memberId, String cursor, Integer size) {
         if (!memberExistenceQueryService.existsMember(memberId)) {
+            log.warn("존재하지 않는 회원의 공개코스 탭 조회 시도: memberId={}", memberId);
             throw new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
         }
 

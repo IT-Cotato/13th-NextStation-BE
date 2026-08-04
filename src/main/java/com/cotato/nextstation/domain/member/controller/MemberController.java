@@ -15,7 +15,9 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
+@Validated
 @RequestMapping("/api/v1/members")
 public class MemberController {
 
@@ -63,6 +66,7 @@ public class MemberController {
     @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "memberId가 1 미만 (`GlobalErrorCode.VALIDATION_ERROR`)"),
             @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`MemberErrorCode.MEMBER_NOT_FOUND`)"),
     })
@@ -70,7 +74,7 @@ public class MemberController {
     public CommonResponse<OtherMemberProfileResponse> getMemberProfile(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "조회할 회원 ID", example = "2")
-            @PathVariable Long memberId) {
+            @PathVariable @Positive Long memberId) {
         return CommonResponse.success(memberQueryService.getMemberProfile(memberId));
     }
 
@@ -87,6 +91,7 @@ public class MemberController {
     @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "memberId가 1 미만 (`GlobalErrorCode.VALIDATION_ERROR`)"),
             @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`MemberErrorCode.MEMBER_NOT_FOUND`)"),
     })
@@ -94,7 +99,7 @@ public class MemberController {
     public CommonResponse<MemberStampListResponse> getMemberStamps(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "조회할 회원 ID", example = "2")
-            @PathVariable Long memberId) {
+            @PathVariable @Positive Long memberId) {
         return CommonResponse.success(memberStampQueryService.getMemberStamps(memberId));
     }
 
@@ -109,7 +114,7 @@ public class MemberController {
     @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "400", description = "size 범위를 벗어남 (`GlobalErrorCode.INVALID_PAGE_SIZE`) 또는 커서가 잘못됨 (`GlobalErrorCode.INVALID_CURSOR`)"),
+            @ApiResponse(responseCode = "400", description = "memberId가 1 미만 (`GlobalErrorCode.VALIDATION_ERROR`), size 범위를 벗어남 (`GlobalErrorCode.INVALID_PAGE_SIZE`), 또는 커서가 잘못됨 (`GlobalErrorCode.INVALID_CURSOR`)"),
             @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`MemberErrorCode.MEMBER_NOT_FOUND`)"),
     })
@@ -117,7 +122,7 @@ public class MemberController {
     public CommonResponse<MemberCourseListResponse> getMemberCourses(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "조회할 회원 ID", example = "2")
-            @PathVariable Long memberId,
+            @PathVariable @Positive Long memberId,
             @Parameter(description = "다음 페이지 커서 (첫 페이지는 생략)")
             @RequestParam(required = false) String cursor,
             @Parameter(description = "페이지 크기 (1~50, 기본 10)", example = "10")

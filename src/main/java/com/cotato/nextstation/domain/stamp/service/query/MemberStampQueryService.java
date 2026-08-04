@@ -12,6 +12,7 @@ import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.Memb
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,7 @@ import java.util.Set;
  * StampCourseQueryService가 CourseQueryService를 주입받고 있어, 코스 목록이 그 서비스를
  * 다시 호출하면 순환 참조가 된다. 그래서 완료 여부 조회만 담는 서비스를 따로 둔다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -84,6 +86,7 @@ public class MemberStampQueryService {
      */
     public MemberStampListResponse getMemberStamps(Long memberId) {
         if (!memberExistenceQueryService.existsMember(memberId)) {
+            log.warn("존재하지 않는 회원의 스탬프 탭 조회 시도: memberId={}", memberId);
             throw new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
         }
 
