@@ -8,6 +8,7 @@ import com.cotato.nextstation.domain.auth.util.EmailMasker;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.member.service.command.MemberCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.AuthTokenClaims;
 import com.cotato.nextstation.global.jwt.JwtProvider;
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -41,9 +43,11 @@ public class AuthTokenService {
     private final JwtProvider jwtProvider;
     private final AuthTokenIssuer authTokenIssuer;
     private final RefreshSessionRepository refreshSessionRepository;
+    private final MemberCommandService memberCommandService;
 
-    // 로그인 - 탈퇴 유예 기간 내 계정을 복구하는 쓰기가 있어 클래스의 readOnly를 덮어쓴다.
-    @Transactional
+    // 로그인 자체는 트랜잭션을 열지 않는다. 복구 쓰기를 MemberCommandService의 별도 트랜잭션에 맡겨,
+    // 프로필 미설정 상태로 탈퇴한 회원이 복구되자마자 PENDING으로 걸려 실패하더라도 복구 자체는 롤백되지 않게 한다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public LoginResult login(String email, String password) {
 
         // 이메일 존재 여부와 비밀번호 불일치를 구분하지 않고 동일한 에러로 응답한다 (계정 존재 여부 노출 방지)
@@ -59,15 +63,17 @@ public class AuthTokenService {
             throw new CustomException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
+        // 복구는 별도 트랜잭션(MemberCommandService)에서 즉시 커밋되므로, 이후 PENDING으로 걸려 로그인이 실패해도 되돌아가지 않는다.
+        // 복구된 상태가 PENDING(프로필 미설정)이면 회원은 /signup을 다시 호출해 signupToken을 재발급받아 프로필 설정을 이어가면 된다.
+        MemberStatus status = member.getStatus();
         boolean restored = member.isRestorable();
         if (restored) {
-            member.restore();
-            log.info("탈퇴 유예 기간 내 재로그인으로 계정 복구: memberId={}, restoredStatus={}", member.getId(), member.getStatus());
+            status = memberCommandService.restore(member.getId());
+            log.info("탈퇴 유예 기간 내 재로그인으로 계정 복구: memberId={}, restoredStatus={}", member.getId(), status);
         }
 
-        // 복구 결과가 PENDING(프로필 미설정)이면 여기서 막히고 트랜잭션이 롤백돼 복구도 함께 되돌아간다.
-        if (member.getStatus() != MemberStatus.ACTIVE) {
-            log.warn("ACTIVE 상태가 아닌 회원의 로그인 시도: memberId={}, status={}", member.getId(), member.getStatus());
+        if (status != MemberStatus.ACTIVE) {
+            log.warn("ACTIVE 상태가 아닌 회원의 로그인 시도: memberId={}, status={}", member.getId(), status);
             throw new CustomException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
