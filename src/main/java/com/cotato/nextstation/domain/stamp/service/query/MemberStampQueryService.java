@@ -4,16 +4,18 @@ import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
 import com.cotato.nextstation.domain.member.service.query.MemberExistenceQueryService;
 import com.cotato.nextstation.domain.stamp.dto.response.MemberStampListResponse;
+import com.cotato.nextstation.domain.stamp.dto.response.MemberStampResponse;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
-import com.cotato.nextstation.domain.station.dto.response.StationSummaryResponse;
-import com.cotato.nextstation.domain.station.service.query.StationQueryService;
+import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MemberStampView;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -30,7 +32,6 @@ public class MemberStampQueryService {
     private final MemberStampRepository memberStampRepository;
     private final JournalRepository journalRepository;
     private final MemberExistenceQueryService memberExistenceQueryService;
-    private final StationQueryService stationQueryService;
 
     // 넘긴 코스들 중 회원이 완료한 코스 id 집합. 목록에서 카드별 완료 여부를 판단하는 데 쓴다.
     public Set<Long> getCompletedCourseIds(Long memberId, List<Long> courseIds) {
@@ -73,14 +74,38 @@ public class MemberStampQueryService {
         return memberStampRepository.countVisitedStations(memberId);
     }
 
-    // 다른 회원의 스탬프 탭. 방문한 역을 최근 방문순으로 조회한다(역 하나당 스탬프 1개).
-    // 프로필 조회와 달리 독립된 API라 여기서 직접 회원 존재를 검증한다.
+    /**
+     * 다른 회원의 스탬프 탭. 방문한 역을 역 하나당 스탬프 1개로 묶어 조회한다.
+     * <p>
+     * 내 스탬프 목록(GET /stamps)과 같은 정렬 기준을 쓴다: 1호선 → 9호선 순, 대표 호선이
+     * 없는 역은 맨 뒤. 동일 호선 내에서는 역명 가나다순으로 2차 정렬한다.
+     * <p>
+     * 프로필 조회와 달리 독립된 API라 여기서 직접 회원 존재를 검증한다.
+     */
     public MemberStampListResponse getMemberStamps(Long memberId) {
         if (!memberExistenceQueryService.existsMember(memberId)) {
             throw new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
         }
-        List<Long> stationIds = memberStampRepository.findVisitedStationIdsOrderByLastVisitedDesc(memberId);
-        List<StationSummaryResponse> stamps = stationQueryService.getStationSummaries(stationIds);
+
+        List<MemberStampResponse> stamps = memberStampRepository.findMemberStampsByMemberId(memberId).stream()
+                .sorted(Comparator.comparing(MemberStampQueryService::lineOrder)
+                        .thenComparing(MemberStampView::getStationName))
+                .map(this::toStampResponse)
+                .toList();
+
         return new MemberStampListResponse(stamps.size(), stamps);
+    }
+
+    // LineCode enum 선언 순서가 1~9호선 → 기타 노선이라 ordinal이 곧 정렬 순서다.
+    // 대표 호선이 없는 역(lineCode == null)은 맨 뒤로 보낸다.
+    private static int lineOrder(MemberStampView stamp) {
+        return stamp.getLineCode() == null ? Integer.MAX_VALUE : stamp.getLineCode().ordinal();
+    }
+
+    private MemberStampResponse toStampResponse(MemberStampView stamp) {
+        LineSummaryResponse line = (stamp.getLineId() == null)
+                ? null
+                : new LineSummaryResponse(stamp.getLineId(), stamp.getLineName(), stamp.getLineCode());
+        return new MemberStampResponse(stamp.getStationId(), stamp.getStationName(), line);
     }
 }
