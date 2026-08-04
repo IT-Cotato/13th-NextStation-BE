@@ -11,9 +11,8 @@ import com.cotato.nextstation.domain.stamp.dto.response.MyStampListResponse;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
-import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MemberStampView;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampDetailView;
-import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampView;
+import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.VisitedStationView;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -97,9 +96,9 @@ public class MemberStampQueryService {
             throw new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
         }
 
-        List<MemberStampResponse> stamps = memberStampRepository.findMemberStampsByMemberId(memberId).stream()
+        List<MemberStampResponse> stamps = memberStampRepository.findVisitedStationsByMemberId(memberId).stream()
                 .sorted(Comparator.comparing(MemberStampQueryService::lineOrder)
-                        .thenComparing(MemberStampView::getStationName))
+                        .thenComparing(VisitedStationView::getStationName))
                 .map(this::toStampResponse)
                 .toList();
 
@@ -108,11 +107,11 @@ public class MemberStampQueryService {
 
     // LineCode enum 선언 순서가 1~9호선 → 기타 노선이라 ordinal이 곧 정렬 순서다.
     // 대표 호선이 없는 역(lineCode == null)은 맨 뒤로 보낸다.
-    private static int lineOrder(MemberStampView stamp) {
+    private static int lineOrder(VisitedStationView stamp) {
         return stamp.getLineCode() == null ? Integer.MAX_VALUE : stamp.getLineCode().ordinal();
     }
 
-    private MemberStampResponse toStampResponse(MemberStampView stamp) {
+    private MemberStampResponse toStampResponse(VisitedStationView stamp) {
         LineSummaryResponse line = (stamp.getLineId() == null)
                 ? null
                 : new LineSummaryResponse(stamp.getLineId(), stamp.getLineName(), stamp.getLineCode());
@@ -122,11 +121,11 @@ public class MemberStampQueryService {
     // 내 스탬프 목록. 역별 중복 제거는 리포지토리 쿼리(DISTINCT)가 처리하고,
     // 여기서는 1호선 → 9호선 순으로 정렬하고(대표 호선 없는 역은 맨 뒤), 동일 호선 내에서는 역명 가나다순으로 2차 정렬한다.
     public MyStampListResponse getMyStamps(Long memberId) {
-        List<MyStampView> stamps = memberStampRepository.findMyStampsByMemberId(memberId);
+        List<VisitedStationView> stamps = memberStampRepository.findVisitedStationsByMemberId(memberId);
 
-        List<MyStampView> sorted = stamps.stream()
-                .sorted(Comparator.comparing(MemberStampQueryService::myStampLineOrder)
-                        .thenComparing(MyStampView::getStationName))
+        List<VisitedStationView> sorted = stamps.stream()
+                .sorted(Comparator.comparing(MemberStampQueryService::lineOrder)
+                        .thenComparing(VisitedStationView::getStationName))
                 .toList();
 
         return memberStampConverter.toMyStampListResponse(sorted);
@@ -149,9 +148,5 @@ public class MemberStampQueryService {
                 .orElse(null);
 
         return memberStampConverter.toMyStampDetailResponse(detail, journalId);
-    }
-
-    private static int myStampLineOrder(MyStampView stamp) {
-        return stamp.getLineCode() == null ? Integer.MAX_VALUE : stamp.getLineCode().ordinal();
     }
 }
