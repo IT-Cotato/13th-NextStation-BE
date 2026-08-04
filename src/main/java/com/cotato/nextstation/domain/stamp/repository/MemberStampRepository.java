@@ -38,21 +38,19 @@ public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> 
             Long memberId, Set<Long> completedStampIds);
 
     // 다른 회원 프로필 - 방문한(스탬프를 찍은) 서로 다른 역의 개수.
-    // MemberStamp는 courseId만 들고 있어(연관관계 미매핑) Course를 id로 ad-hoc 조인한다.
-    @Query("SELECT COUNT(DISTINCT c.stationId) FROM MemberStamp ms " +
-            "JOIN Course c ON c.id = ms.courseId " +
+    // ms.stationId는 완주 시점의 역 스냅샷이라 코스가 삭제(@SQLRestriction)돼도 값이 남는다.
+    @Query("SELECT COUNT(DISTINCT ms.stationId) FROM MemberStamp ms " +
             "WHERE ms.memberId = :memberId")
     long countVisitedStations(@Param("memberId") Long memberId);
 
     // 다른 회원의 스탬프 탭 - 방문한 역을 역/대표 호선과 함께 중복 없이 조회한다(역 하나당 스탬프 1개).
     // 내 스탬프 목록(MyStampListResponse)과 같은 방식으로 대표 호선(station.draw_line)만 내려주고,
     // 1~9호선 정렬 + 동일 호선 내 역명 가나다순 정렬은 서비스 레이어에서 처리한다.
-    // MemberStamp는 courseId만 들고 있어(연관관계 미매핑) Course를 id로 ad-hoc 조인한다.
+    // ms.stationId는 완주 시점의 역 스냅샷이라 코스가 삭제(@SQLRestriction)돼도 값이 남는다.
     @Query("SELECT DISTINCT s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM MemberStamp ms " +
-            "JOIN Course c ON c.id = ms.courseId " +
-            "JOIN Station s ON s.id = c.stationId " +
+            "JOIN Station s ON s.id = ms.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE ms.memberId = :memberId")
     List<MemberStampView> findMemberStampsByMemberId(@Param("memberId") Long memberId);
