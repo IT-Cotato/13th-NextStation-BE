@@ -120,12 +120,13 @@ public class MemberStampQueryService {
     }
 
     // 내 스탬프 목록. 역별 중복 제거는 리포지토리 쿼리(DISTINCT)가 처리하고,
-    // 여기서는 1호선 → 9호선 순으로 정렬만 한다(대표 호선 없는 역은 맨 뒤).
+    // 여기서는 1호선 → 9호선 순으로 정렬하고(대표 호선 없는 역은 맨 뒤), 동일 호선 내에서는 역명 가나다순으로 2차 정렬한다.
     public MyStampListResponse getMyStamps(Long memberId) {
         List<MyStampView> stamps = memberStampRepository.findMyStampsByMemberId(memberId);
 
         List<MyStampView> sorted = stamps.stream()
-                .sorted(Comparator.comparing(MemberStampQueryService::myStampLineOrder))
+                .sorted(Comparator.comparing(MemberStampQueryService::myStampLineOrder)
+                        .thenComparing(MyStampView::getStationName))
                 .toList();
 
         return memberStampConverter.toMyStampListResponse(sorted);
