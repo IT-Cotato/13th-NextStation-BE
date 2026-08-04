@@ -61,7 +61,7 @@ public class MemberController {
     @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
-            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 닉네임 길이/문자/금칙어 위반, 또는 허용되지 않은 프로필 이미지 URL (`GlobalErrorCode.VALIDATION_ERROR`, `NicknameErrorCode.NICKNAME_TOO_SHORT`, `NicknameErrorCode.NICKNAME_TOO_LONG`, `NicknameErrorCode.NICKNAME_INVALID_CHARACTER`, `NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD`, `MemberErrorCode.INVALID_PROFILE_IMAGE_URL`)"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 닉네임 길이/문자/금칙어/예약어 위반, 또는 허용되지 않은 프로필 이미지 URL (`GlobalErrorCode.VALIDATION_ERROR`, `NicknameErrorCode.NICKNAME_TOO_SHORT`, `NicknameErrorCode.NICKNAME_TOO_LONG`, `NicknameErrorCode.NICKNAME_INVALID_CHARACTER`, `NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD`, `NicknameErrorCode.NICKNAME_CONTAINS_RESERVED_WORD`, `MemberErrorCode.INVALID_PROFILE_IMAGE_URL`)"),
             @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`MemberErrorCode.MEMBER_NOT_FOUND`)"),
             @ApiResponse(responseCode = "409", description = "이미 사용 중인 닉네임 (`NicknameErrorCode.DUPLICATE_NICKNAME`)"),
