@@ -1,6 +1,6 @@
 package com.cotato.nextstation.domain.auth.dto.response;
 
-import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResultType;
+import com.cotato.nextstation.domain.auth.service.result.KakaoLoginResultType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "카카오 로그인 결과. resultType으로 분기해서 나머지 필드를 읽는다.")

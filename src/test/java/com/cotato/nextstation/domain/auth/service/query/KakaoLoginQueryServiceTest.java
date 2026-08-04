@@ -4,8 +4,10 @@ import com.cotato.nextstation.domain.auth.client.KakaoOAuthClient;
 import com.cotato.nextstation.domain.auth.client.dto.KakaoTokenResponse;
 import com.cotato.nextstation.domain.auth.client.dto.KakaoUserInfoResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
-import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResult;
-import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResultType;
+import com.cotato.nextstation.domain.auth.service.AuthTokenIssuer;
+import com.cotato.nextstation.domain.auth.service.IssuedTokens;
+import com.cotato.nextstation.domain.auth.service.result.KakaoLoginResult;
+import com.cotato.nextstation.domain.auth.service.result.KakaoLoginResultType;
 import com.cotato.nextstation.domain.auth.util.KakaoSignupTokenClaims;
 import com.cotato.nextstation.domain.member.entity.AuthProvider;
 import com.cotato.nextstation.domain.member.entity.Gender;
@@ -52,6 +54,9 @@ class KakaoLoginQueryServiceTest {
 
     @Mock
     private JwtProvider jwtProvider;
+
+    @Mock
+    private AuthTokenIssuer authTokenIssuer;
 
     private static final String CODE = "auth-code";
     private static final String KAKAO_ACCESS_TOKEN = "kakao-access-token";
@@ -176,8 +181,7 @@ class KakaoLoginQueryServiceTest {
         given(memberSocialAccountRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, PROVIDER_USER_ID))
                 .willReturn(Optional.of(socialAccount(1L)));
         given(memberRepository.findById(1L)).willReturn(Optional.of(activeMember()));
-        given(jwtProvider.generateToken(eq("1"), any(Map.class), any(Duration.class)))
-                .willReturn("access-token", "refresh-token");
+        given(authTokenIssuer.issue(1L)).willReturn(new IssuedTokens("access-token", "refresh-token"));
 
         // when
         KakaoLoginResult result = kakaoLoginQueryService.login(CODE);

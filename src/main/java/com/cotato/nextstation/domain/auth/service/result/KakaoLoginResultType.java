@@ -1,4 +1,4 @@
-package com.cotato.nextstation.domain.auth.service.query.result;
+package com.cotato.nextstation.domain.auth.service.result;
 
 public enum KakaoLoginResultType {
     NEW_MEMBER,      // Member 미생성, kakaoSignupToken만 발급됨
