@@ -69,3 +69,6 @@ scripts/GenerateSignupToken.java
 
 # 운영 DB 직접 실행용 마이그레이션 스크립트
 scripts/cleanup-retired-place-tags.sql
+
+# Google Sheets API 서비스 계정 키 (장소 데이터 시트 쓰기 배치용)
+credentials/

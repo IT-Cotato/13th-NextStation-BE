@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 // 역 조회 전용 서비스. 다른 도메인이 역 정보가 필요할 때 이 서비스를 호출한다
@@ -54,11 +55,17 @@ public class StationQueryService {
     /**
      * 코스 만들기 후보 장소를 카테고리별로 묶어 반환한다.
      * 카테고리당 최대 {@value #PLACES_PER_CATEGORY}개이며, 후보가 더 많으면 잘라내고 적으면 있는 만큼 내린다.
-     * 랜덤뽑기와 달리 호출할 때마다 결과가 바뀌면 선택 중인 사용자가 혼란스러우므로 순서를 고정한다
-     * (현재 선정 기준은 id 순).
      * 뽑기 대상이 아닌 역은 빈 목록이 나가며, 역 자체가 없으면 404다.
+     *
+     * @param travelStyles 비어 있으면(랜덤뽑기 등 일반 진입) 호출할 때마다 같은 결과가 나오도록 id 순으로 고정한다.
+     *                     값이 있으면(맞춤추천 결과 화면 진입) 카테고리 안에서 선택한 태그와 매칭되는 개수가
+     *                     많은 장소부터 우선 노출하고, 매칭 개수가 같으면 무작위로 섞는다.
+     *                     값의 유효성·중복은 컨트롤러에서 걸러져 들어온다.
      */
-    public StationPlacesResponse getStationPlaces(Long stationId) {
+    public StationPlacesResponse getStationPlaces(Long stationId, List<String> travelStyles) {
+        // 선택 파라미터라 안 보내면 null로 들어온다. 이후 분기를 하나로 두려고 빈 목록으로 맞춘다.
+        List<String> selectedStyles = (travelStyles == null) ? List.of() : travelStyles;
+
         Station station = stationRepository.findById(stationId)
                 .orElseThrow(() -> new CustomException(StationErrorCode.STATION_NOT_FOUND));
 
@@ -70,17 +77,17 @@ public class StationQueryService {
         Map<String, List<PlaceInfoResponse>> placesByCategory = allPlaces.stream()
                 .collect(Collectors.groupingBy(PlaceInfoResponse::categoryCode));
 
+        Map<Long, List<String>> tagNamesByPlaceId = selectedStyles.isEmpty()
+                ? Map.of()
+                : placeInfoQueryService.getTagNamesByPlace(allPlaces.stream().map(PlaceInfoResponse::placeId).toList());
+
         List<StationPlaceCategoryResponse> categories = new ArrayList<>();
         for (String categoryCode : CATEGORY_DISPLAY_ORDER) {
             List<PlaceInfoResponse> places = placesByCategory.getOrDefault(categoryCode, List.of());
             if (places.isEmpty()) {
                 continue;
             }
-            // 후보가 최대 개수보다 많으면 잘라낸다. 순서만 고정되면 되므로 현재는 id 순으로 정렬한다.
-            List<PlaceInfoResponse> selected = places.stream()
-                    .sorted(Comparator.comparing(PlaceInfoResponse::placeId))
-                    .limit(PLACES_PER_CATEGORY)
-                    .toList();
+            List<PlaceInfoResponse> selected = selectCategoryPlaces(places, selectedStyles, tagNamesByPlaceId);
             // 카테고리 표시명은 카테고리의 속성이지만 별도 조회 창구가 없어 같은 그룹의 장소에서 가져온다.
             // 한 그룹의 장소는 모두 같은 카테고리이므로 어느 것을 써도 값은 같다.
             categories.add(stationConverter.toPlaceCategoryResponse(
@@ -91,6 +98,39 @@ public class StationQueryService {
         List<String> tags = resolveTopTags(allPlaces);
         String defaultCourseName = station.getStationName() + COURSE_NAME_SUFFIX;
         return stationConverter.toPlacesResponse(station, lines, tags, defaultCourseName, categories);
+    }
+
+    // 카테고리 후보가 최대 개수보다 많으면 잘라낸다.
+    // travelStyles가 없으면 호출할 때마다 같은 결과가 나와야 선택 중인 사용자가 혼란스럽지 않다.
+    // travelStyles가 있으면 태그 매칭 개수가 많은 순으로 정렬하되, 매칭 개수가 같은 장소끼리는 무작위로 섞는다.
+    // 매칭 0개인 장소도 순위에 포함되므로 태그에 맞는 후보가 3개가 안 되면 자연히 무작위로 채워진다.
+    private List<PlaceInfoResponse> selectCategoryPlaces(List<PlaceInfoResponse> places, List<String> travelStyles,
+                                                          Map<Long, List<String>> tagNamesByPlaceId) {
+        if (travelStyles.isEmpty()) {
+            return places.stream()
+                    .sorted(Comparator.comparing(PlaceInfoResponse::placeId))
+                    .limit(PLACES_PER_CATEGORY)
+                    .toList();
+        }
+
+        List<PlaceInfoResponse> shuffled = new ArrayList<>(places);
+        Collections.shuffle(shuffled, ThreadLocalRandom.current());
+        return shuffled.stream()
+                .sorted(Comparator.comparingInt(
+                        (PlaceInfoResponse place) -> matchCount(place, travelStyles, tagNamesByPlaceId)).reversed())
+                .limit(PLACES_PER_CATEGORY)
+                .toList();
+    }
+
+    private int matchCount(PlaceInfoResponse place, List<String> travelStyles, Map<Long, List<String>> tagNamesByPlaceId) {
+        List<String> placeTags = tagNamesByPlaceId.getOrDefault(place.placeId(), List.of());
+        int count = 0;
+        for (String travelStyle : travelStyles) {
+            if (placeTags.contains(travelStyle)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     // 역 대표 태그 = 그 역 장소들의 태그를 집계한 상위 3개

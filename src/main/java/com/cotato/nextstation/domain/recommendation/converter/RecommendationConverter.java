@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.recommendation.converter;
 
 import com.cotato.nextstation.domain.recommendation.dto.response.CoursePreviewPlaceResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.CoursePreviewResponse;
+import com.cotato.nextstation.domain.recommendation.dto.response.CustomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.RandomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.RecommendedStationResponse;
 import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceView;
@@ -34,7 +35,12 @@ public class RecommendationConverter {
         );
     }
 
-    private RecommendedStationResponse toRecommendedStation(Station station, List<StationLineView> lineViews) {
+    public CustomRecommendationResponse toCustomResponse(Station station, List<StationLineView> lineViews,
+                                                          int travelDurationMinutes) {
+        return new CustomRecommendationResponse(toRecommendedStation(station, lineViews), travelDurationMinutes);
+    }
+
+    public RecommendedStationResponse toRecommendedStation(Station station, List<StationLineView> lineViews) {
         return new RecommendedStationResponse(
                 station.getId(),
                 station.getStationName(),

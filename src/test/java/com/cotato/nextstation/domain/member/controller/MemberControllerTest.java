@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.member.controller;
 
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
 import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
+import com.cotato.nextstation.domain.member.service.command.MemberCommandService;
 import com.cotato.nextstation.domain.member.service.query.MemberQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
@@ -13,11 +14,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -31,6 +34,9 @@ class MemberControllerTest {
 
     @MockitoBean
     MemberQueryService memberQueryService;
+
+    @MockitoBean
+    MemberCommandService memberCommandService;
 
     // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
     @MockitoBean
@@ -78,5 +84,33 @@ class MemberControllerTest {
                         .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(MemberErrorCode.MEMBER_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("정상 accessToken이면 넘어온 필드만 프로필을 수정한다")
+    void updateMyProfile_success() throws Exception {
+        // given
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+        given(memberCommandService.updateMyProfile(1L, "새닉네임", null))
+                .willReturn(new MemberProfileResponse(1L, "새닉네임", null));
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/members/me")
+                        .header("Authorization", "Bearer " + TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"새닉네임\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nickname").value("새닉네임"));
+    }
+
+    @Test
+    @DisplayName("Authorization 헤더가 없으면 401을 반환한다")
+    void updateMyProfile_missingAuthorizationHeader() throws Exception {
+        mockMvc.perform(patch("/api/v1/members/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"새닉네임\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
     }
 }

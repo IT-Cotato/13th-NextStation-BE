@@ -29,4 +29,15 @@ public class RefreshTokenCookieFactory {
                 .maxAge(AuthTokenClaims.REFRESH_TOKEN_EXPIRATION)
                 .build();
     }
+
+    // 로그아웃 시 브라우저가 쿠키를 즉시 지우도록 maxAge=0으로 내려보낸다. 삭제로 인식되려면 나머지 속성이 발급 시점과 동일해야 한다.
+    public ResponseCookie createExpired() {
+        return ResponseCookie.from(COOKIE_NAME, "")
+                .httpOnly(true)
+                .secure(secure)
+                .sameSite(sameSite)
+                .path("/")
+                .maxAge(0)
+                .build();
+    }
 }
