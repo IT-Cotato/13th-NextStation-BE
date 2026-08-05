@@ -7,13 +7,16 @@ import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.converter.JournalConverter;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
+import com.cotato.nextstation.domain.journal.dto.response.MyJournalListResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.entity.JournalImage;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.journal.exception.JournalErrorCode;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
+import com.cotato.nextstation.domain.journal.repository.JournalImageRepository.JournalImageView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
@@ -25,7 +28,11 @@ import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.service.query.StationQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
+import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
+import com.cotato.nextstation.global.util.CursorData;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +46,10 @@ import java.util.stream.Collectors;
 public class JournalQueryService {
 
     private static final int TAGS_PER_CARD = 2;
+
+    // 내 여행일지 목록 페이지 크기. 저장 탭 "내가 만든 코스"와 같은 기본값·상한을 쓴다.
+    private static final int MY_JOURNALS_DEFAULT_SIZE = 10;
+    private static final int MY_JOURNALS_MAX_SIZE = 50;
 
     private final MemberStampQueryService memberStampQueryService;
     private final CourseQueryService courseQueryService;
@@ -130,6 +141,63 @@ public class JournalQueryService {
                 uncompletedStamps, courseInfoMap, stationNameMap, tagsByCourse);
     }
 
+
+    // 내 여행일지 목록 조회 (최신순, 커서 기반 페이지네이션)
+    public MyJournalListResponse getMyJournals(Long memberId, String cursor, Integer size) {
+        int pageSize = resolveMyJournalsPageSize(size);
+        Pageable pageable = PageRequest.of(0, pageSize + 1); // hasNext 판단용 1개 더 조회
+
+        CursorData cursorData = CursorData.decode(cursor);
+        List<MyJournalCardView> myJournalCards = fetchMyJournalCards(memberId, cursorData, pageable);
+
+        boolean hasNext = myJournalCards.size() > pageSize;
+        List<MyJournalCardView> pageContent = hasNext ? myJournalCards.subList(0, pageSize) : myJournalCards;
+
+        String nextCursor = null;
+        if (hasNext) {
+            MyJournalCardView last = pageContent.get(pageContent.size() - 1);
+            nextCursor = new CursorData(last.getJournalId(), null, last.getCreatedAt()).encode();
+        }
+
+        if (pageContent.isEmpty()) {
+            return journalConverter.toMyJournalListResponse(List.of(), Map.of(), nextCursor, hasNext);
+        }
+
+        List<Long> journalIds = pageContent.stream().map(MyJournalCardView::getJournalId).toList();
+        Map<Long, String> thumbnailUrlByJournalId = journalImageRepository.findImagesByJournalIds(journalIds).stream()
+                .collect(Collectors.toMap(
+                        JournalImageView::getJournalId,
+                        JournalImageView::getImageUrl,
+                        (first, next) -> first));
+
+        return journalConverter.toMyJournalListResponse(pageContent, thumbnailUrlByJournalId, nextCursor, hasNext);
+    }
+
+    private List<MyJournalCardView> fetchMyJournalCards(Long memberId, CursorData cursorData, Pageable pageable) {
+        if (cursorData == null) {
+            return journalRepository.findMyJournalCards(memberId, pageable);
+        }
+        validateMyJournalsCursor(cursorData);
+        return journalRepository.findMyJournalCardsAfterCursor(
+                memberId, cursorData.dateTimeValue(), cursorData.id(), pageable);
+    }
+
+    // 이 목록은 시간순 정렬이라 커서에는 시각과 id만 들어 있어야 한다.
+    private void validateMyJournalsCursor(CursorData cursorData) {
+        if (cursorData.id() == null || cursorData.dateTimeValue() == null || cursorData.longValue() != null) {
+            throw new CustomException(GlobalErrorCode.INVALID_CURSOR);
+        }
+    }
+
+    private int resolveMyJournalsPageSize(Integer size) {
+        if (size == null) {
+            return MY_JOURNALS_DEFAULT_SIZE;
+        }
+        if (size < 1 || size > MY_JOURNALS_MAX_SIZE) {
+            throw new CustomException(GlobalErrorCode.INVALID_PAGE_SIZE);
+        }
+        return size;
+    }
 
     // 여행일지 상세 조회
     public JournalDetailResponse getJournalDetail(Long memberId, Long journalId) {
