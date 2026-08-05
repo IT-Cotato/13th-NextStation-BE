@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.recommendation.controller;
 
+import com.cotato.nextstation.domain.recommendation.dto.response.CoursePreviewResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.RandomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.service.command.RecommendationCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,5 +49,26 @@ public class RandomController {
             @Parameter(hidden = true) @AuthenticationPrincipal(required = false) JwtPrincipal principal) {
         Long memberId = (principal != null) ? principal.memberId() : null;
         return CommonResponse.success(recommendationCommandService.drawRandom(memberId));
+    }
+
+    @Operation(
+            summary = "코스만 다시 뽑기",
+            description = """
+                    역은 그대로 두고 코스 미리보기만 다시 무작위로 뽑는다. 랜덤뽑기 결과 화면에서 "다시 뽑기"를 눌렀을 때 쓴다.
+                    - 직전 결과와 관계없이 완전 무작위다.
+                    - 카테고리별 장소 1개씩으로 구성되며, 장소가 없는 카테고리는 제외된다.
+                    - 코스 미리보기는 저장되지 않는다. 저장은 코스 저장 API에서만 일어난다.
+                    - 역을 새로 추천한 것이 아니므로 recommendation_log에 기록되지 않는다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "다시 뽑기 성공"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 역 (`StationErrorCode.STATION_NOT_FOUND`)"),
+    })
+    @PostMapping("/{stationId}/course")
+    public CommonResponse<CoursePreviewResponse> redrawCourse(
+            @Parameter(description = "코스를 다시 뽑을 역 ID (직전 뽑기 결과의 역)", example = "10")
+            @PathVariable Long stationId) {
+        return CommonResponse.success(recommendationCommandService.redrawCourse(stationId));
     }
 }

@@ -11,6 +11,7 @@ import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
+import com.cotato.nextstation.domain.station.exception.StationErrorCode;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import org.junit.jupiter.api.BeforeEach;
@@ -165,5 +166,30 @@ class RandomControllerTest {
         mockMvc.perform(post("/api/v1/random")
                         .header("Authorization", "  "))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("코스만 다시 뽑기는 stationId로 호출되고 200과 코스 미리보기를 반환한다")
+    void redrawCourse_success() throws Exception {
+        CoursePreviewResponse response = new CoursePreviewResponse("보문역 환승여행 코스", List.of(
+                new CoursePreviewPlaceResponse(100L, "성북천", "설명", "CULTURE", "문화공간", "img", 127.0, 37.5)
+        ));
+        given(recommendationCommandService.redrawCourse(10L)).willReturn(response);
+
+        mockMvc.perform(post("/api/v1/random/10/course"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("보문역 환승여행 코스"))
+                .andExpect(jsonPath("$.data.places[0].categoryCode").value("CULTURE"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 역으로 코스만 다시 뽑기를 호출하면 404를 반환한다")
+    void redrawCourse_stationNotFound() throws Exception {
+        given(recommendationCommandService.redrawCourse(99L))
+                .willThrow(new CustomException(StationErrorCode.STATION_NOT_FOUND));
+
+        mockMvc.perform(post("/api/v1/random/99/course"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_STATION_NOT_FOUND"));
     }
 }
