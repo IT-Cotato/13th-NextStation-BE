@@ -93,7 +93,7 @@ public class KakaoLoginQueryService {
 
     private KakaoLoginResult issueKakaoSignupToken(String providerUserId, KakaoUserInfoResponse userInfo) {
 
-        // Map.of()는 value가 null이면 NPE를 던지므로, 선택 동의 거부로 null일 수 있는 값들은 빈 문자열로 치환
+        // Map.of()는 value가 null이면 NPE를 던지므로, 미인증 이메일이나 선택 동의 거부로 null일 수 있는 값들은 빈 문자열로 치환
         Map<String, Object> claims = Map.of(
                 KakaoSignupTokenClaims.PURPOSE_KEY, KakaoSignupTokenClaims.KAKAO_SIGNUP_PURPOSE,
                 KakaoSignupTokenClaims.EMAIL_KEY, orEmpty(userInfo.extractVerifiedEmail()),
