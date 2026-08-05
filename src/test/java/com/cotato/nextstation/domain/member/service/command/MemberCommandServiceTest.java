@@ -3,7 +3,9 @@ package com.cotato.nextstation.domain.member.service.command;
 import com.cotato.nextstation.domain.image.service.command.ImageCommandService;
 import com.cotato.nextstation.domain.member.converter.MemberConverter;
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
+import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
@@ -19,6 +21,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,6 +68,20 @@ class MemberCommandServiceTest {
         Member member = Member.builder().email("user@example.com").password("encoded").build();
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
         member.completeProfile(nickname, profileImageUrl, member.getGender(), null);
+        return member;
+    }
+
+    private Member activeMember() {
+        Member member = Member.builder().email("user@example.com").password("encoded").build();
+        ReflectionTestUtils.setField(member, "id", 1L);
+        member.completeProfile("환승러", "https://cdn.example.com/profile/1.png", Gender.MALE, LocalDate.of(2000, 1, 1));
+        return member;
+    }
+
+    private Member withdrawnMember(LocalDateTime deletedAt) {
+        Member member = activeMember();
+        member.withdraw();
+        ReflectionTestUtils.setField(member, "deletedAt", deletedAt);
         return member;
     }
 
@@ -179,5 +197,141 @@ class MemberCommandServiceTest {
         assertThatThrownBy(() -> memberCommandService.updateMyProfile(MEMBER_ID, "닉네임", null))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(MemberErrorCode.MEMBER_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 status가 WITHDRAWN이 되고 deletedAt이 기록된다")
+    void withdraw_success() {
+        // given
+        Member member = activeMember();
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+
+        // when
+        memberCommandService.withdraw(1L);
+
+        // then
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.WITHDRAWN);
+        assertThat(member.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("탈퇴해도 개인정보는 비우지 않는다 - 유예 기간 내 복구를 위해 그대로 둔다")
+    void withdraw_keepsPersonalData() {
+        // given
+        Member member = activeMember();
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+
+        // when
+        memberCommandService.withdraw(1L);
+
+        // then
+        assertThat(member.getEmail()).isEqualTo("user@example.com");
+        assertThat(member.getPassword()).isEqualTo("encoded");
+        assertThat(member.getNickname()).isEqualTo("환승러");
+    }
+
+    @Test
+    @DisplayName("프로필 설정 전(PENDING) 회원도 탈퇴할 수 있다")
+    void withdraw_pendingMember() {
+        // given
+        Member member = Member.builder().email("pending@example.com").password("encoded").build();
+        ReflectionTestUtils.setField(member, "id", 1L);
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+
+        // when
+        memberCommandService.withdraw(1L);
+
+        // then
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.WITHDRAWN);
+    }
+
+    @Test
+    @DisplayName("이미 탈퇴한 회원이 다시 호출하면 deletedAt을 갱신하지 않는다 - 유예 기간이 밀리면 안 된다")
+    void withdraw_idempotent() {
+        // given
+        Member member = activeMember();
+        member.withdraw();
+        LocalDateTime firstDeletedAt = member.getDeletedAt();
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+
+        // when
+        memberCommandService.withdraw(1L);
+
+        // then
+        assertThat(member.getDeletedAt()).isEqualTo(firstDeletedAt);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원이면 예외가 발생한다")
+    void withdraw_memberNotFound() {
+        // given
+        given(memberRepository.findById(1L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> memberCommandService.withdraw(1L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(MemberErrorCode.MEMBER_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("유예 기간이 남았으면 ACTIVE로 복구하고 deletedAt을 지운다")
+    void restore_withinGracePeriod() {
+        // given - 3일 전 탈퇴
+        Member member = withdrawnMember(LocalDateTime.now().minusDays(3));
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+
+        // when
+        MemberStatus restored = memberCommandService.restore(1L);
+
+        // then
+        assertThat(restored).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(member.getDeletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("프로필 설정 전에 탈퇴한 회원은 ACTIVE가 아니라 PENDING으로 복구한다")
+    void restore_pendingMember() {
+        // given - 닉네임이 없는(프로필 미설정) 회원
+        Member member = Member.builder().email("user@example.com").password("encoded").build();
+        ReflectionTestUtils.setField(member, "id", 1L);
+        member.withdraw();
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+
+        // when
+        MemberStatus restored = memberCommandService.restore(1L);
+
+        // then
+        assertThat(restored).isEqualTo(MemberStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("유예 기간이 지났으면 복구하지 않고 현재 상태를 그대로 반환한다")
+    void restore_afterGracePeriod() {
+        // given - 8일 전 탈퇴 (유예 7일 경과)
+        Member member = withdrawnMember(LocalDateTime.now().minusDays(8));
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+
+        // when
+        MemberStatus restored = memberCommandService.restore(1L);
+
+        // then
+        assertThat(restored).isEqualTo(MemberStatus.WITHDRAWN);
+        assertThat(member.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("탈퇴하지 않은 회원에는 복구가 아무 영향을 주지 않는다")
+    void restore_activeMember() {
+        // given
+        Member member = activeMember();
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+
+        // when
+        MemberStatus restored = memberCommandService.restore(1L);
+
+        // then
+        assertThat(restored).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(member.getDeletedAt()).isNull();
     }
 }

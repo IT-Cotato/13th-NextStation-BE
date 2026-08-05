@@ -71,7 +71,8 @@ public class KakaoAuthController {
                 result.signupToken(),
                 result.kakaoSignupToken(),
                 result.kakaoNickname(),
-                result.kakaoProfileImageUrl()
+                result.kakaoProfileImageUrl(),
+                result.restored()
         );
         return CommonResponse.success(response);
     }

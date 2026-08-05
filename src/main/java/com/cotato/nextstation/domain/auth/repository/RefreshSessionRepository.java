@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 
 // refreshToken rotation의 세션 상태(familyId -> 현재 유효한 jti)를 Redis Hash로 관리한다.
 // 조회/비교/교체를 Lua로 원자화해 동시 요청이 서로의 갱신을 덮어쓰지 않게 한다.
@@ -19,6 +20,10 @@ import java.util.List;
 public class RefreshSessionRepository {
 
     private static final String SESSION_KEY_FORMAT = "auth:refresh-session:%s";
+
+    // 세션은 familyId(기기) 단위로만 저장돼 "이 회원의 모든 세션"을 찾을 수 없다.
+    // 탈퇴처럼 회원 단위로 세션을 전부 끊어야 할 때를 위해 memberId -> familyId 목록 인덱스를 따로 둔다.
+    private static final String MEMBER_SESSIONS_KEY_FORMAT = "auth:member-sessions:%d";
 
     // rotate할 때마다 TTL을 다시 채우는 sliding 방식
     // 활발히 쓰는 유저가 14일마다 강제 로그아웃되는 걸 막되, 세션이 무한정 살아있지 않도록 최초 로그인 기준 절대 상한을 함께 둔다.
@@ -33,6 +38,13 @@ public class RefreshSessionRepository {
     private static final RedisScript<Boolean> CREATE_SCRIPT = new DefaultRedisScript<>("""
             redis.call('HSET', KEYS[1], 'memberId', ARGV[1], 'jti', ARGV[2], 'absoluteExpiry', ARGV[3])
             redis.call('PEXPIRE', KEYS[1], ARGV[4])
+            return 1
+            """, Boolean.class);
+
+    // CREATE_SCRIPT와 같은 이유로 원자화한다. SADD 직후 죽으면 TTL 없는 인덱스가 영구히 남는다.
+    private static final RedisScript<Boolean> ADD_TO_INDEX_SCRIPT = new DefaultRedisScript<>("""
+            redis.call('SADD', KEYS[1], ARGV[1])
+            redis.call('PEXPIRE', KEYS[1], ARGV[2])
             return 1
             """, Boolean.class);
 
@@ -139,8 +151,49 @@ public class RefreshSessionRepository {
         redisTemplate.delete(sessionKey(familyId));
     }
 
+    /**
+     * 회원의 세션 인덱스에 familyId를 추가한다. TTL은 SADD마다 세션 절대 상한과 같은 값으로 다시 채운다.
+     * rotate는 familyId를 바꾸지 않으므로 인덱스를 갱신할 필요가 없다.
+     */
+    public void addToMemberIndex(Long memberId, String familyId) {
+        redisTemplate.execute(
+                ADD_TO_INDEX_SCRIPT,
+                List.of(memberSessionsKey(memberId)),
+                familyId,
+                String.valueOf(ABSOLUTE_EXPIRATION.toMillis())
+        );
+    }
+
+    public void removeFromMemberIndex(Long memberId, String familyId) {
+        redisTemplate.opsForSet().remove(memberSessionsKey(memberId), familyId);
+    }
+
+    /**
+     * 회원의 모든 기기 세션을 삭제한다. 삭제된 세션 수를 반환한다.
+     * <p>
+     * 인덱스에는 이미 사라진 familyId가 남아있을 수 있다(TTL 만료, 재사용 탐지로 인한 세션 강제 삭제 등).
+     * DEL은 없는 키에도 안전하고 인덱스 자체가 TTL로 정리되므로 그대로 둔다.
+     * 조회와 삭제를 원자화하지 않는 이유는, 이 메서드가 탈퇴 커밋 이후에 호출돼 그 사이 새 세션이 생길 수 없기 때문이다
+     * (로그인은 status != ACTIVE에서 막힌다).
+     */
+    public int deleteAllOf(Long memberId) {
+        String indexKey = memberSessionsKey(memberId);
+        Set<String> familyIds = redisTemplate.opsForSet().members(indexKey);
+
+        if (familyIds != null && !familyIds.isEmpty()) {
+            redisTemplate.delete(familyIds.stream().map(this::sessionKey).toList());
+        }
+        redisTemplate.delete(indexKey);
+
+        return familyIds == null ? 0 : familyIds.size();
+    }
+
     private String sessionKey(String familyId) {
         return SESSION_KEY_FORMAT.formatted(familyId);
+    }
+
+    private String memberSessionsKey(Long memberId) {
+        return MEMBER_SESSIONS_KEY_FORMAT.formatted(memberId);
     }
 
     public record RotateResult(RotateStatus status, String jti) {

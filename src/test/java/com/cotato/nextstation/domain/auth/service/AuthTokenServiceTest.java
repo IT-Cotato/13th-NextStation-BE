@@ -6,7 +6,9 @@ import com.cotato.nextstation.domain.auth.service.result.LoginResult;
 import com.cotato.nextstation.domain.auth.service.result.ReissueResult;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.member.service.command.MemberCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.AuthTokenClaims;
 import com.cotato.nextstation.global.jwt.JwtProvider;
@@ -23,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +56,9 @@ class AuthTokenServiceTest {
     @Mock
     private RefreshSessionRepository refreshSessionRepository;
 
+    @Mock
+    private MemberCommandService memberCommandService;
+
     private static final String EMAIL = "user@example.com";
     private static final String PASSWORD = "abc12345!";
 
@@ -66,6 +72,20 @@ class AuthTokenServiceTest {
     private Member pendingMember() {
         Member member = Member.builder().email(EMAIL).password("encoded").build();
         ReflectionTestUtils.setField(member, "id", 1L);
+        return member;
+    }
+
+    private Member withdrawnMember(LocalDateTime deletedAt) {
+        Member member = activeMember();
+        member.withdraw();
+        ReflectionTestUtils.setField(member, "deletedAt", deletedAt);
+        return member;
+    }
+
+    private Member withdrawnPendingMember(LocalDateTime deletedAt) {
+        Member member = pendingMember();
+        member.withdraw();
+        ReflectionTestUtils.setField(member, "deletedAt", deletedAt);
         return member;
     }
 
@@ -103,11 +123,95 @@ class AuthTokenServiceTest {
     void login_memberNotActive() {
         // given
         given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(pendingMember()));
+        given(passwordEncoder.matches(PASSWORD, "encoded")).willReturn(true);
 
         // when & then
         assertThatThrownBy(() -> authTokenService.login(EMAIL, PASSWORD))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.INVALID_CREDENTIALS.getMessage());
+    }
+
+    @Test
+    @DisplayName("유예 기간이 남은 탈퇴 회원이 로그인하면 계정을 복구하고 토큰을 발급한다")
+    void login_restoresWithdrawnMemberWithinGracePeriod() {
+        // given - 3일 전 탈퇴, 복구는 별도 트랜잭션(MemberCommandService)이 담당한다
+        Member member = withdrawnMember(LocalDateTime.now().minusDays(3));
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(PASSWORD, "encoded")).willReturn(true);
+        given(memberCommandService.restore(1L)).willReturn(MemberStatus.ACTIVE);
+        given(authTokenIssuer.issue(1L)).willReturn(new IssuedTokens("access-token", "refresh-token"));
+
+        // when
+        LoginResult result = authTokenService.login(EMAIL, PASSWORD);
+
+        // then
+        org.mockito.Mockito.verify(memberCommandService).restore(1L);
+        assertThat(result.accessToken()).isEqualTo("access-token");
+        assertThat(result.restored()).isTrue();
+    }
+
+    @Test
+    @DisplayName("프로필 설정 전(PENDING)에 탈퇴한 회원은 유예 기간 내 재로그인해도 복구는 되지만 로그인은 실패한다")
+    void login_pendingBeforeWithdrawalRestoresButStillFails() {
+        // given - 프로필 미설정 상태로 탈퇴, 3일 전 탈퇴
+        Member member = withdrawnPendingMember(LocalDateTime.now().minusDays(3));
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(PASSWORD, "encoded")).willReturn(true);
+        given(memberCommandService.restore(1L)).willReturn(MemberStatus.PENDING);
+
+        // when & then - 복구 자체는 memberCommandService의 별도 트랜잭션에서 커밋되므로 이 실패로 롤백되지 않는다
+        assertThatThrownBy(() -> authTokenService.login(EMAIL, PASSWORD))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(AuthErrorCode.INVALID_CREDENTIALS.getMessage());
+
+        org.mockito.Mockito.verify(memberCommandService).restore(1L);
+    }
+
+    @Test
+    @DisplayName("탈퇴한 적 없는 회원의 로그인은 restored가 false다")
+    void login_notRestored() {
+        // given
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(activeMember()));
+        given(passwordEncoder.matches(PASSWORD, "encoded")).willReturn(true);
+        given(authTokenIssuer.issue(1L)).willReturn(new IssuedTokens("access-token", "refresh-token"));
+
+        // when
+        LoginResult result = authTokenService.login(EMAIL, PASSWORD);
+
+        // then
+        assertThat(result.restored()).isFalse();
+    }
+
+    @Test
+    @DisplayName("유예 기간이 지난 탈퇴 회원은 복구되지 않고 로그인에 실패한다")
+    void login_doesNotRestoreAfterGracePeriod() {
+        // given - 8일 전 탈퇴 (유예 7일 경과)
+        Member member = withdrawnMember(LocalDateTime.now().minusDays(8));
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(PASSWORD, "encoded")).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> authTokenService.login(EMAIL, PASSWORD))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(AuthErrorCode.INVALID_CREDENTIALS.getMessage());
+
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.WITHDRAWN);
+    }
+
+    @Test
+    @DisplayName("탈퇴 회원이어도 비밀번호가 틀리면 복구하지 않는다")
+    void login_doesNotRestoreOnPasswordMismatch() {
+        // given
+        Member member = withdrawnMember(LocalDateTime.now().minusDays(3));
+        given(memberRepository.findByEmail(EMAIL)).willReturn(Optional.of(member));
+        given(passwordEncoder.matches(PASSWORD, "encoded")).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> authTokenService.login(EMAIL, PASSWORD))
+                .isInstanceOf(CustomException.class);
+
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.WITHDRAWN);
+        assertThat(member.getDeletedAt()).isNotNull();
     }
 
     @Test
