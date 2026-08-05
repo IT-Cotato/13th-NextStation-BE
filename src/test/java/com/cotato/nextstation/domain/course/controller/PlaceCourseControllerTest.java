@@ -6,6 +6,8 @@ import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
+import io.jsonwebtoken.Jwts;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(GlobalExceptionHandler.class)
 class PlaceCourseControllerTest {
 
+    private static final String TOKEN = "access-token";
+
     @Autowired
     MockMvc mockMvc;
 
@@ -38,6 +42,12 @@ class PlaceCourseControllerTest {
     @MockitoBean
     JwtProvider jwtProvider;
 
+    @BeforeEach
+    void authenticateAsMember1() {
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+    }
+
     @Test
     @DisplayName("장소를 포함한 코스는 200과 코스 카드를 반환한다")
     void getCoursesByPlace_success() throws Exception {
@@ -45,7 +55,8 @@ class PlaceCourseControllerTest {
                 new PlaceCourseResponse(10L, "주연의 보문역 여행", 123L, "보문역",
                         new LineSummaryResponse(6L, "6호선", LineCode.LINE_6), 4, "SHORT", List.of("자연과함께", "사진찍기좋은"), "cover.jpg")));
 
-        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 1L))
+        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 1L)
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].courseId").value(10))
                 .andExpect(jsonPath("$.data[0].name").value("주연의 보문역 여행"))
@@ -66,7 +77,8 @@ class PlaceCourseControllerTest {
                 new PlaceCourseResponse(11L, "코스", 200L, "역이름",
                         null, 3, "SHORT", List.of(), null)));
 
-        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 2L))
+        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 2L)
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].line").hasJsonPath())
                 .andExpect(jsonPath("$.data[0].line").value(nullValue()));
@@ -77,9 +89,18 @@ class PlaceCourseControllerTest {
     void getCoursesByPlace_empty() throws Exception {
         given(courseQueryService.getCoursesByPlace(999L)).willReturn(List.of());
 
-        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 999L))
+        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 999L)
+                        .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("토큰 없이 요청하면 401을 반환한다")
+    void getCoursesByPlace_requiresAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/places/{placeId}/courses", 1L))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
     }
 }
