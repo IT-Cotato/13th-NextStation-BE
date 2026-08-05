@@ -3,6 +3,7 @@ package com.cotato.nextstation.domain.recommendation.service.command;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.recommendation.converter.RecommendationConverter;
 import com.cotato.nextstation.domain.recommendation.dto.request.CustomRecommendationRequest;
+import com.cotato.nextstation.domain.recommendation.dto.response.CoursePreviewResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.CustomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.RandomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.entity.RecommendationLog;
@@ -14,6 +15,7 @@ import com.cotato.nextstation.domain.recommendation.service.port.StationPlaceVie
 import com.cotato.nextstation.domain.recommendation.service.port.StationTagCountReader;
 import com.cotato.nextstation.domain.route.repository.StationRouteRepository;
 import com.cotato.nextstation.domain.station.entity.Station;
+import com.cotato.nextstation.domain.station.exception.StationErrorCode;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineView;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
@@ -72,6 +74,22 @@ public class RecommendationCommandService {
         List<StationPlaceView> previewPlaces = selectOnePerCategory(stationPlaceReader.getPlacesByStation(picked.getId()));
         String courseName = picked.getStationName() + COURSE_NAME_SUFFIX;
         return recommendationConverter.toRandomResponse(picked, lines, courseName, previewPlaces);
+    }
+
+    // 코스만 다시 뽑기. 역은 고정하고 코스 미리보기만 완전 무작위로 다시 구성한다.
+    // 새로 추천된 역이 없으므로(=recommendation_log가 남길 대상인 "역 추천"이 일어나지 않음) 로그를 남기지 않고,
+    // 직전 결과 제외 같은 로직도 적용하지 않는다.
+    public CoursePreviewResponse redrawCourse(Long stationId) {
+        Station station = stationRepository.findById(stationId)
+                .orElseThrow(() -> new CustomException(StationErrorCode.STATION_NOT_FOUND));
+
+        // 뽑기 대상이 아닌 역은 장소가 없어 빈 코스가 나간다. 현재 데이터도 장소가 뽑기 역에만 붙어 있지만
+        // StationQueryService.getStationPlaces와 같은 이유로 그 전제에 기대지 않고 조건을 명시한다.
+        List<StationPlaceView> previewPlaces = station.isDrawable()
+                ? selectOnePerCategory(stationPlaceReader.getPlacesByStation(stationId))
+                : List.of();
+        String courseName = station.getStationName() + COURSE_NAME_SUFFIX;
+        return recommendationConverter.toCoursePreview(courseName, previewPlaces);
     }
 
     /**
