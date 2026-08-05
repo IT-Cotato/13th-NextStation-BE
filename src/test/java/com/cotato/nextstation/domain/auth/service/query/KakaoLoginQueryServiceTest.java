@@ -4,15 +4,19 @@ import com.cotato.nextstation.domain.auth.client.KakaoOAuthClient;
 import com.cotato.nextstation.domain.auth.client.dto.KakaoTokenResponse;
 import com.cotato.nextstation.domain.auth.client.dto.KakaoUserInfoResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
-import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResult;
-import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResultType;
+import com.cotato.nextstation.domain.auth.service.AuthTokenIssuer;
+import com.cotato.nextstation.domain.auth.service.IssuedTokens;
+import com.cotato.nextstation.domain.auth.service.result.KakaoLoginResult;
+import com.cotato.nextstation.domain.auth.service.result.KakaoLoginResultType;
 import com.cotato.nextstation.domain.auth.util.KakaoSignupTokenClaims;
 import com.cotato.nextstation.domain.member.entity.AuthProvider;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberSocialAccount;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.domain.member.repository.MemberSocialAccountRepository;
+import com.cotato.nextstation.domain.member.service.command.MemberCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +30,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 
@@ -34,6 +39,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.never;
+import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 class KakaoLoginQueryServiceTest {
@@ -52,6 +59,12 @@ class KakaoLoginQueryServiceTest {
 
     @Mock
     private JwtProvider jwtProvider;
+
+    @Mock
+    private AuthTokenIssuer authTokenIssuer;
+
+    @Mock
+    private MemberCommandService memberCommandService;
 
     private static final String CODE = "auth-code";
     private static final String KAKAO_ACCESS_TOKEN = "kakao-access-token";
@@ -88,6 +101,13 @@ class KakaoLoginQueryServiceTest {
         Member member = Member.builder().email(null).build();
         ReflectionTestUtils.setField(member, "id", 1L);
         member.completeProfile("환승러", null, Gender.UNSPECIFIED, LocalDate.of(2000, 1, 1));
+        return member;
+    }
+
+    private Member withdrawnMember(LocalDateTime deletedAt) {
+        Member member = activeMember();
+        member.withdraw();
+        ReflectionTestUtils.setField(member, "deletedAt", deletedAt);
         return member;
     }
 
@@ -176,8 +196,7 @@ class KakaoLoginQueryServiceTest {
         given(memberSocialAccountRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, PROVIDER_USER_ID))
                 .willReturn(Optional.of(socialAccount(1L)));
         given(memberRepository.findById(1L)).willReturn(Optional.of(activeMember()));
-        given(jwtProvider.generateToken(eq("1"), any(Map.class), any(Duration.class)))
-                .willReturn("access-token", "refresh-token");
+        given(authTokenIssuer.issue(1L)).willReturn(new IssuedTokens("access-token", "refresh-token"));
 
         // when
         KakaoLoginResult result = kakaoLoginQueryService.login(CODE);
@@ -190,20 +209,40 @@ class KakaoLoginQueryServiceTest {
     }
 
     @Test
-    @DisplayName("정지/탈퇴 등 ACTIVE도 PENDING도 아닌 회원이면 예외가 발생한다")
+    @DisplayName("유예 기간이 지난 탈퇴 회원이면 복구하지 않고 예외가 발생한다")
     void login_memberNotActive() {
-        // given
+        // given - 8일 전 탈퇴 (유예 7일 경과)
         givenTokenExchangeSucceeds(userInfoWithConsent());
         given(memberSocialAccountRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, PROVIDER_USER_ID))
                 .willReturn(Optional.of(socialAccount(1L)));
-        Member withdrawnMember = activeMember();
-        withdrawnMember.withdraw();
-        given(memberRepository.findById(1L)).willReturn(Optional.of(withdrawnMember));
+        given(memberRepository.findById(1L)).willReturn(Optional.of(withdrawnMember(LocalDateTime.now().minusDays(8))));
 
         // when & then
         assertThatThrownBy(() -> kakaoLoginQueryService.login(CODE))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.KAKAO_MEMBER_NOT_ACTIVE.getMessage());
+
+        then(memberCommandService).should(never()).restore(any());
+    }
+
+    @Test
+    @DisplayName("유예 기간이 남은 탈퇴 회원이 카카오로 로그인하면 계정을 복구하고 토큰을 발급한다")
+    void login_restoresWithdrawnMemberWithinGracePeriod() {
+        // given - 3일 전 탈퇴
+        givenTokenExchangeSucceeds(userInfoWithConsent());
+        given(memberSocialAccountRepository.findByProviderAndProviderUserId(AuthProvider.KAKAO, PROVIDER_USER_ID))
+                .willReturn(Optional.of(socialAccount(1L)));
+        given(memberRepository.findById(1L)).willReturn(Optional.of(withdrawnMember(LocalDateTime.now().minusDays(3))));
+        given(memberCommandService.restore(1L)).willReturn(MemberStatus.ACTIVE);
+        given(authTokenIssuer.issue(1L)).willReturn(new IssuedTokens("access-token", "refresh-token"));
+
+        // when
+        KakaoLoginResult result = kakaoLoginQueryService.login(CODE);
+
+        // then
+        assertThat(result.resultType()).isEqualTo(KakaoLoginResultType.LOGIN_SUCCESS);
+        assertThat(result.accessToken()).isEqualTo("access-token");
+        assertThat(result.restored()).isTrue();
     }
 
     @Test

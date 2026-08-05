@@ -1,6 +1,6 @@
 package com.cotato.nextstation.domain.auth.dto.response;
 
-import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResultType;
+import com.cotato.nextstation.domain.auth.service.result.KakaoLoginResultType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "카카오 로그인 결과. resultType으로 분기해서 나머지 필드를 읽는다.")
@@ -25,6 +25,9 @@ public record KakaoLoginResponse(
         String kakaoNickname,
 
         @Schema(description = "NEW_MEMBER일 때 프로필 설정 화면 프리필용 프로필 이미지 URL", example = "https://k.kakaocdn.net/...")
-        String kakaoProfileImageUrl
+        String kakaoProfileImageUrl,
+
+        @Schema(description = "이번 로그인으로 탈퇴 상태였던 계정이 복구되었는지 여부. true면 '계정이 복구되었습니다' 안내를 노출한다.", example = "false")
+        boolean restored
 ) {
 }

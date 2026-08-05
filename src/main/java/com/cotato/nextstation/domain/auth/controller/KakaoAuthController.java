@@ -6,8 +6,8 @@ import com.cotato.nextstation.domain.auth.dto.response.KakaoLoginResponse;
 import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
 import com.cotato.nextstation.domain.auth.service.command.KakaoSignupCommandService;
 import com.cotato.nextstation.domain.auth.service.query.KakaoLoginQueryService;
-import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResult;
-import com.cotato.nextstation.domain.auth.service.query.result.KakaoLoginResultType;
+import com.cotato.nextstation.domain.auth.service.result.KakaoLoginResult;
+import com.cotato.nextstation.domain.auth.service.result.KakaoLoginResultType;
 import com.cotato.nextstation.domain.auth.util.RefreshTokenCookieFactory;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import com.cotato.nextstation.global.util.ClientIpResolver;
@@ -71,7 +71,8 @@ public class KakaoAuthController {
                 result.signupToken(),
                 result.kakaoSignupToken(),
                 result.kakaoNickname(),
-                result.kakaoProfileImageUrl()
+                result.kakaoProfileImageUrl(),
+                result.restored()
         );
         return CommonResponse.success(response);
     }

@@ -32,9 +32,16 @@ public class MemberStamp extends BaseTimeEntity {
     @Column(name = "course_id", nullable = false)
     private Long courseId;
 
+    // 완료 시점의 역을 스냅샷으로 저장한다. 코스는 이후 삭제(소프트 삭제)될 수 있는데,
+    // Course를 조인해 역을 조회하면 Course의 @SQLRestriction 때문에 완주 이력(스탬프)까지
+    // 함께 사라져 보인다. 완주 이력은 코스 삭제와 무관하게 영구 보존돼야 하므로 여기 따로 둔다.
+    @Column(name = "station_id", nullable = false)
+    private Long stationId;
+
     @Builder
-    public MemberStamp(Long memberId, Long courseId) {
+    public MemberStamp(Long memberId, Long courseId, Long stationId) {
         this.memberId = memberId;
         this.courseId = courseId;
+        this.stationId = stationId;
     }
 }

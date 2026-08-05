@@ -3,58 +3,37 @@ package com.cotato.nextstation.domain.auth.service.command;
 import com.cotato.nextstation.domain.auth.dto.response.ProfileSetupResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.util.SignupTokenClaims;
-import com.cotato.nextstation.domain.image.enums.S3Folder;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
-import com.cotato.nextstation.domain.member.util.NicknameProfanityFilter;
-import com.cotato.nextstation.domain.member.util.NicknameReservedWordsFilter;
+import com.cotato.nextstation.domain.member.util.NicknameValidator;
+import com.cotato.nextstation.domain.member.util.ProfileImageUrlValidator;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.LocalDate;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ProfileSetupCommandService {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private static final int NICKNAME_MIN_LENGTH = 2;
-    private static final int NICKNAME_MAX_LENGTH = 10;
-    private static final Pattern NICKNAME_ALLOWED_PATTERN = Pattern.compile("^[가-힣a-zA-Z0-9]+$");
-
     private final MemberRepository memberRepository;
-    private final NicknameProfanityFilter nicknameProfanityFilter;
-    private final NicknameReservedWordsFilter nicknameReservedWordsFilter;
+    private final NicknameValidator nicknameValidator;
+    private final ProfileImageUrlValidator profileImageUrlValidator;
     private final JwtProvider jwtProvider;
-    private final String expectedProfileImageHost;
-
-    public ProfileSetupCommandService(MemberRepository memberRepository,
-                                       NicknameProfanityFilter nicknameProfanityFilter,
-                                       NicknameReservedWordsFilter nicknameReservedWordsFilter,
-                                       JwtProvider jwtProvider,
-                                       @Value("${aws.s3.bucket-name}") String bucketName,
-                                       @Value("${spring.cloud.aws.region.static}") String region) {
-        this.memberRepository = memberRepository;
-        this.nicknameProfanityFilter = nicknameProfanityFilter;
-        this.nicknameReservedWordsFilter = nicknameReservedWordsFilter;
-        this.jwtProvider = jwtProvider;
-        this.expectedProfileImageHost = "%s.s3.%s.amazonaws.com".formatted(bucketName, region);
-    }
 
     @Transactional
     public ProfileSetupResponse setupProfile(String authorizationHeader, String nickname, String profileImageUrl,
@@ -65,8 +44,10 @@ public class ProfileSetupCommandService {
                 .orElseThrow(() -> new CustomException(AuthErrorCode.MEMBER_NOT_FOUND));
 
         validateProfileNotAlreadyCompleted(member);
-        validateNickname(nickname);
-        validateProfileImageUrl(profileImageUrl, memberId);
+        nicknameValidator.validate(nickname);
+        if (profileImageUrl != null && !profileImageUrl.isBlank()) {
+            profileImageUrlValidator.validate(profileImageUrl, memberId);
+        }
 
         member.completeProfile(nickname, profileImageUrl, gender, birthDate);
         try {
@@ -115,54 +96,6 @@ public class ProfileSetupCommandService {
     private void validateProfileNotAlreadyCompleted(Member member) {
         if (member.getStatus() != MemberStatus.PENDING) {
             throw new CustomException(AuthErrorCode.PROFILE_ALREADY_COMPLETED);
-        }
-    }
-
-    // 길이 -> 허용 문자 -> 금칙어 -> 중복 순으로 검증
-    private void validateNickname(String nickname) {
-        if (nickname.length() < NICKNAME_MIN_LENGTH) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_TOO_SHORT);
-        }
-        if (nickname.length() > NICKNAME_MAX_LENGTH) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_TOO_LONG);
-        }
-        if (!NICKNAME_ALLOWED_PATTERN.matcher(nickname).matches()) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_INVALID_CHARACTER);
-        }
-        if (nicknameReservedWordsFilter.isReservedWord(nickname)) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_CONTAINS_RESERVED_WORD);
-        }
-        if (nicknameProfanityFilter.containsBannedWord(nickname)) {
-            throw new CustomException(NicknameErrorCode.NICKNAME_CONTAINS_BANNED_WORD);
-        }
-        if (memberRepository.existsByNickname(nickname)) {
-            throw new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME);
-        }
-    }
-
-    // profileImageUrl은 선택값이며, 값이 있으면 본인 presigned URL로 발급받은 S3 경로인지 검증한다 (임의 외부 URL/XSS 스킴 차단)
-    private void validateProfileImageUrl(String profileImageUrl, Long memberId) {
-        if (profileImageUrl == null || profileImageUrl.isBlank()) {
-            return;
-        }
-
-        URI uri;
-        try {
-            uri = new URI(profileImageUrl);
-        } catch (URISyntaxException e) {
-            log.warn("파싱할 수 없는 프로필 이미지 URL로 프로필 설정 시도: memberId={}", memberId);
-            throw new CustomException(AuthErrorCode.INVALID_PROFILE_IMAGE_URL);
-        }
-
-        String expectedPathPrefix = "/%s/%d/".formatted(S3Folder.PROFILE.getPath(), memberId);
-        boolean isAllowed = "https".equalsIgnoreCase(uri.getScheme())
-                && expectedProfileImageHost.equals(uri.getHost())
-                && uri.getRawPath() != null
-                && uri.getRawPath().startsWith(expectedPathPrefix);
-
-        if (!isAllowed) {
-            log.warn("허용되지 않은 프로필 이미지 URL로 프로필 설정 시도: memberId={}, profileImageUrl={}", memberId, profileImageUrl);
-            throw new CustomException(AuthErrorCode.INVALID_PROFILE_IMAGE_URL);
         }
     }
 }

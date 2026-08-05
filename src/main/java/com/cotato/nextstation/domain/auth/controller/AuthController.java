@@ -16,9 +16,9 @@ import com.cotato.nextstation.domain.auth.service.command.EmailVerificationComma
 import com.cotato.nextstation.domain.auth.service.command.PasswordResetCommandService;
 import com.cotato.nextstation.domain.auth.service.command.ProfileSetupCommandService;
 import com.cotato.nextstation.domain.auth.service.command.SignupCommandService;
-import com.cotato.nextstation.domain.auth.service.query.LoginQueryService;
-import com.cotato.nextstation.domain.auth.service.query.result.LoginResult;
-import com.cotato.nextstation.domain.auth.service.query.result.ReissueResult;
+import com.cotato.nextstation.domain.auth.service.AuthTokenService;
+import com.cotato.nextstation.domain.auth.service.result.LoginResult;
+import com.cotato.nextstation.domain.auth.service.result.ReissueResult;
 import com.cotato.nextstation.domain.auth.util.RefreshTokenCookieFactory;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import com.cotato.nextstation.global.exception.CustomException;
@@ -36,6 +36,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -52,7 +53,7 @@ public class AuthController {
     private final EmailVerificationCommandService emailVerificationCommandService;
     private final SignupCommandService signupCommandService;
     private final ProfileSetupCommandService profileSetupCommandService;
-    private final LoginQueryService loginQueryService;
+    private final AuthTokenService authTokenService;
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
     private final PasswordResetCommandService passwordResetCommandService;
 
@@ -188,12 +189,12 @@ public class AuthController {
     })
     @PostMapping("/login")
     public CommonResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse httpResponse) {
-        LoginResult result = loginQueryService.login(request.email(), request.password());
+        LoginResult result = authTokenService.login(request.email(), request.password());
 
         ResponseCookie refreshTokenCookie = refreshTokenCookieFactory.create(result.refreshToken());
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
 
-        return CommonResponse.success(new LoginResponse(result.memberId(), result.accessToken()));
+        return CommonResponse.success(new LoginResponse(result.memberId(), result.accessToken(), result.restored()));
     }
 
     @Tag(name = "로그인")
@@ -202,24 +203,64 @@ public class AuthController {
             description = """
                     로그인 시 발급된 httpOnly 쿠키(`refreshToken`)를 검증해 새 accessToken을 발급한다.
                     - accessToken이 만료(401)되면 이 API를 호출해 새 accessToken을 받고, 원래 요청을 재시도하면 된다.
+                    - **rotation**: 호출할 때마다 refreshToken도 함께 새로 발급되어 쿠키가 갱신된다(`Set-Cookie`). httpOnly라 프론트에서 값을 직접 다루지 않아도 되며, `credentials: 'include'`만 유지하면 브라우저가 새 쿠키를 자동 반영한다.
+                    - **세션 연장(sliding)**: 이 API를 호출할 때마다 로그인 유지 기간이 14일로 다시 채워진다. 다만 최초 로그인 후 90일이 지나면 사용 여부와 무관하게 재로그인이 필요하다.
+                    - **재사용 탐지**: 이미 rotate되어 무효화된 옛 refreshToken이 다시 사용되면 탈취 의심으로 간주해 해당 세션을 즉시 종료하고 `REFRESH_TOKEN_REUSE_DETECTED`(401)를 반환한다. 이 경우 재로그인이 필요하다.
+                    - 단, rotate 직후 10초 이내에 같은 refreshToken으로 들어온 요청은 멀티탭/병렬 호출로 보고 정상 처리한다(탐지 대상 아님). 그래도 프론트에서 401 발생 시 재발급 요청을 하나로 합치는(single-flight) 처리를 권장한다.
                     - Swagger UI에서 테스트하려면 우측 상단 자물쇠(Authorize) 버튼을 눌러 로그인 API 응답 쿠키의 refreshToken 값을(접두사 없이) 넣으면 된다.
                     """
     )
     @SecurityRequirement(name = "refreshTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "재발급 성공"),
-            @ApiResponse(responseCode = "401", description = "refreshToken 누락, 위변조, purpose 불일치, 또는 만료 (`AuthErrorCode.INVALID_REFRESH_TOKEN`, `AuthErrorCode.REFRESH_TOKEN_EXPIRED`)"),
+            @ApiResponse(responseCode = "401", description = "refreshToken 누락, 위변조, purpose 불일치, 만료, 또는 재사용 탐지 (`AuthErrorCode.INVALID_REFRESH_TOKEN`, `AuthErrorCode.REFRESH_TOKEN_EXPIRED`, `AuthErrorCode.REFRESH_TOKEN_REUSE_DETECTED`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`AuthErrorCode.MEMBER_NOT_FOUND`)"),
     })
     @PostMapping("/reissue")
     public CommonResponse<ReissueResponse> reissue(
             @Parameter(hidden = true)
-            @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshToken) {
-        if (refreshToken == null) {
+            @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshToken,
+            HttpServletResponse httpResponse) {
+        // 로그아웃 응답이 쿠키 값을 빈 문자열로 덮으므로, 만료를 무시하고 되돌려보내는 클라이언트가 있으면 빈 값이 들어온다.
+        // JWT 파서는 빈 문자열에 JwtException이 아닌 IllegalArgumentException을 던져 500이 되므로 여기서 걸러낸다.
+        if (!StringUtils.hasText(refreshToken)) {
             throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
-        ReissueResult result = loginQueryService.reissue(refreshToken);
+        ReissueResult result = authTokenService.reissue(refreshToken);
+
+        ResponseCookie refreshTokenCookie = refreshTokenCookieFactory.create(result.refreshToken());
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+
         return CommonResponse.success(new ReissueResponse(result.accessToken()));
+    }
+
+    @Tag(name = "로그인")
+    @Operation(
+            summary = "로그아웃",
+            description = """
+                    현재 기기의 로그인 세션을 종료한다.
+                    - httpOnly 쿠키(`refreshToken`)를 읽어 서버의 세션(refresh 재발급 이력)을 무효화하고, 쿠키를 즉시 만료시켜 응답한다.
+                    - 쿠키가 없거나 이미 만료/무효한 상태에서 호출해도 에러 없이 성공(200)한다(멱등) — 이미 로그아웃된 상태를 다시 요청한 것으로 간주한다.
+                    - accessToken은 이 API로 즉시 무효화되지 않는다. 발급 후 최대 1시간까지는 자연 만료 전까지 유효하다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그아웃 성공(쿠키 없음/무효한 토큰이어도 항상 200)"),
+    })
+    @PostMapping("/logout")
+    public CommonResponse<Void> logout(
+            @Parameter(hidden = true)
+            @CookieValue(name = RefreshTokenCookieFactory.COOKIE_NAME, required = false) String refreshToken,
+            HttpServletResponse httpResponse) {
+        // 값이 빈 쿠키는 보내지 않은 것과 같게 취급한다 (빈 문자열은 JWT 파서에서 IllegalArgumentException -> 500).
+        if (StringUtils.hasText(refreshToken)) {
+            authTokenService.logout(refreshToken);
+        }
+
+        ResponseCookie expiredCookie = refreshTokenCookieFactory.createExpired();
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+
+        return CommonResponse.success(null);
     }
 
     @Tag(name = "비밀번호 재설정")
