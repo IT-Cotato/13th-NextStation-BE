@@ -77,7 +77,7 @@ public class RecommendationCommandService {
     }
 
     // 코스만 다시 뽑기. 역은 고정하고 코스 미리보기만 완전 무작위로 다시 구성한다.
-    // 새로 추천된 역이 없으므로(=recommendation_log가 남길 대상인 "역 추천"이 일어나지 않음) 로그를 남기지 않고,
+    // 새로 추천된 역이 없으므로 로그를 남기지 않고,
     // 직전 결과 제외 같은 로직도 적용하지 않는다.
     public CoursePreviewResponse redrawCourse(Long stationId) {
         Station station = stationRepository.findById(stationId)
