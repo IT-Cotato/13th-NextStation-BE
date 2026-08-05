@@ -9,6 +9,9 @@ public record LoginResponse(
         Long memberId,
 
         @Schema(description = "API 요청 시 Authorization: Bearer 헤더에 담아 보내는 access token. 1시간 후 만료된다.", example = "eyJhbGciOiJIUzI1NiJ9...")
-        String accessToken
+        String accessToken,
+
+        @Schema(description = "이번 로그인으로 탈퇴 상태였던 계정이 복구되었는지 여부. true면 '계정이 복구되었습니다' 안내를 노출한다.", example = "false")
+        boolean restored
 ) {
 }

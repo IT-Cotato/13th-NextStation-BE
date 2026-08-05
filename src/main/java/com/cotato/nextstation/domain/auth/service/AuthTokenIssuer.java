@@ -31,6 +31,9 @@ public class AuthTokenIssuer {
         // 세션 기록이 실패하면 토큰도 나가지 않도록 발급을 먼저 끝낸다.
         IssuedTokens tokens = reissue(memberId, familyId, jti);
         refreshSessionRepository.create(familyId, memberId, jti);
+
+        // 탈퇴 시 이 회원의 모든 기기 세션을 찾으려면 회원 단위 인덱스가 필요하다.
+        refreshSessionRepository.addToMemberIndex(memberId, familyId);
         return tokens;
     }
 

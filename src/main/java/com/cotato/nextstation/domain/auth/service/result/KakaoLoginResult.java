@@ -9,6 +9,7 @@ public record KakaoLoginResult(
         String signupToken,
         String kakaoSignupToken,
         String kakaoNickname,
-        String kakaoProfileImageUrl
+        String kakaoProfileImageUrl,
+        boolean restored
 ) {
 }

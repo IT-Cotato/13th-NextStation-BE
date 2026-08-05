@@ -1,11 +1,13 @@
 package com.cotato.nextstation.domain.member.controller;
 
+import com.cotato.nextstation.domain.auth.util.RefreshTokenCookieFactory;
 import com.cotato.nextstation.domain.course.dto.response.CourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MemberCourseListResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
 import com.cotato.nextstation.domain.member.dto.response.OtherMemberProfileResponse;
 import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
+import com.cotato.nextstation.domain.member.service.MemberWithdrawService;
 import com.cotato.nextstation.domain.member.service.command.MemberCommandService;
 import com.cotato.nextstation.domain.member.service.query.MemberQueryService;
 import com.cotato.nextstation.domain.stamp.dto.response.MemberStampListResponse;
@@ -24,16 +26,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -58,6 +66,13 @@ class MemberControllerTest {
 
     @MockitoBean
     CourseQueryService courseQueryService;
+
+    @MockitoBean
+    MemberWithdrawService memberWithdrawService;
+
+    // 생성자에서 @Value 프로퍼티를 받아 슬라이스 컨텍스트에서는 생성되지 않는다
+    @MockitoBean
+    RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
     @MockitoBean
@@ -131,6 +146,34 @@ class MemberControllerTest {
                         .content("{\"nickname\":\"새닉네임\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("탈퇴에 성공하면 refreshToken 쿠키를 즉시 만료시킨다")
+    void withdraw_success() throws Exception {
+        // given
+        given(jwtProvider.parseClaims(TOKEN)).willReturn(
+                Jwts.claims().subject("1").add("purpose", "ACCESS").build());
+        given(refreshTokenCookieFactory.createExpired())
+                .willReturn(ResponseCookie.from("refreshToken", "").path("/").maxAge(0).build());
+
+        // when & then
+        mockMvc.perform(delete("/api/v1/members/me")
+                        .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        then(memberWithdrawService).should().withdraw(1L);
+    }
+
+    @Test
+    @DisplayName("탈퇴 시 Authorization 헤더가 없으면 401을 반환한다")
+    void withdraw_missingAuthorizationHeader() throws Exception {
+        mockMvc.perform(delete("/api/v1/members/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
+
+        then(memberWithdrawService).shouldHaveNoInteractions();
     }
 
     @Test

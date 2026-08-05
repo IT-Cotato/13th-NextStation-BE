@@ -16,6 +16,7 @@ import com.cotato.nextstation.domain.member.entity.MemberSocialAccount;
 import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.domain.member.repository.MemberSocialAccountRepository;
+import com.cotato.nextstation.domain.member.service.command.MemberCommandService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ public class KakaoLoginQueryService {
     private final MemberSocialAccountRepository memberSocialAccountRepository;
     private final JwtProvider jwtProvider;
     private final AuthTokenIssuer authTokenIssuer;
+    private final MemberCommandService memberCommandService;
 
     // 인가코드로 토큰교환 + 사용자 조회 후 신규/PENDING/기존 회원 3분기 판별, Member 생성은 여기서 하지 않는다(KakaoSignupCommandService 담당)
     public KakaoLoginResult login(String code) {
@@ -64,20 +66,29 @@ public class KakaoLoginQueryService {
                     return new CustomException(AuthErrorCode.MEMBER_NOT_FOUND);
                 });
 
-        if (member.getStatus() == MemberStatus.PENDING) {
-            log.info("PENDING 상태 카카오 회원 재로그인: memberId={}", member.getId());
-            return reissueSignupTokenForPendingMember(member);
+        // 카카오 인증을 통과한 것 자체가 본인 확인이므로, 유예 기간이 남아있으면 그대로 복구한다.
+        // 이 클래스는 트랜잭션이 없어 dirty checking이 동작하지 않으므로 쓰기는 커맨드 서비스에 위임한다.
+        MemberStatus status = member.getStatus();
+        boolean restored = member.isRestorable();
+        if (restored) {
+            status = memberCommandService.restore(member.getId());
+            log.info("탈퇴 유예 기간 내 카카오 재로그인으로 계정 복구: memberId={}, restoredStatus={}", member.getId(), status);
         }
-        if (member.getStatus() != MemberStatus.ACTIVE) {
-            log.warn("ACTIVE/PENDING이 아닌 카카오 회원의 로그인 시도: memberId={}, status={}", member.getId(), member.getStatus());
+
+        if (status == MemberStatus.PENDING) {
+            log.info("PENDING 상태 카카오 회원 재로그인: memberId={}", member.getId());
+            return reissueSignupTokenForPendingMember(member, restored);
+        }
+        if (status != MemberStatus.ACTIVE) {
+            log.warn("ACTIVE/PENDING이 아닌 카카오 회원의 로그인 시도: memberId={}, status={}", member.getId(), status);
             throw new CustomException(AuthErrorCode.KAKAO_MEMBER_NOT_ACTIVE);
         }
 
-        log.info("카카오 로그인 성공: memberId={}", member.getId());
+        log.info("카카오 로그인 성공: memberId={}, restored={}", member.getId(), restored);
         IssuedTokens tokens = authTokenIssuer.issue(member.getId());
 
         return new KakaoLoginResult(KakaoLoginResultType.LOGIN_SUCCESS, member.getId(), tokens.accessToken(), tokens.refreshToken(),
-                null, null, null, null);
+                null, null, null, null, restored);
     }
 
     private KakaoLoginResult issueKakaoSignupToken(String providerUserId, KakaoUserInfoResponse userInfo) {
@@ -93,10 +104,10 @@ public class KakaoLoginQueryService {
         String kakaoSignupToken = jwtProvider.generateToken(providerUserId, claims, KAKAO_SIGNUP_TOKEN_EXPIRATION);
 
         return new KakaoLoginResult(KakaoLoginResultType.NEW_MEMBER, null, null, null,
-                null, kakaoSignupToken, userInfo.extractNickname(), userInfo.extractProfileImageUrl());
+                null, kakaoSignupToken, userInfo.extractNickname(), userInfo.extractProfileImageUrl(), false);
     }
 
-    private KakaoLoginResult reissueSignupTokenForPendingMember(Member member) {
+    private KakaoLoginResult reissueSignupTokenForPendingMember(Member member, boolean restored) {
 
         String signupToken = jwtProvider.generateToken(
                 member.getId().toString(),
@@ -104,7 +115,7 @@ public class KakaoLoginQueryService {
                 SIGNUP_TOKEN_EXPIRATION
         );
         return new KakaoLoginResult(KakaoLoginResultType.PENDING_PROFILE, member.getId(), null, null,
-                signupToken, null, null, null);
+                signupToken, null, null, null, restored);
     }
 
     private String orEmpty(String value) {

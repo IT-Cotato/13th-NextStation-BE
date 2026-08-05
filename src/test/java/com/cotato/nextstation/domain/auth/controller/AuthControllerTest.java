@@ -372,7 +372,7 @@ class AuthControllerTest {
     void login_success() throws Exception {
         LoginRequest request = new LoginRequest("user@example.com", "abc12345!");
         given(authTokenService.login("user@example.com", "abc12345!"))
-                .willReturn(new LoginResult(1L, "access-token", "refresh-token"));
+                .willReturn(new LoginResult(1L, "access-token", "refresh-token", false));
         given(refreshTokenCookieFactory.create("refresh-token"))
                 .willReturn(ResponseCookie.from("refreshToken", "refresh-token").httpOnly(true).build());
 
