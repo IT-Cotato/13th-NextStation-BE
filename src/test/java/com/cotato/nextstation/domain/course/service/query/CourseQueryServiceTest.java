@@ -27,6 +27,9 @@ import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
 import com.cotato.nextstation.domain.journal.service.query.JournalCardQueryService;
+import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
+import com.cotato.nextstation.domain.member.service.query.MemberExistenceQueryService;
+import com.cotato.nextstation.domain.course.dto.response.MemberCourseListResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
@@ -88,6 +91,9 @@ class CourseQueryServiceTest {
 
     @Mock
     private JournalCardQueryService journalCardQueryService;
+
+    @Mock
+    private MemberExistenceQueryService memberExistenceQueryService;
 
     @Mock
     private CourseConverter courseConverter;
@@ -1107,5 +1113,91 @@ class CourseQueryServiceTest {
         // then: 빈 id 목록으로 장소를 조회하지 않는다
         verify(placeInfoQueryService, never()).getPlaceInfos(any());
         verify(courseConverter).toMyCourseDetailResponse(view, List.of());
+    }
+
+    // ---------- 다른 회원 프로필의 공개 코스 개수 ----------
+
+    @Test
+    @DisplayName("공개 코스 개수를 그대로 반환한다")
+    void countPublicCourses_returnsCount() {
+        // given
+        given(courseRepository.countPublicCoursesByMemberId(1L)).willReturn(5L);
+
+        // when
+        long publicCourseCount = courseQueryService.countPublicCourses(1L);
+
+        // then
+        assertThat(publicCourseCount).isEqualTo(5L);
+    }
+
+    // ---------- 다른 회원의 공개코스 탭 ----------
+
+    @Test
+    @DisplayName("존재하지 않는 회원의 공개 코스를 조회하면 예외가 발생하고 조회하지 않는다")
+    void getMemberPublicCourses_memberNotFound() {
+        // given
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> courseQueryService.getMemberPublicCourses(2L, null, null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(MemberErrorCode.MEMBER_NOT_FOUND.getMessage());
+        verify(courseRepository, never()).findPublicCoursesByMemberId(any(), any());
+    }
+
+    @Test
+    @DisplayName("첫 페이지는 memberId로 공개 코스를 조회해 카드로 변환한다")
+    void getMemberPublicCourses_firstPage() {
+        // given
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
+        given(courseRepository.findPublicCoursesByMemberId(eq(2L), any(Pageable.class))).willReturn(List.of());
+        MemberCourseListResponse expected = new MemberCourseListResponse(List.of(), null, false);
+        given(courseConverter.toMemberCourseListResponse(List.of(), null, false)).willReturn(expected);
+
+        // when
+        MemberCourseListResponse response = courseQueryService.getMemberPublicCourses(2L, null, 10);
+
+        // then
+        assertThat(response).isEqualTo(expected);
+        verify(courseRepository).findPublicCoursesByMemberId(eq(2L), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("다음 페이지 커서는 마지막 코스의 생성 시각과 id로 만든다")
+    void getMemberPublicCourses_nextCursor() {
+        // given: size 1 요청 → 2개 조회되어 다음 페이지 있음
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 23, 12, 0);
+        List<MyCourseView> views = List.of(myView(3L, createdAt), myView(2L, createdAt));
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
+        given(courseRepository.findPublicCoursesByMemberId(eq(2L), any(Pageable.class))).willReturn(views);
+
+        // when
+        courseQueryService.getMemberPublicCourses(2L, null, 1);
+
+        // then
+        ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
+        verify(courseConverter).toMemberCourseListResponse(any(), cursorCaptor.capture(), eq(true));
+        CursorData nextCursor = CursorData.decode(cursorCaptor.getValue());
+        assertThat(nextCursor.id()).isEqualTo(3L);
+        assertThat(nextCursor.dateTimeValue()).isEqualTo(createdAt);
+    }
+
+    @Test
+    @DisplayName("커서가 있으면 다음 페이지 조회 쿼리로 넘어간다")
+    void getMemberPublicCourses_afterCursor() {
+        // given
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 23, 12, 0);
+        String cursor = new CursorData(5L, null, createdAt).encode();
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
+        given(courseRepository.findPublicCoursesByMemberIdAfterCursor(
+                eq(2L), eq(createdAt), eq(5L), any(Pageable.class))).willReturn(List.of());
+
+        // when
+        courseQueryService.getMemberPublicCourses(2L, cursor, 10);
+
+        // then
+        verify(courseRepository).findPublicCoursesByMemberIdAfterCursor(
+                eq(2L), eq(createdAt), eq(5L), any(Pageable.class));
+        verify(courseRepository, never()).findPublicCoursesByMemberId(any(), any());
     }
 }

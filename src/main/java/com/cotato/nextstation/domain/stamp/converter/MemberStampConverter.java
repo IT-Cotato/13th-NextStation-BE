@@ -4,7 +4,7 @@ import com.cotato.nextstation.domain.stamp.dto.response.MyStampDetailResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.MyStampListResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.StampResponse;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampDetailView;
-import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampView;
+import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.VisitedStationView;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +13,7 @@ import java.util.List;
 @Component
 public class MemberStampConverter {
 
-    public MyStampListResponse toMyStampListResponse(List<MyStampView> stamps) {
+    public MyStampListResponse toMyStampListResponse(List<VisitedStationView> stamps) {
         List<StampResponse> responses = stamps.stream()
                 .map(this::toStampResponse)
                 .toList();
@@ -33,7 +33,7 @@ public class MemberStampConverter {
         );
     }
 
-    private StampResponse toStampResponse(MyStampView stamp) {
+    private StampResponse toStampResponse(VisitedStationView stamp) {
         LineSummaryResponse line = stamp.getLineId() == null
                 ? null
                 : new LineSummaryResponse(stamp.getLineId(), stamp.getLineName(), stamp.getLineCode());
