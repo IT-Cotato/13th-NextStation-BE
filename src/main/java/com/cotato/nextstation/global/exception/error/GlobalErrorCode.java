@@ -31,6 +31,9 @@ public enum GlobalErrorCode implements ErrorCode {
     // 409 Conflict
     DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "CLIENT_ERROR_409_DUPLICATE_RESOURCE", "이미 존재하는 리소스입니다."),
 
+    // 429 Too Many Requests
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "CLIENT_ERROR_429_TOO_MANY_REQUESTS", "요청 횟수 제한을 초과했습니다."),
+
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR_500_INTERNAL_SERVER_ERROR", "서버 내부 오류입니다."),
     DATABASE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR_500_DATABASE_ERROR", "데이터베이스 오류입니다."),
