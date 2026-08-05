@@ -11,7 +11,9 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.RedisConnectionFailureException;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.inOrder;
 import static org.mockito.BDDMockito.never;
@@ -40,6 +42,20 @@ class MemberWithdrawServiceTest {
         InOrder inOrder = inOrder(memberCommandService, refreshSessionRepository);
         inOrder.verify(memberCommandService).withdraw(1L);
         inOrder.verify(refreshSessionRepository).deleteAllOf(1L);
+    }
+
+    @Test
+    @DisplayName("세션 삭제가 실패해도 예외를 올리지 않는다 - 탈퇴는 이미 커밋됐으므로 실패 응답을 주면 안 된다")
+    void withdraw_swallowsSessionDeletionFailure() {
+        // given
+        willThrow(new RedisConnectionFailureException("redis down"))
+                .given(refreshSessionRepository).deleteAllOf(1L);
+
+        // when & then
+        assertThatCode(() -> memberWithdrawService.withdraw(1L))
+                .doesNotThrowAnyException();
+
+        then(memberCommandService).should().withdraw(1L);
     }
 
     @Test

@@ -23,7 +23,11 @@ public class MemberWithdrawService {
     public void withdraw(Long memberId) {
         memberCommandService.withdraw(memberId);
 
-        int deletedSessions = refreshSessionRepository.deleteAllOf(memberId);
-        log.info("탈퇴 회원 세션 정리 완료: memberId={}, deletedSessions={}", memberId, deletedSessions);
+        try {
+            int deletedSessions = refreshSessionRepository.deleteAllOf(memberId);
+            log.info("탈퇴 회원 세션 정리 완료: memberId={}, deletedSessions={}", memberId, deletedSessions);
+        } catch (Exception e) {
+            log.error("탈퇴 회원 세션 정리 실패 - 탈퇴 자체는 완료됨: memberId={}", memberId, e);
+        }
     }
 }
