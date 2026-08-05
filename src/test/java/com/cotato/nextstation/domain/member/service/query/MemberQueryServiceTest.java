@@ -79,7 +79,7 @@ class MemberQueryServiceTest {
         // given
         Member member = activeMember();
         given(memberRepository.findById(1L)).willReturn(Optional.of(member));
-        given(memberSocialAccountRepository.findFirstByMemberId(1L)).willReturn(Optional.empty());
+        given(memberSocialAccountRepository.findFirstByMemberIdOrderByIdAsc(1L)).willReturn(Optional.empty());
         given(memberConverter.toAccountInfoResponse(member, null))
                 .willReturn(new AccountInfoResponse("LOCAL", "user@example.com"));
 
@@ -103,7 +103,7 @@ class MemberQueryServiceTest {
                 .email("user@example.com")
                 .build();
         given(memberRepository.findById(1L)).willReturn(Optional.of(member));
-        given(memberSocialAccountRepository.findFirstByMemberId(1L)).willReturn(Optional.of(socialAccount));
+        given(memberSocialAccountRepository.findFirstByMemberIdOrderByIdAsc(1L)).willReturn(Optional.of(socialAccount));
         given(memberConverter.toAccountInfoResponse(member, socialAccount))
                 .willReturn(new AccountInfoResponse("KAKAO", "user@example.com"));
 

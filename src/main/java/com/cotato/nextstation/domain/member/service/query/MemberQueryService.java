@@ -47,7 +47,7 @@ public class MemberQueryService {
                     return new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
                 });
 
-        MemberSocialAccount socialAccount = memberSocialAccountRepository.findFirstByMemberId(memberId)
+        MemberSocialAccount socialAccount = memberSocialAccountRepository.findFirstByMemberIdOrderByIdAsc(memberId)
                 .orElse(null);
         log.info("계정 정보 조회: memberId={}, social={}", memberId, socialAccount != null);
 
