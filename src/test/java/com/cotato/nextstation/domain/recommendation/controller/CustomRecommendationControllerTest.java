@@ -28,6 +28,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -87,14 +88,15 @@ class CustomRecommendationControllerTest {
     }
 
     @Test
-    @DisplayName("토큰 없이 요청하면 401을 반환한다")
-    void recommendCustom_requiresAuth() throws Exception {
+    @DisplayName("토큰 없는 비로그인 요청은 memberId null로 호출되고 200을 반환한다")
+    void recommendCustom_anonymous() throws Exception {
+        given(recommendationCommandService.recommendCustom(isNull(), any())).willReturn(sampleResponse());
+
         mockMvc.perform(post("/api/v1/recommendations/custom")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request())))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
-        verify(recommendationCommandService, never()).recommendCustom(any(), any());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.station.stationName").value("보문역"));
     }
 
     @Test

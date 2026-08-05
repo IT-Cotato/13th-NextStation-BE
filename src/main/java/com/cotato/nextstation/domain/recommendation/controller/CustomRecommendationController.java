@@ -34,19 +34,24 @@ public class CustomRecommendationController {
                     - 직전 추천 역은 제외한다. 제외 후 후보가 없으면 이 조건도 적용하지 않는다.
                     - 남은 후보 중 무작위로 하나를 고른다.
                     - 결과 역에서 코스를 만들려면 역별 장소 목록 조회로 이어진다.
+
+                    accessToken은 **선택**이다. 없으면 비로그인 추천으로 동작한다(가본 역 감점·직전 추천 제외 미적용).
+                    보냈는데 만료·위조면 401이다.
                     """
     )
     @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "추천 성공"),
             @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 — 여행 스타일이 1~3개가 아니거나, 존재하지 않거나, 중복됨 (`GlobalErrorCode.VALIDATION_ERROR`)"),
-            @ApiResponse(responseCode = "401", description = "인증이 필요함"),
+            @ApiResponse(responseCode = "401", description = "accessToken을 보냈으나 위변조 또는 만료 (`GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 출발역 또는 조건에 맞게 갈 수 있는 역이 없음 (`RecommendationErrorCode.DEPARTURE_STATION_NOT_FOUND`, `NO_REACHABLE_STATION`)"),
     })
     @PostMapping("/custom")
     public CommonResponse<CustomRecommendationResponse> recommendCustom(
-            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            // 비로그인도 추천받을 수 있어야 해서 required = false다. 로그인 시에만 가본 역 감점·직전 추천 제외가 적용된다.
+            @Parameter(hidden = true) @AuthenticationPrincipal(required = false) JwtPrincipal principal,
             @Valid @RequestBody CustomRecommendationRequest request) {
-        return CommonResponse.success(recommendationCommandService.recommendCustom(principal.memberId(), request));
+        Long memberId = (principal != null) ? principal.memberId() : null;
+        return CommonResponse.success(recommendationCommandService.recommendCustom(memberId, request));
     }
 }
