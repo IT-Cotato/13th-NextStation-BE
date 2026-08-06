@@ -2,7 +2,6 @@ package com.cotato.nextstation.domain.journal.service.query;
 
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
-import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
@@ -105,9 +104,11 @@ public class JournalQueryService {
     // 완주 후 코스가 삭제되면 COURSE_NOT_FOUND를 던진다. 여행일지 조회(작성 초기 정보/미작성 목록/상세)는
     // 코스 삭제와 무관하게 완주 당시 코스 정보를 그대로 보여줘야 해서, journalRepository가 course
     // 테이블을 직접 조회해 그 제약을 우회한다.
+    // Course 도메인 클래스에 의존하지 않도록 예외는 JournalErrorCode의 로컬 상수로 던진다
+    // (courseId는 이미 소유권 검증을 마친 스탬프에서 나온 값이라 실제로는 거의 발생하지 않는다).
     private CourseSnapshotView getCourseSnapshot(Long courseId) {
         return journalRepository.findCourseSnapshotById(courseId)
-                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+                .orElseThrow(() -> new CustomException(JournalErrorCode.COURSE_NOT_FOUND));
     }
 
     // 여행일지 미작성 코스 조회

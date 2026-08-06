@@ -7,10 +7,12 @@ import com.cotato.nextstation.domain.course.service.command.CourseCommandService
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.converter.JournalConverter;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
+import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.MyJournalListResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
+import com.cotato.nextstation.domain.journal.exception.JournalErrorCode;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository.JournalImageView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
@@ -149,6 +151,60 @@ class JournalQueryServiceTest {
         given(journalImageRepository.findByJournalIdOrderByIdAsc(JOURNAL_ID)).willReturn(List.of());
         given(placeReviewRepository.findByJournalId(JOURNAL_ID)).willReturn(List.of());
         given(placeReviewImageRepository.findByPlaceReviewIdIn(anyList())).willReturn(List.of());
+    }
+
+    @Nested
+    @DisplayName("getWriteInfo")
+    class GetWriteInfo {
+
+        @Test
+        @DisplayName("역/코스/장소 정보를 채운 작성 초기 정보를 반환한다")
+        void returnsWriteInfo() {
+            // when
+            JournalWriteInfoResponse response = journalQueryService.getWriteInfo(OWNER_ID, MEMBER_STAMP_ID);
+
+            // then
+            assertThat(response.stationName()).isEqualTo("보문역");
+            assertThat(response.courseName()).isEqualTo("보문에 살어리랏다");
+            assertThat(response.places()).hasSize(1);
+            assertThat(response.places().get(0).placeId()).isEqualTo(PLACE_ID);
+            assertThat(response.places().get(0).placeName()).isEqualTo("보문숲길도서관");
+            assertThat(response.places().get(0).orderNum()).isEqualTo(1);
+        }
+
+        @Test
+        // https://github.com/IT-Cotato/13th-NextStation-BE/issues/143
+        @DisplayName("완주 후 코스가 삭제됐어도(courseQueryService였다면 COURSE_NOT_FOUND) journalRepository의 " +
+                "코스 스냅샷과 CoursePlaceRepository로 작성 정보가 그대로 나온다")
+        void deletedCourse_stillReturnsWriteInfoUsingSnapshot() {
+            // given: courseQueryService.getCourseInfo/getCoursePlaces를 실제로 호출했다면 Course의
+            // @SQLRestriction 때문에 404가 났을 상황을 흉내낸다. 이 서비스가 더 이상 그 경로를 타지 않는지도 함께 검증한다.
+            given(courseQueryService.getCourseInfo(COURSE_ID))
+                    .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+            given(courseQueryService.getCoursePlaces(COURSE_ID))
+                    .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+            // when
+            JournalWriteInfoResponse response = journalQueryService.getWriteInfo(OWNER_ID, MEMBER_STAMP_ID);
+
+            // then
+            assertThat(response.courseName()).isEqualTo("보문에 살어리랏다");
+            assertThat(response.stationName()).isEqualTo("보문역");
+            verify(courseQueryService, never()).getCourseInfo(any());
+            verify(courseQueryService, never()).getCoursePlaces(any());
+        }
+
+        @Test
+        @DisplayName("코스 스냅샷 자체가 없으면(정상적으로는 거의 발생하지 않음) JournalErrorCode.COURSE_NOT_FOUND를 던진다")
+        void courseSnapshotMissing_throwsJournalCourseNotFound() {
+            // given: CourseErrorCode가 아니라 JournalErrorCode로 던지는지가 이번에 고친 지점이다
+            given(journalRepository.findCourseSnapshotById(COURSE_ID)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> journalQueryService.getWriteInfo(OWNER_ID, MEMBER_STAMP_ID))
+                    .isInstanceOf(CustomException.class)
+                    .hasMessageContaining(JournalErrorCode.COURSE_NOT_FOUND.getMessage());
+        }
     }
 
     @Nested
