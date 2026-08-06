@@ -8,7 +8,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public interface JournalRepository extends JpaRepository<Journal, Long> {
@@ -57,6 +59,33 @@ public interface JournalRepository extends JpaRepository<Journal, Long> {
                                                           @Param("createdAt") LocalDateTime createdAt,
                                                           @Param("journalId") Long journalId,
                                                           Pageable pageable);
+
+    // 코스 정보 스냅샷 (삭제된 코스 포함). 여행일지 작성 초기 정보/상세 조회는 완주 후 코스가
+    // 삭제돼도 그 코스 이름 등을 그대로 보여줘야 한다. Course의 @SQLRestriction(is_deleted = false) 때문에
+    // 일반 조회(findById)는 삭제된 코스를 COURSE_NOT_FOUND로 취급하므로, 여기서는 course 테이블을
+    // 직접 네이티브로 조회해 그 제약을 우회한다. soft delete는 is_deleted만 켜고 다른 컬럼은
+    // 그대로 남기므로 삭제된 코스도 완주 당시 값을 그대로 돌려줄 수 있다.
+    @Query(value = "SELECT c.id AS courseId, c.name AS name, c.station_id AS stationId, " +
+            "c.view_count AS viewCount, c.like_count AS likeCount " +
+            "FROM course c WHERE c.id = :courseId",
+            nativeQuery = true)
+    Optional<CourseSnapshotView> findCourseSnapshotById(@Param("courseId") Long courseId);
+
+    // 위와 같은 목적의 배치 조회. 여행일지 미작성 목록은 스탬프 개수만큼 개별 조회하면
+    // 코스 하나만 삭제돼도(또는 그냥 N+1로도) 전체가 영향받으므로 한 번에 가져온다.
+    @Query(value = "SELECT c.id AS courseId, c.name AS name, c.station_id AS stationId, " +
+            "c.view_count AS viewCount, c.like_count AS likeCount " +
+            "FROM course c WHERE c.id IN :courseIds",
+            nativeQuery = true)
+    List<CourseSnapshotView> findCourseSnapshotsByIds(@Param("courseIds") Collection<Long> courseIds);
+
+    interface CourseSnapshotView {
+        Long getCourseId();
+        String getName();
+        Long getStationId();
+        int getViewCount();
+        int getLikeCount();
+    }
 
     interface MyJournalCardView {
         Long getJournalId();

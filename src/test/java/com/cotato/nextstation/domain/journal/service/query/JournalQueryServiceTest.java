@@ -1,23 +1,27 @@
 package com.cotato.nextstation.domain.journal.service.query;
 
-import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
-import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.entity.CoursePlace;
+import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
+import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.converter.JournalConverter;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.MyJournalListResponse;
+import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository.JournalImageView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.CourseSnapshotView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
+import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
@@ -40,7 +44,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -67,6 +73,8 @@ class JournalQueryServiceTest {
     private CourseQueryService courseQueryService;
     @Mock
     private CourseCommandService courseCommandService;
+    @Mock
+    private CoursePlaceRepository coursePlaceRepository;
     @Mock
     private PlaceInfoQueryService placeInfoQueryService;
     @Mock
@@ -96,7 +104,7 @@ class JournalQueryServiceTest {
     void setUp() {
         // JournalConverter는 의존성 없는 순수 변환기라 목이 아닌 실제 인스턴스를 쓴다.
         journalQueryService = new JournalQueryService(
-                memberStampQueryService, courseQueryService, courseCommandService,
+                memberStampQueryService, courseQueryService, courseCommandService, coursePlaceRepository,
                 placeInfoQueryService, stationQueryService,
                 journalRepository, journalImageRepository,
                 placeReviewRepository, placeReviewImageRepository,
@@ -118,13 +126,22 @@ class JournalQueryServiceTest {
 
         given(journalRepository.findById(JOURNAL_ID)).willReturn(Optional.of(journal));
         given(memberStampQueryService.getCourseId(OWNER_ID, MEMBER_STAMP_ID)).willReturn(COURSE_ID);
-        given(courseQueryService.getCourseInfo(COURSE_ID)).willReturn(
-                new CourseInfoResponse(COURSE_ID, "보문에 살어리랏다", OWNER_ID, STATION_ID, JOURNAL_ID, 10, 3, null));
+
+        // courseQueryService.getCourseInfo() 대신 journalRepository가 course 테이블을 직접 조회한다
+        // (코스가 삭제돼도 여행일지 조회는 계속돼야 해서 @SQLRestriction을 우회하는 경로를 쓴다)
+        CourseSnapshotView courseSnapshot = mock(CourseSnapshotView.class);
+        given(courseSnapshot.getCourseId()).willReturn(COURSE_ID);
+        given(courseSnapshot.getName()).willReturn("보문에 살어리랏다");
+        given(courseSnapshot.getStationId()).willReturn(STATION_ID);
+        given(courseSnapshot.getViewCount()).willReturn(10);
+        given(courseSnapshot.getLikeCount()).willReturn(3);
+        given(journalRepository.findCourseSnapshotById(COURSE_ID)).willReturn(Optional.of(courseSnapshot));
+
         given(stationQueryService.getStationName(STATION_ID)).willReturn("보문역");
         given(stationQueryService.getLine(STATION_ID))
                 .willReturn(new LineSummaryResponse(1L, "우이신설선", null));
-        given(courseQueryService.getCoursePlaces(COURSE_ID))
-                .willReturn(List.of(new CoursePlaceInfoResponse(PLACE_ID, 1)));
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(COURSE_ID))
+                .willReturn(List.of(CoursePlace.builder().courseId(COURSE_ID).placeId(PLACE_ID).orderNum(1).build()));
         given(placeInfoQueryService.getPlaceInfos(anyList())).willReturn(List.of(
                 new PlaceInfoResponse(PLACE_ID, "보문숲길도서관", "설명", "CULTURE", "문화공간", null, 127.123, 37.456)));
         given(placeInfoQueryService.getTopTagNames(anyList())).willReturn(List.of());
@@ -207,6 +224,29 @@ class JournalQueryServiceTest {
         }
 
         @Test
+        // https://github.com/IT-Cotato/13th-NextStation-BE/issues/143
+        @DisplayName("완주 후 코스가 삭제됐어도(courseQueryService였다면 COURSE_NOT_FOUND) journalRepository의 " +
+                "코스 스냅샷으로 상세 조회가 그대로 성공한다")
+        void deletedCourse_stillReturnsDetailUsingSnapshot() {
+            // given: courseQueryService.getCourseInfo/getCoursePlaces를 실제로 호출했다면 Course의
+            // @SQLRestriction 때문에 404가 났을 상황을 흉내낸다. 이 서비스가 더 이상 그 경로를 타지 않는지도 함께 검증한다.
+            given(courseQueryService.getCourseInfo(COURSE_ID))
+                    .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+            given(courseQueryService.getCoursePlaces(COURSE_ID))
+                    .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+            given(courseQueryService.isLikedByMember(COURSE_ID, OWNER_ID)).willReturn(false);
+
+            // when
+            JournalDetailResponse response = journalQueryService.getJournalDetail(OWNER_ID, JOURNAL_ID);
+
+            // then
+            assertThat(response.courseName()).isEqualTo("보문에 살어리랏다");
+            assertThat(response.stationName()).isEqualTo("보문역");
+            verify(courseQueryService, never()).getCourseInfo(any());
+            verify(courseQueryService, never()).getCoursePlaces(any());
+        }
+
+        @Test
         @DisplayName("비로그인 조회도 조회수 반영 호출은 그대로 나간다 (본인 제외 판단은 CourseCommandService 몫)")
         void anonymousViews_stillCallsIncreaseViewCount() {
             // given
@@ -239,6 +279,93 @@ class JournalQueryServiceTest {
                     .isInstanceOf(CustomException.class);
 
             verify(courseCommandService, never()).increaseViewCount(anyLong(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("getUncompletedJournals")
+    class GetUncompletedJournals {
+
+        private static final Long COURSE_ID_1 = 501L;
+        private static final Long COURSE_ID_2 = 502L; // 삭제된 코스를 흉내낸다
+        private static final Long STATION_ID_1 = 6L;
+        private static final Long STATION_ID_2 = 7L;
+
+        @Test
+        // https://github.com/IT-Cotato/13th-NextStation-BE/issues/143
+        @DisplayName("미작성 스탬프 중 하나가 참조하는 코스가 삭제됐어도(courseQueryService였다면 그 스탬프에서 " +
+                "404) 목록 조회 전체가 성공하고 삭제된 코스의 이름도 그대로 나온다")
+        void oneCourseDeleted_stillReturnsFullList() {
+            // given
+            MemberStamp stamp1 = mock(MemberStamp.class);
+            given(stamp1.getId()).willReturn(201L);
+            given(stamp1.getCourseId()).willReturn(COURSE_ID_1);
+            given(stamp1.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 1, 10, 0));
+
+            MemberStamp stamp2 = mock(MemberStamp.class);
+            given(stamp2.getId()).willReturn(202L);
+            given(stamp2.getCourseId()).willReturn(COURSE_ID_2);
+            given(stamp2.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 2, 10, 0));
+
+            given(journalRepository.findCompletedMemberStampIdsByMemberId(OWNER_ID)).willReturn(Set.of());
+            given(memberStampQueryService.getUncompletedStamps(OWNER_ID, Set.of()))
+                    .willReturn(List.of(stamp1, stamp2));
+
+            // course 테이블 네이티브 조회는 코스가 삭제됐어도(is_deleted=true) 그대로 값을 돌려준다
+            CourseSnapshotView snapshot1 = mock(CourseSnapshotView.class);
+            given(snapshot1.getCourseId()).willReturn(COURSE_ID_1);
+            given(snapshot1.getName()).willReturn("보문에 살어리랏다");
+            given(snapshot1.getStationId()).willReturn(STATION_ID_1);
+
+            CourseSnapshotView snapshot2 = mock(CourseSnapshotView.class);
+            given(snapshot2.getCourseId()).willReturn(COURSE_ID_2);
+            given(snapshot2.getName()).willReturn("삭제되기 전 코스 이름");
+            given(snapshot2.getStationId()).willReturn(STATION_ID_2);
+
+            given(journalRepository.findCourseSnapshotsByIds(List.of(COURSE_ID_1, COURSE_ID_2)))
+                    .willReturn(List.of(snapshot1, snapshot2));
+
+            given(stationQueryService.getStationNames(Set.of(STATION_ID_1, STATION_ID_2)))
+                    .willReturn(Map.of(STATION_ID_1, "보문역", STATION_ID_2, "한성대입구역"));
+
+            given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(COURSE_ID_1)).willReturn(List.of());
+            given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(COURSE_ID_2)).willReturn(List.of());
+            given(placeInfoQueryService.getTopTagNames(anyList())).willReturn(List.of());
+
+            // 실제로 courseQueryService.getCourseInfo(COURSE_ID_2)를 호출했다면 삭제된 코스라 404가
+            // 났을 상황을 흉내낸다. 이 서비스가 더 이상 그 경로를 타지 않는지도 함께 검증한다.
+            given(courseQueryService.getCourseInfo(COURSE_ID_2))
+                    .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+            // when
+            UncompletedJournalListResponse response = journalQueryService.getUncompletedJournals(OWNER_ID);
+
+            // then
+            assertThat(response.totalCount()).isEqualTo(2);
+            assertThat(response.courses())
+                    .extracting(UncompletedJournalListResponse.UncompletedCourseResponse::courseName)
+                    .containsExactlyInAnyOrder("보문에 살어리랏다", "삭제되기 전 코스 이름");
+            assertThat(response.courses())
+                    .extracting(UncompletedJournalListResponse.UncompletedCourseResponse::stationName)
+                    .containsExactlyInAnyOrder("보문역", "한성대입구역");
+            verify(courseQueryService, never()).getCourseInfo(any());
+            verify(courseQueryService, never()).getCoursePlaces(any());
+        }
+
+        @Test
+        @DisplayName("미작성 스탬프가 없으면 빈 목록을 반환하고 코스 스냅샷 조회는 나가지 않는다")
+        void noUncompletedStamps_returnsEmptyList() {
+            // given
+            given(journalRepository.findCompletedMemberStampIdsByMemberId(OWNER_ID)).willReturn(Set.of());
+            given(memberStampQueryService.getUncompletedStamps(OWNER_ID, Set.of())).willReturn(List.of());
+
+            // when
+            UncompletedJournalListResponse response = journalQueryService.getUncompletedJournals(OWNER_ID);
+
+            // then
+            assertThat(response.totalCount()).isEqualTo(0);
+            assertThat(response.courses()).isEmpty();
+            verify(journalRepository, never()).findCourseSnapshotsByIds(any());
         }
     }
 
