@@ -54,34 +54,37 @@ public class JournalConverter {
         return new JournalWriteInfoResponse(stationName, courseName, tags, places);
     }
 
-        public UncompletedJournalListResponse toUncompletedJournalListResponse(
-                List<MemberStamp> uncompletedStamps,
-                Map<Long, UncompletedCourseCardView> courseCardMap,
-                Map<Long, List<String>> tagsByCourse
-        ) {
-            List<UncompletedJournalListResponse.UncompletedCourseResponse> courses =
-                    uncompletedStamps.stream()
-                            .map(stamp -> {
-                                UncompletedCourseCardView courseCard = courseCardMap.get(stamp.getCourseId());
-                                LineSummaryResponse line = courseCard.getLineId() == null
-                                        ? null
-                                        : new LineSummaryResponse(
-                                                courseCard.getLineId(), courseCard.getLineName(), courseCard.getLineCode());
-                                List<String> tags = tagsByCourse.get(stamp.getCourseId());
+    // uncompletedStamps는 courseCardMap에 카드가 없는 스탬프가 이미 걸러진 상태로 들어온다
+    // (JournalQueryService.getUncompletedJournals 참고). 그래도 이 컨버터만 따로 호출됐을 때
+    // NPE 대신 안전하게 건너뛰도록 한 번 더 방어한다.
+    public UncompletedJournalListResponse toUncompletedJournalListResponse(
+            List<MemberStamp> uncompletedStamps,
+            Map<Long, UncompletedCourseCardView> courseCardMap,
+            Map<Long, List<String>> tagsByCourse
+    ) {
+        List<UncompletedJournalListResponse.UncompletedCourseResponse> courses = uncompletedStamps.stream()
+                .filter(stamp -> courseCardMap.containsKey(stamp.getCourseId()))
+                .map(stamp -> {
+                    UncompletedCourseCardView courseCard = courseCardMap.get(stamp.getCourseId());
+                    LineSummaryResponse line = courseCard.getLineId() == null
+                            ? null
+                            : new LineSummaryResponse(
+                                    courseCard.getLineId(), courseCard.getLineName(), courseCard.getLineCode());
+                    List<String> tags = tagsByCourse.get(stamp.getCourseId());
 
-                                return new UncompletedJournalListResponse.UncompletedCourseResponse(
-                                        stamp.getId(),
-                                        courseCard.getStationName(),
-                                        line,
-                                        courseCard.getName(),
-                                        tags,
-                                        stamp.getCreatedAt()
-                                );
-                            })
-                            .toList();
+                    return new UncompletedJournalListResponse.UncompletedCourseResponse(
+                            stamp.getId(),
+                            courseCard.getStationName(),
+                            line,
+                            courseCard.getName(),
+                            tags,
+                            stamp.getCreatedAt()
+                    );
+                })
+                .toList();
 
-            return new UncompletedJournalListResponse(courses.size(), courses);
-        }
+        return new UncompletedJournalListResponse(courses.size(), courses);
+    }
 
     public MyJournalListResponse toMyJournalListResponse(
             List<MyJournalCardView> myJournalCards,

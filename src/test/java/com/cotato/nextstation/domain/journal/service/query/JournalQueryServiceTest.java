@@ -418,6 +418,58 @@ class JournalQueryServiceTest {
         }
 
         @Test
+        @DisplayName("배치 조회 결과에 courseId 하나가 통째로 빠져도(course/station 하드 삭제 등) " +
+                "NPE 없이 그 스탬프만 제외하고 나머지 목록은 정상 반환한다")
+        void courseCardMissingFromBatchResult_excludesThatStampOnly() {
+            // given
+            MemberStamp stamp1 = mock(MemberStamp.class);
+            given(stamp1.getId()).willReturn(301L);
+            given(stamp1.getCourseId()).willReturn(COURSE_ID_1);
+            given(stamp1.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 1, 10, 0));
+
+            // course나 station이 하드 삭제되면 INNER JOIN 때문에 이 courseId는 배치 조회
+            // 결과에서 아예 빠진다 (course_place.place_id가 재시딩으로 끊기는 것과 같은 종류의
+            // 참조 무결성 문제).
+            MemberStamp stamp2 = mock(MemberStamp.class);
+            given(stamp2.getId()).willReturn(302L);
+            given(stamp2.getCourseId()).willReturn(COURSE_ID_2);
+            given(stamp2.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 2, 10, 0));
+
+            given(journalRepository.findCompletedMemberStampIdsByMemberId(OWNER_ID)).willReturn(Set.of());
+            given(memberStampQueryService.getUncompletedStamps(OWNER_ID, Set.of()))
+                    .willReturn(List.of(stamp1, stamp2));
+
+            UncompletedCourseCardView card1 = mock(UncompletedCourseCardView.class);
+            given(card1.getCourseId()).willReturn(COURSE_ID_1);
+            given(card1.getName()).willReturn("보문에 살어리랏다");
+            given(card1.getStationName()).willReturn("보문역");
+            given(card1.getLineId()).willReturn(6L);
+            given(card1.getLineName()).willReturn("6호선");
+            given(card1.getLineCode()).willReturn(LineCode.LINE_6);
+
+            // COURSE_ID_2의 카드는 응답에 없다
+            given(journalRepository.findUncompletedCourseCardsByIds(List.of(COURSE_ID_1, COURSE_ID_2)))
+                    .willReturn(List.of(card1));
+
+            given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(COURSE_ID_1)).willReturn(List.of());
+            given(placeInfoQueryService.getTopTagNames(anyList())).willReturn(List.of());
+
+            // when
+            UncompletedJournalListResponse response = journalQueryService.getUncompletedJournals(OWNER_ID);
+
+            // then
+            assertThat(response.totalCount()).isEqualTo(1);
+            assertThat(response.courses())
+                    .extracting(UncompletedJournalListResponse.UncompletedCourseResponse::memberStampId)
+                    .containsExactly(301L);
+            assertThat(response.courses())
+                    .extracting(UncompletedJournalListResponse.UncompletedCourseResponse::courseName)
+                    .containsExactly("보문에 살어리랏다");
+            // 빠진 courseId의 CoursePlace/태그는 조회할 필요가 없다
+            verify(coursePlaceRepository, never()).findByCourseIdOrderByOrderNumAsc(COURSE_ID_2);
+        }
+
+        @Test
         @DisplayName("미작성 스탬프가 없으면 빈 목록을 반환하고 코스 카드 조회는 나가지 않는다")
         void noUncompletedStamps_returnsEmptyList() {
             // given

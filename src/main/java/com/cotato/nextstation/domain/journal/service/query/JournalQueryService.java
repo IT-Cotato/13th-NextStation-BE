@@ -34,6 +34,7 @@ import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -138,10 +140,25 @@ public class JournalQueryService {
                 .stream()
                 .collect(Collectors.toMap(UncompletedCourseCardView::getCourseId, Function.identity()));
 
+        // course→station INNER JOIN이라 course나 station이 하드 삭제되면 그 courseId는 결과에서
+        // 통째로 빠진다. 그 스탬프만 목록에서 제외하고, 나머지 스탬프는 정상 응답돼야 한다
+        // (배치 조회를 쓰는 목적 자체가 스탬프 하나 때문에 전체가 죽지 않게 하는 것이다).
+        List<MemberStamp> validStamps = uncompletedStamps.stream()
+                .filter(stamp -> courseCardMap.containsKey(stamp.getCourseId()))
+                .toList();
+        if (validStamps.size() < uncompletedStamps.size()) {
+            log.warn("코스 카드를 찾을 수 없어 미작성 목록에서 제외: missingCourseIds={}",
+                    uncompletedStamps.stream()
+                            .map(MemberStamp::getCourseId)
+                            .filter(courseId -> !courseCardMap.containsKey(courseId))
+                            .toList());
+        }
+
         // 5. courseId → placeIds → 태그 2개. CoursePlace는 코스가 삭제돼도 남아 있다.
         // TODO: CoursePlaceRepository에 배치 조회 메서드 생기면 N+1 개선 가능
         Map<Long, List<String>> tagsByCourse = new HashMap<>();
-        for (Long courseId : courseIds) {
+        for (MemberStamp stamp : validStamps) {
+            Long courseId = stamp.getCourseId();
             List<Long> placeIds = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId).stream()
                     .map(CoursePlace::getPlaceId)
                     .toList();
@@ -151,8 +168,7 @@ public class JournalQueryService {
             tagsByCourse.put(courseId, tags);
         }
 
-
-        return journalConverter.toUncompletedJournalListResponse(uncompletedStamps, courseCardMap, tagsByCourse);
+        return journalConverter.toUncompletedJournalListResponse(validStamps, courseCardMap, tagsByCourse);
     }
 
 
