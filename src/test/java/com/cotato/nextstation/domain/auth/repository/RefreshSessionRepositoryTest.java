@@ -7,14 +7,19 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.script.RedisScript;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.never;
+import static org.mockito.BDDMockito.then;
 
 // Lua 스크립트 자체의 동작(회전/grace/상한)은 실제 Redis가 있어야 검증되므로, 여기서는 반환값 해석만 다룬다.
 @ExtendWith(MockitoExtension.class)
@@ -25,6 +30,14 @@ class RefreshSessionRepositoryTest {
 
     @Mock
     private RedisTemplate<String, String> redisTemplate;
+
+    @Mock
+    private SetOperations<String, String> setOperations;
+
+    private void givenIndexContains(Set<String> familyIds) {
+        given(redisTemplate.opsForSet()).willReturn(setOperations);
+        given(setOperations.members("auth:member-sessions:1")).willReturn(familyIds);
+    }
 
     @SuppressWarnings("unchecked")
     private void givenRotateReturns(List<?> result) {
@@ -87,5 +100,50 @@ class RefreshSessionRepositoryTest {
 
         // then
         assertThat(result.status()).isEqualTo(RefreshSessionRepository.RotateStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("회원의 모든 세션과 인덱스를 함께 삭제한다")
+    void deleteAllOf_deletesEverySession() {
+        // given
+        givenIndexContains(new LinkedHashSet<>(List.of("family-1", "family-2")));
+
+        // when
+        int deleted = refreshSessionRepository.deleteAllOf(1L);
+
+        // then
+        assertThat(deleted).isEqualTo(2);
+        then(redisTemplate).should()
+                .delete(List.of("auth:refresh-session:family-1", "auth:refresh-session:family-2"));
+        then(redisTemplate).should().delete("auth:member-sessions:1");
+    }
+
+    @Test
+    @DisplayName("인덱스가 비어 있어도 실패하지 않는다 - 로그인한 적 없는 회원의 탈퇴")
+    void deleteAllOf_emptyIndex() {
+        // given
+        givenIndexContains(Set.of());
+
+        // when
+        int deleted = refreshSessionRepository.deleteAllOf(1L);
+
+        // then
+        assertThat(deleted).isZero();
+        then(redisTemplate).should(never()).delete(anyList());
+        then(redisTemplate).should().delete("auth:member-sessions:1");
+    }
+
+    @Test
+    @DisplayName("인덱스 조회가 null을 반환해도 실패하지 않는다")
+    void deleteAllOf_nullIndex() {
+        // given
+        givenIndexContains(null);
+
+        // when
+        int deleted = refreshSessionRepository.deleteAllOf(1L);
+
+        // then
+        assertThat(deleted).isZero();
+        then(redisTemplate).should().delete("auth:member-sessions:1");
     }
 }

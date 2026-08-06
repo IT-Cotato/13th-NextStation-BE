@@ -77,7 +77,7 @@ public class RecommendationConverter {
                 .toList();
     }
 
-    private CoursePreviewResponse toCoursePreview(String courseName, List<StationPlaceView> places) {
+    public CoursePreviewResponse toCoursePreview(String courseName, List<StationPlaceView> places) {
         List<CoursePreviewPlaceResponse> placeResponses = places.stream()
                 .map(this::toCoursePreviewPlace)
                 .toList();

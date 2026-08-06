@@ -3,6 +3,7 @@ package com.cotato.nextstation.domain.recommendation.service.command;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.recommendation.converter.RecommendationConverter;
 import com.cotato.nextstation.domain.recommendation.dto.request.CustomRecommendationRequest;
+import com.cotato.nextstation.domain.recommendation.dto.response.CoursePreviewResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.CustomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.dto.response.RandomRecommendationResponse;
 import com.cotato.nextstation.domain.recommendation.entity.RecommendationLog;
@@ -18,6 +19,7 @@ import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.Line;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.domain.station.entity.Station;
+import com.cotato.nextstation.domain.station.exception.StationErrorCode;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository;
 import com.cotato.nextstation.domain.station.repository.StationLineRepository.StationLineView;
 import com.cotato.nextstation.domain.station.repository.StationRepository;
@@ -313,6 +315,56 @@ class RecommendationCommandServiceTest {
                 .stationName(name).description(name + " 소개").todo(todo).isDrawable(true).build();
         ReflectionTestUtils.setField(station, "id", id);
         return station;
+    }
+
+    // ---------- 코스만 다시 뽑기 ----------
+
+    @Test
+    @DisplayName("역은 고정한 채 카테고리별 장소만 다시 무작위로 구성하고, 로그는 남기지 않는다")
+    void redrawCourse_rebuildsCourseForSameStation() {
+        // given
+        Station station = station(10L, "제기동역");
+        given(stationRepository.findById(10L)).willReturn(Optional.of(station));
+        given(stationPlaceReader.getPlacesByStation(10L)).willReturn(List.of(
+                place(100L, "CULTURE"),
+                place(200L, "FOOD")
+        ));
+
+        // when
+        CoursePreviewResponse response = recommendationCommandService.redrawCourse(10L);
+
+        // then
+        assertThat(response.name()).isEqualTo("제기동역 환승여행 코스");
+        assertThat(response.places()).extracting(p -> p.categoryCode()).containsExactly("CULTURE", "FOOD");
+        verify(recommendationLogRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 역이면 예외가 발생한다")
+    void redrawCourse_stationNotFound() {
+        // given
+        given(stationRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> recommendationCommandService.redrawCourse(99L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(StationErrorCode.STATION_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("뽑기 대상이 아닌 역은 장소를 조회하지 않고 빈 코스를 반환한다")
+    void redrawCourse_nonDrawableStationReturnsEmptyCourse() {
+        // given
+        Station notDrawable = Station.builder().stationName("출발전용역").isDrawable(false).build();
+        ReflectionTestUtils.setField(notDrawable, "id", 10L);
+        given(stationRepository.findById(10L)).willReturn(Optional.of(notDrawable));
+
+        // when
+        CoursePreviewResponse response = recommendationCommandService.redrawCourse(10L);
+
+        // then
+        assertThat(response.places()).isEmpty();
+        verify(stationPlaceReader, never()).getPlacesByStation(any());
     }
 
     // ---------- 맞춤추천 ----------

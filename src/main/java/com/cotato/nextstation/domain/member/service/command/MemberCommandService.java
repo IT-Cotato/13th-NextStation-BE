@@ -4,6 +4,7 @@ import com.cotato.nextstation.domain.image.service.command.ImageCommandService;
 import com.cotato.nextstation.domain.member.converter.MemberConverter;
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
 import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.member.entity.MemberStatus;
 import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
 import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
@@ -98,5 +99,51 @@ public class MemberCommandService {
         }
         profileImageUrlValidator.validate(profileImageUrl, member.getId());
         member.changeProfileImageUrl(profileImageUrl);
+    }
+
+    /**
+     * 탈퇴 - soft delete로 status/deletedAt만 기록한다.
+     * 유예 기간(7일) 안에 계정을 복구할 수 있으므로 개인정보는 파기하지 않는다.
+     * TODO: 유예가 지난 회원의 개인정보 파기는 별도 배치가 담당한다.
+     */
+    @Transactional
+    public void withdraw(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> {
+                    log.warn("존재하지 않는 회원의 탈퇴 시도: memberId={}", memberId);
+                    return new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
+                });
+
+        if (member.getStatus() == MemberStatus.WITHDRAWN) {
+            log.info("이미 탈퇴한 회원의 탈퇴 재요청 - 무시: memberId={}", memberId);
+            return;
+        }
+
+        MemberStatus previousStatus = member.getStatus();
+        member.withdraw();
+        log.info("회원 탈퇴 처리 완료: memberId={}, previousStatus={}", memberId, previousStatus);
+    }
+
+    /**
+     * 유예 기간 내 계정 복구. 복구 후의 상태를 반환한다.
+     * 트랜잭션이 없는 로그인 경로(카카오/로컬)에서도 독립적으로 커밋되도록 서비스로 분리해 둔다.
+     */
+    @Transactional
+    public MemberStatus restore(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> {
+                    log.warn("존재하지 않는 회원의 복구 시도: memberId={}", memberId);
+                    return new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
+                });
+
+        if (!member.isRestorable()) {
+            log.warn("복구할 수 없는 회원의 복구 시도: memberId={}, status={}, deletedAt={}",
+                    memberId, member.getStatus(), member.getDeletedAt());
+            return member.getStatus();
+        }
+
+        member.restore();
+        log.info("탈퇴 유예 기간 내 계정 복구: memberId={}, restoredStatus={}", memberId, member.getStatus());
+        return member.getStatus();
     }
 }

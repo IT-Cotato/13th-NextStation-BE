@@ -11,6 +11,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -19,6 +20,9 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends BaseTimeEntity {
+    // 탈퇴 후 이 기간 안에는 로그인만으로 계정을 복구할 수 있고, 지나면 배치가 회원 행과 콘텐츠를 통째로 삭제한다.
+    // 삭제 전까지는 email UNIQUE가 살아있어 같은 이메일로 재가입할 수 없다(그 기간엔 재가입 대신 복구를 제공).
+    public static final Duration WITHDRAWAL_GRACE_PERIOD = Duration.ofDays(7);
 
     @Column(unique = true, length = 254) // RFC 5321 이메일 최대 길이
     private String email;
@@ -70,9 +74,35 @@ public class Member extends BaseTimeEntity {
         this.status = MemberStatus.ACTIVE;
     }
 
+    /**
+     * 탈퇴 - soft delete. 개인정보는 그대로 두고 상태만 바꾼다.
+     * 유예 기간 안에 {@link #restore()}로 되살릴 수 있어야 하므로 이 시점에는 아무것도 비우지 않는다.
+     */
     public void withdraw() {
         this.status = MemberStatus.WITHDRAWN;
         this.deletedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 유예 기간 내 복구.
+     * 프로필 설정을 마치기 전에 탈퇴한 회원(nickname 없음)은 ACTIVE가 아니라 PENDING으로 되돌린다.
+     */
+    public void restore() {
+        this.status = nickname == null ? MemberStatus.PENDING : MemberStatus.ACTIVE;
+        this.deletedAt = null;
+    }
+
+    public boolean isWithdrawn() {
+        return status == MemberStatus.WITHDRAWN;
+    }
+
+    /**
+     * 유예 기간이 남아 복구할 수 있는 상태인지 여부
+     */
+    public boolean isRestorable() {
+        return isWithdrawn()
+                && deletedAt != null
+                && deletedAt.isAfter(LocalDateTime.now().minus(WITHDRAWAL_GRACE_PERIOD));
     }
 
     public void changePassword(String encodedPassword) {

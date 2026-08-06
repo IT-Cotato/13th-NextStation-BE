@@ -74,6 +74,16 @@ class StationControllerTest {
                 .andExpect(jsonPath("$.data").isEmpty());
     }
 
+    // 랜덤뽑기·맞춤추천 결과 화면이 비로그인으로도 접근 가능해, 그 다음 단계인 출발역 검색도 비로그인 접근이 유지돼야 한다(#147).
+    @Test
+    @DisplayName("Authorization 헤더 없이도 200을 반환한다 (비로그인 접근 유지 확정, #147)")
+    void searchStations_noAuthHeaderRequired() throws Exception {
+        given(stationQueryService.searchByName("왕십리역")).willReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/stations").param("keyword", "왕십리역"))
+                .andExpect(status().isOk());
+    }
+
     @Test
     @DisplayName("역별 장소 목록은 200과 카테고리별 장소를 반환한다")
     void getStationPlaces_success() throws Exception {
@@ -113,6 +123,17 @@ class StationControllerTest {
                 .andExpect(jsonPath("$.data.line").hasJsonPath())
                 .andExpect(jsonPath("$.data.line").value(nullValue()))
                 .andExpect(jsonPath("$.data.categories").isEmpty());
+    }
+
+    // 랜덤뽑기·맞춤추천 결과 화면이 비로그인으로도 접근 가능해, 그 다음 단계인 코스 만들기 후보 조회도 비로그인 접근이 유지돼야 한다(#147).
+    @Test
+    @DisplayName("Authorization 헤더 없이도 200을 반환한다 (비로그인 접근 유지 확정, #147)")
+    void getStationPlaces_noAuthHeaderRequired() throws Exception {
+        given(stationQueryService.getStationPlaces(6L, null))
+                .willReturn(new StationPlacesResponse(6L, "보문역", null, null, List.of(), List.of(), "보문역 환승여행 코스", List.of()));
+
+        mockMvc.perform(get("/api/v1/stations/{stationId}/places", 6L))
+                .andExpect(status().isOk());
     }
 
     @Test

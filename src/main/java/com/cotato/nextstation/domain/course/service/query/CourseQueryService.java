@@ -13,6 +13,7 @@ import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.MemberCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.course.entity.CourseSort;
@@ -30,6 +31,8 @@ import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.Like
 import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.journal.service.query.JournalCardQueryService;
+import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
+import com.cotato.nextstation.domain.member.service.query.MemberExistenceQueryService;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
@@ -86,6 +89,7 @@ public class CourseQueryService {
     private final PlaceInfoQueryService placeInfoQueryService;
     private final MemberStampQueryService memberStampQueryService;
     private final JournalCardQueryService journalCardQueryService;
+    private final MemberExistenceQueryService memberExistenceQueryService;
     private final CourseConverter courseConverter;
 
     /**
@@ -589,6 +593,50 @@ public class CourseQueryService {
         return placeInfoQueryService.getTopTagNames(placeIds).stream()
                 .limit(TAGS_PER_CARD)
                 .toList();
+    }
+
+    // 다른 회원 프로필의 공개 코스 개수. 호출부(회원 조회)에서 이미 존재 검증을 마쳤다고 가정한다.
+    public long countPublicCourses(Long memberId) {
+        return courseRepository.countPublicCoursesByMemberId(memberId);
+    }
+
+    /**
+     * 다른 회원 프로필의 공개코스 탭. 그 회원이 만든 코스 중 여행일지가 공개된 코스만 최신순으로 조회한다.
+     * <p>
+     * 저장 탭(getMyCourses)과 달리 호선/역 필터가 없어 availableLines를 계산하지 않는다.
+     * 프로필 조회와 달리 독립된 API라 여기서 직접 회원 존재를 검증한다.
+     */
+    public MemberCourseListResponse getMemberPublicCourses(Long memberId, String cursor, Integer size) {
+        if (!memberExistenceQueryService.existsMember(memberId)) {
+            log.warn("존재하지 않는 회원의 공개코스 탭 조회 시도: memberId={}", memberId);
+            throw new CustomException(MemberErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        int pageSize = resolvePageSize(size);
+        Pageable pageable = PageRequest.of(0, pageSize + 1); // hasNext 판단용 1개 더 조회
+
+        CursorData cursorData = CursorData.decode(cursor);
+        List<MyCourseView> courses = fetchMemberPublicCourses(memberId, cursorData, pageable);
+
+        boolean hasNext = courses.size() > pageSize;
+        List<MyCourseView> pageContent = hasNext ? courses.subList(0, pageSize) : courses;
+
+        String nextCursor = null;
+        if (hasNext) {
+            MyCourseView last = pageContent.get(pageContent.size() - 1);
+            nextCursor = new CursorData(last.getCourseId(), null, last.getCreatedAt()).encode();
+        }
+
+        return courseConverter.toMemberCourseListResponse(pageContent, nextCursor, hasNext);
+    }
+
+    private List<MyCourseView> fetchMemberPublicCourses(Long memberId, CursorData cursorData, Pageable pageable) {
+        if (cursorData == null) {
+            return courseRepository.findPublicCoursesByMemberId(memberId, pageable);
+        }
+        validateTimeCursor(cursorData);
+        return courseRepository.findPublicCoursesByMemberIdAfterCursor(
+                memberId, cursorData.dateTimeValue(), cursorData.id(), pageable);
     }
 
     public CourseInfoResponse getCourseInfo(Long courseId) {

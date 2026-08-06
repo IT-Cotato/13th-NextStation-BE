@@ -1,12 +1,17 @@
 package com.cotato.nextstation.domain.stamp.service.query;
 
+import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
+import com.cotato.nextstation.domain.member.service.query.MemberExistenceQueryService;
 import com.cotato.nextstation.domain.stamp.converter.MemberStampConverter;
+import com.cotato.nextstation.domain.stamp.dto.response.MemberStampListResponse;
+import com.cotato.nextstation.domain.stamp.dto.response.MemberStampResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.MyStampDetailResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.MyStampListResponse;
 import com.cotato.nextstation.domain.stamp.exception.StampErrorCode;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampDetailView;
-import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampView;
+import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.VisitedStationView;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,7 +47,20 @@ class MemberStampQueryServiceTest {
     private MemberStampRepository memberStampRepository;
 
     @Mock
+    private MemberExistenceQueryService memberExistenceQueryService;
+
+    @Mock
     private MemberStampConverter memberStampConverter;
+
+    private VisitedStationView stampView(Long stationId, String stationName, Long lineId, String lineName, LineCode lineCode) {
+        VisitedStationView view = mock(VisitedStationView.class);
+        lenient().when(view.getStationId()).thenReturn(stationId);
+        lenient().when(view.getStationName()).thenReturn(stationName);
+        lenient().when(view.getLineId()).thenReturn(lineId);
+        lenient().when(view.getLineName()).thenReturn(lineName);
+        lenient().when(view.getLineCode()).thenReturn(lineCode);
+        return view;
+    }
 
     @Test
     @DisplayName("완료한 코스 id만 집합으로 반환한다")
@@ -82,14 +101,92 @@ class MemberStampQueryServiceTest {
     }
 
     @Test
+    @DisplayName("방문한 서로 다른 역의 개수를 그대로 반환한다")
+    void getStampCount_returnsVisitedStationCount() {
+        // given
+        given(memberStampRepository.countVisitedStations(1L)).willReturn(12L);
+
+        // when
+        long stampCount = memberStampQueryService.getStampCount(1L);
+
+        // then
+        assertThat(stampCount).isEqualTo(12L);
+    }
+
+    @Test
+    @DisplayName("존재하는 회원이면 역 목록을 스탬프 목록으로 반환한다")
+    void getMemberStamps_success() {
+        // given
+        VisitedStationView view = stampView(6L, "보문역", 6L, "6호선", LineCode.LINE_6);
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
+        given(memberStampRepository.findVisitedStationsByMemberId(2L)).willReturn(List.of(view));
+
+        // when
+        MemberStampListResponse response = memberStampQueryService.getMemberStamps(2L);
+
+        // then
+        assertThat(response.stampCount()).isEqualTo(1);
+        assertThat(response.stamps()).containsExactly(
+                new MemberStampResponse(6L, "보문역", new LineSummaryResponse(6L, "6호선", LineCode.LINE_6)));
+    }
+
+    @Test
+    @DisplayName("1호선 → 9호선 순으로 정렬하고, 대표 호선이 없는 역은 맨 뒤로 보낸다")
+    void getMemberStamps_sortsByLineOrderWithNoLineLast() {
+        // given: 일부러 뒤섞어서 넘긴다 (3호선, 노선없음, 1호선)
+        VisitedStationView line3 = stampView(3L, "역C", 3L, "3호선", LineCode.LINE_3);
+        VisitedStationView noLine = stampView(2L, "역B", null, null, null);
+        VisitedStationView line1 = stampView(1L, "역A", 1L, "1호선", LineCode.LINE_1);
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
+        given(memberStampRepository.findVisitedStationsByMemberId(2L)).willReturn(List.of(line3, noLine, line1));
+
+        // when
+        MemberStampListResponse response = memberStampQueryService.getMemberStamps(2L);
+
+        // then
+        assertThat(response.stamps()).extracting(MemberStampResponse::stationId)
+                .containsExactly(1L, 3L, 2L);
+    }
+
+    @Test
+    @DisplayName("동일 호선 내에서는 역명 가나다순으로 정렬한다")
+    void getMemberStamps_sortsByStationNameWithinSameLine() {
+        // given: 같은 2호선인데 역명 순서를 뒤섞어서 넘긴다
+        VisitedStationView na = stampView(2L, "나역", 2L, "2호선", LineCode.LINE_2);
+        VisitedStationView da = stampView(3L, "다역", 2L, "2호선", LineCode.LINE_2);
+        VisitedStationView ga = stampView(1L, "가역", 2L, "2호선", LineCode.LINE_2);
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
+        given(memberStampRepository.findVisitedStationsByMemberId(2L)).willReturn(List.of(na, da, ga));
+
+        // when
+        MemberStampListResponse response = memberStampQueryService.getMemberStamps(2L);
+
+        // then
+        assertThat(response.stamps()).extracting(MemberStampResponse::stationName)
+                .containsExactly("가역", "나역", "다역");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원의 스탬프 목록을 조회하면 예외가 발생한다")
+    void getMemberStamps_memberNotFound() {
+        // given
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> memberStampQueryService.getMemberStamps(2L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(MemberErrorCode.MEMBER_NOT_FOUND.getMessage());
+    }
+
+    @Test
     @DisplayName("1호선 → 9호선 순으로 정렬하고, 대표 호선이 없는 역은 맨 뒤로 보낸다")
     void getMyStamps_sortsByLineOrder_nullLineLast() {
         // given: 리포지토리 응답 순서와 무관하게 노선 순으로 재정렬돼야 한다
-        MyStampView line6 = stampView(1L, LineCode.LINE_6);
-        MyStampView noLine = stampView(2L, null);
-        MyStampView line1 = stampView(3L, LineCode.LINE_1);
+        VisitedStationView line6 = stampView(1L, "역F", null, null, LineCode.LINE_6);
+        VisitedStationView noLine = stampView(2L, "역N", null, null, null);
+        VisitedStationView line1 = stampView(3L, "역A", null, null, LineCode.LINE_1);
 
-        given(memberStampRepository.findMyStampsByMemberId(1L))
+        given(memberStampRepository.findVisitedStationsByMemberId(1L))
                 .willReturn(List.of(line6, noLine, line1));
         given(memberStampConverter.toMyStampListResponse(any())).willReturn(mock(MyStampListResponse.class));
 
@@ -97,19 +194,43 @@ class MemberStampQueryServiceTest {
         memberStampQueryService.getMyStamps(1L);
 
         // then
-        ArgumentCaptor<List<MyStampView>> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<VisitedStationView>> captor = ArgumentCaptor.forClass(List.class);
         verify(memberStampConverter).toMyStampListResponse(captor.capture());
 
         assertThat(captor.getValue())
-                .extracting(MyStampView::getStationId)
+                .extracting(VisitedStationView::getStationId)
                 .containsExactly(3L, 1L, 2L);
+    }
+
+    @Test
+    @DisplayName("동일 호선 내에서는 역명 가나다순으로 정렬한다")
+    void getMyStamps_sortsByStationNameWithinSameLine() {
+        // given: 같은 2호선인데 역명 순서를 뒤섞어서 넘긴다
+        VisitedStationView na = stampView(2L, "나역", null, null, LineCode.LINE_2);
+        VisitedStationView da = stampView(3L, "다역", null, null, LineCode.LINE_2);
+        VisitedStationView ga = stampView(1L, "가역", null, null, LineCode.LINE_2);
+
+        given(memberStampRepository.findVisitedStationsByMemberId(1L))
+                .willReturn(List.of(na, da, ga));
+        given(memberStampConverter.toMyStampListResponse(any())).willReturn(mock(MyStampListResponse.class));
+
+        // when
+        memberStampQueryService.getMyStamps(1L);
+
+        // then
+        ArgumentCaptor<List<VisitedStationView>> captor = ArgumentCaptor.forClass(List.class);
+        verify(memberStampConverter).toMyStampListResponse(captor.capture());
+
+        assertThat(captor.getValue())
+                .extracting(VisitedStationView::getStationName)
+                .containsExactly("가역", "나역", "다역");
     }
 
     @Test
     @DisplayName("컨버터가 만든 응답을 그대로 반환한다")
     void getMyStamps_returnsConverterResponse() {
         // given
-        given(memberStampRepository.findMyStampsByMemberId(1L)).willReturn(List.of());
+        given(memberStampRepository.findVisitedStationsByMemberId(1L)).willReturn(List.of());
         MyStampListResponse expected = mock(MyStampListResponse.class);
         given(memberStampConverter.toMyStampListResponse(any())).willReturn(expected);
 
@@ -190,11 +311,4 @@ class MemberStampQueryServiceTest {
                 .hasMessageContaining(StampErrorCode.MEMBER_STAMP_NOT_FOUND.getMessage());
     }
 
-    // stationName은 getMyStamps의 정렬 로직이 참조하지 않아 스텁하지 않는다(불필요 스텁 경고 방지).
-    private MyStampView stampView(Long stationId, LineCode lineCode) {
-        MyStampView view = mock(MyStampView.class);
-        given(view.getStationId()).willReturn(stationId);
-        given(view.getLineCode()).willReturn(lineCode);
-        return view;
-    }
 }

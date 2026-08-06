@@ -4,7 +4,7 @@ import com.cotato.nextstation.domain.stamp.dto.response.MyStampDetailResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.MyStampListResponse;
 import com.cotato.nextstation.domain.stamp.dto.response.StampResponse;
 import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampDetailView;
-import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.MyStampView;
+import com.cotato.nextstation.domain.stamp.repository.MemberStampRepository.VisitedStationView;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +25,7 @@ class MemberStampConverterTest {
     @DisplayName("스탬프 목록과 총 개수를 응답으로 변환한다")
     void toMyStampListResponse_success() {
         // given
-        MyStampView view = mock(MyStampView.class);
+        VisitedStationView view = mock(VisitedStationView.class);
         given(view.getStationId()).willReturn(5L);
         given(view.getStationName()).willReturn("제기동역");
         given(view.getLineId()).willReturn(1L);
@@ -49,7 +49,7 @@ class MemberStampConverterTest {
     @DisplayName("대표 호선이 없으면 line이 null로 반환된다")
     void toMyStampListResponse_nullLine() {
         // given
-        MyStampView view = mock(MyStampView.class);
+        VisitedStationView view = mock(VisitedStationView.class);
         given(view.getStationId()).willReturn(7L);
         given(view.getStationName()).willReturn("동묘앞역");
         given(view.getLineId()).willReturn(null);
