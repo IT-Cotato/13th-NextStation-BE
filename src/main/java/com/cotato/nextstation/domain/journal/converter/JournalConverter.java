@@ -10,6 +10,7 @@ import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalList
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.CourseSnapshotView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.UncompletedCourseCardView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
@@ -55,21 +56,24 @@ public class JournalConverter {
 
         public UncompletedJournalListResponse toUncompletedJournalListResponse(
                 List<MemberStamp> uncompletedStamps,
-                Map<Long, CourseSnapshotView> courseSnapshotMap,
-                Map<Long, String> stationNameMap,
+                Map<Long, UncompletedCourseCardView> courseCardMap,
                 Map<Long, List<String>> tagsByCourse
         ) {
             List<UncompletedJournalListResponse.UncompletedCourseResponse> courses =
                     uncompletedStamps.stream()
                             .map(stamp -> {
-                                CourseSnapshotView courseSnapshot = courseSnapshotMap.get(stamp.getCourseId());
-                                String stationName = stationNameMap.get(courseSnapshot.getStationId());
+                                UncompletedCourseCardView courseCard = courseCardMap.get(stamp.getCourseId());
+                                LineSummaryResponse line = courseCard.getLineId() == null
+                                        ? null
+                                        : new LineSummaryResponse(
+                                                courseCard.getLineId(), courseCard.getLineName(), courseCard.getLineCode());
                                 List<String> tags = tagsByCourse.get(stamp.getCourseId());
 
                                 return new UncompletedJournalListResponse.UncompletedCourseResponse(
                                         stamp.getId(),
-                                        stationName,
-                                        courseSnapshot.getName(),
+                                        courseCard.getStationName(),
+                                        line,
+                                        courseCard.getName(),
                                         tags,
                                         stamp.getCreatedAt()
                                 );

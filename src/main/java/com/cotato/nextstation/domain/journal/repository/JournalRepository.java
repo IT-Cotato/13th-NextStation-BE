@@ -71,13 +71,19 @@ public interface JournalRepository extends JpaRepository<Journal, Long> {
             nativeQuery = true)
     Optional<CourseSnapshotView> findCourseSnapshotById(@Param("courseId") Long courseId);
 
-    // 위와 같은 목적의 배치 조회. 여행일지 미작성 목록은 스탬프 개수만큼 개별 조회하면
-    // 코스 하나만 삭제돼도(또는 그냥 N+1로도) 전체가 영향받으므로 한 번에 가져온다.
-    @Query(value = "SELECT c.id AS courseId, c.name AS name, c.station_id AS stationId, " +
-            "c.view_count AS viewCount, c.like_count AS likeCount " +
-            "FROM course c WHERE c.id IN :courseIds",
+    // 여행일지 미작성 목록 카드용 코스 정보 배치 조회 (삭제된 코스 포함). course→station→line을
+    // 네이티브로 직접 조인해 코스 이름·역 이름·대표 호선을 한 번에 가져온다
+    // (findMyJournalCards와 같은 기법). 완주 당시 스탬프라 코스가 이후 삭제됐을 수 있고,
+    // 스탬프 개수만큼 개별 조회하면 코스 하나만 삭제돼도(또는 그냥 N+1로도) 전체가 영향받으므로
+    // 삭제 여부와 무관하게 한 번에 가져온다.
+    @Query(value = "SELECT c.id AS courseId, c.name AS name, s.station_name AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM course c " +
+            "JOIN station s ON s.id = c.station_id " +
+            "LEFT JOIN line l ON l.id = s.draw_line_id " +
+            "WHERE c.id IN :courseIds",
             nativeQuery = true)
-    List<CourseSnapshotView> findCourseSnapshotsByIds(@Param("courseIds") Collection<Long> courseIds);
+    List<UncompletedCourseCardView> findUncompletedCourseCardsByIds(@Param("courseIds") Collection<Long> courseIds);
 
     interface CourseSnapshotView {
         Long getCourseId();
@@ -85,6 +91,15 @@ public interface JournalRepository extends JpaRepository<Journal, Long> {
         Long getStationId();
         int getViewCount();
         int getLikeCount();
+    }
+
+    interface UncompletedCourseCardView {
+        Long getCourseId();
+        String getName();
+        String getStationName();
+        Long getLineId();
+        String getLineName();
+        LineCode getLineCode();
     }
 
     interface MyJournalCardView {

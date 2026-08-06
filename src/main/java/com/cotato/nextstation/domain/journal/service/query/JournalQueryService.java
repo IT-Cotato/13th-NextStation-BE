@@ -20,6 +20,7 @@ import com.cotato.nextstation.domain.journal.repository.JournalImageRepository.J
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.CourseSnapshotView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.UncompletedCourseCardView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
@@ -127,20 +128,16 @@ public class JournalQueryService {
                 .map(MemberStamp::getCourseId)
                 .toList();
 
-        // 4. courseId → 코스 정보 (courseName, stationId). 완주 당시 스탬프라 코스가 이후
-        // 삭제됐을 수 있어 삭제 여부와 무관하게 한 번에 조회한다(스탬프 하나가 미작성이라도
-        // 전체 목록이 죽지 않도록 개별 조회 대신 배치 조회를 쓴다)
-        Map<Long, CourseSnapshotView> courseSnapshotMap = journalRepository.findCourseSnapshotsByIds(courseIds)
+        // 4. courseId → 코스 카드 정보 (courseName, stationName, line). 완주 당시 스탬프라 코스가
+        // 이후 삭제됐을 수 있어 삭제 여부와 무관하게 한 번에 조회한다(스탬프 하나가 미작성이라도
+        // 전체 목록이 죽지 않도록 개별 조회 대신 배치 조회를 쓴다). course→station→line을 한
+        // 쿼리에서 조인해 가져오므로 stationQueryService는 따로 부르지 않는다.
+        Map<Long, UncompletedCourseCardView> courseCardMap = journalRepository
+                .findUncompletedCourseCardsByIds(courseIds)
                 .stream()
-                .collect(Collectors.toMap(CourseSnapshotView::getCourseId, Function.identity()));
+                .collect(Collectors.toMap(UncompletedCourseCardView::getCourseId, Function.identity()));
 
-        // 5. stationId → stationName
-        Set<Long> stationIds = courseSnapshotMap.values().stream()
-                .map(CourseSnapshotView::getStationId)
-                .collect(Collectors.toSet());
-        Map<Long, String> stationNameMap = stationQueryService.getStationNames(stationIds);
-
-        // 6. courseId → placeIds → 태그 2개. CoursePlace는 코스가 삭제돼도 남아 있다.
+        // 5. courseId → placeIds → 태그 2개. CoursePlace는 코스가 삭제돼도 남아 있다.
         // TODO: CoursePlaceRepository에 배치 조회 메서드 생기면 N+1 개선 가능
         Map<Long, List<String>> tagsByCourse = new HashMap<>();
         for (Long courseId : courseIds) {
@@ -154,8 +151,7 @@ public class JournalQueryService {
         }
 
 
-        return journalConverter.toUncompletedJournalListResponse(
-                uncompletedStamps, courseSnapshotMap, stationNameMap, tagsByCourse);
+        return journalConverter.toUncompletedJournalListResponse(uncompletedStamps, courseCardMap, tagsByCourse);
     }
 
 

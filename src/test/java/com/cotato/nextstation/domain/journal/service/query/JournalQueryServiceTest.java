@@ -16,6 +16,7 @@ import com.cotato.nextstation.domain.journal.repository.JournalImageRepository.J
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.CourseSnapshotView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.UncompletedCourseCardView;
 import com.cotato.nextstation.domain.member.entity.Member;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
@@ -288,13 +289,11 @@ class JournalQueryServiceTest {
 
         private static final Long COURSE_ID_1 = 501L;
         private static final Long COURSE_ID_2 = 502L; // 삭제된 코스를 흉내낸다
-        private static final Long STATION_ID_1 = 6L;
-        private static final Long STATION_ID_2 = 7L;
 
         @Test
         // https://github.com/IT-Cotato/13th-NextStation-BE/issues/143
         @DisplayName("미작성 스탬프 중 하나가 참조하는 코스가 삭제됐어도(courseQueryService였다면 그 스탬프에서 " +
-                "404) 목록 조회 전체가 성공하고 삭제된 코스의 이름도 그대로 나온다")
+                "404) 목록 조회 전체가 성공하고 삭제된 코스의 이름·역·호선도 그대로 나온다")
         void oneCourseDeleted_stillReturnsFullList() {
             // given
             MemberStamp stamp1 = mock(MemberStamp.class);
@@ -311,22 +310,24 @@ class JournalQueryServiceTest {
             given(memberStampQueryService.getUncompletedStamps(OWNER_ID, Set.of()))
                     .willReturn(List.of(stamp1, stamp2));
 
-            // course 테이블 네이티브 조회는 코스가 삭제됐어도(is_deleted=true) 그대로 값을 돌려준다
-            CourseSnapshotView snapshot1 = mock(CourseSnapshotView.class);
-            given(snapshot1.getCourseId()).willReturn(COURSE_ID_1);
-            given(snapshot1.getName()).willReturn("보문에 살어리랏다");
-            given(snapshot1.getStationId()).willReturn(STATION_ID_1);
+            // course→station→line 네이티브 조인은 코스가 삭제됐어도(is_deleted=true) 그대로 값을 돌려준다.
+            // 대표 호선이 없는 역(card2)도 함께 검증한다(LEFT JOIN이라 line 컬럼이 전부 null).
+            UncompletedCourseCardView card1 = mock(UncompletedCourseCardView.class);
+            given(card1.getCourseId()).willReturn(COURSE_ID_1);
+            given(card1.getName()).willReturn("보문에 살어리랏다");
+            given(card1.getStationName()).willReturn("보문역");
+            given(card1.getLineId()).willReturn(6L);
+            given(card1.getLineName()).willReturn("6호선");
+            given(card1.getLineCode()).willReturn(LineCode.LINE_6);
 
-            CourseSnapshotView snapshot2 = mock(CourseSnapshotView.class);
-            given(snapshot2.getCourseId()).willReturn(COURSE_ID_2);
-            given(snapshot2.getName()).willReturn("삭제되기 전 코스 이름");
-            given(snapshot2.getStationId()).willReturn(STATION_ID_2);
+            UncompletedCourseCardView card2 = mock(UncompletedCourseCardView.class);
+            given(card2.getCourseId()).willReturn(COURSE_ID_2);
+            given(card2.getName()).willReturn("삭제되기 전 코스 이름");
+            given(card2.getStationName()).willReturn("한성대입구역");
+            given(card2.getLineId()).willReturn(null);
 
-            given(journalRepository.findCourseSnapshotsByIds(List.of(COURSE_ID_1, COURSE_ID_2)))
-                    .willReturn(List.of(snapshot1, snapshot2));
-
-            given(stationQueryService.getStationNames(Set.of(STATION_ID_1, STATION_ID_2)))
-                    .willReturn(Map.of(STATION_ID_1, "보문역", STATION_ID_2, "한성대입구역"));
+            given(journalRepository.findUncompletedCourseCardsByIds(List.of(COURSE_ID_1, COURSE_ID_2)))
+                    .willReturn(List.of(card1, card2));
 
             given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(COURSE_ID_1)).willReturn(List.of());
             given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(COURSE_ID_2)).willReturn(List.of());
@@ -348,12 +349,20 @@ class JournalQueryServiceTest {
             assertThat(response.courses())
                     .extracting(UncompletedJournalListResponse.UncompletedCourseResponse::stationName)
                     .containsExactlyInAnyOrder("보문역", "한성대입구역");
+            assertThat(response.courses())
+                    .filteredOn(course -> course.courseName().equals("보문에 살어리랏다"))
+                    .extracting(UncompletedJournalListResponse.UncompletedCourseResponse::line)
+                    .containsExactly(new LineSummaryResponse(6L, "6호선", LineCode.LINE_6));
+            assertThat(response.courses())
+                    .filteredOn(course -> course.courseName().equals("삭제되기 전 코스 이름"))
+                    .extracting(UncompletedJournalListResponse.UncompletedCourseResponse::line)
+                    .containsExactly((LineSummaryResponse) null);
             verify(courseQueryService, never()).getCourseInfo(any());
             verify(courseQueryService, never()).getCoursePlaces(any());
         }
 
         @Test
-        @DisplayName("미작성 스탬프가 없으면 빈 목록을 반환하고 코스 스냅샷 조회는 나가지 않는다")
+        @DisplayName("미작성 스탬프가 없으면 빈 목록을 반환하고 코스 카드 조회는 나가지 않는다")
         void noUncompletedStamps_returnsEmptyList() {
             // given
             given(journalRepository.findCompletedMemberStampIdsByMemberId(OWNER_ID)).willReturn(Set.of());
@@ -365,7 +374,7 @@ class JournalQueryServiceTest {
             // then
             assertThat(response.totalCount()).isEqualTo(0);
             assertThat(response.courses()).isEmpty();
-            verify(journalRepository, never()).findCourseSnapshotsByIds(any());
+            verify(journalRepository, never()).findUncompletedCourseCardsByIds(any());
         }
     }
 
