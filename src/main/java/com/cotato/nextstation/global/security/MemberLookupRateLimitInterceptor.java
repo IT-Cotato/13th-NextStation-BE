@@ -10,7 +10,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.time.Duration;
@@ -25,9 +24,15 @@ import java.time.Duration;
  * 인증 검증 자체는 컨트롤러 진입 시점에 JwtPrincipalArgumentResolver가 담당한다.
  * 여기서는 토큰이 없거나 파싱에 실패하면 그냥 통과시킨다 - 401 처리는 그쪽 책임이고,
  * 이 인터셉터가 인증 실패를 대신 판단하면 두 곳의 에러 처리가 어긋날 수 있다.
+ * <p>
+ * 주의: 아직 WebConfig.addInterceptors()에 등록돼 있지 않아 실제로는 요청 경로를 타지 않는다
+ * (프로덕션에서 레이트리밋 미적용). 예전엔 @Component였는데, 그 상태로는 Spring Boot의
+ * @WebMvcTest가 HandlerInterceptor 구현체를 슬라이스에 자동 포함시키면서 등록되지도 않은 이
+ * 빈 때문에 RedisTemplate<String,String> 빈이 없어 모든 @WebMvcTest가 컨텍스트 로딩에서
+ * 깨졌다. 실제로 등록해서 쓰려면 @Component를 복원하고 addInterceptors()에 추가한 뒤,
+ * 그 슬라이스를 쓰는 모든 @WebMvcTest에 RedisTemplate mock을 같이 추가해야 한다.
  */
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class MemberLookupRateLimitInterceptor implements HandlerInterceptor {
 
