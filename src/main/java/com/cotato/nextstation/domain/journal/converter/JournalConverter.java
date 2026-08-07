@@ -1,14 +1,16 @@
 package com.cotato.nextstation.domain.journal.converter;
 
-import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.entity.CoursePlace;
 import com.cotato.nextstation.domain.journal.dto.response.JournalDetailResponse;
 import com.cotato.nextstation.domain.journal.dto.response.JournalWriteInfoResponse;
 import com.cotato.nextstation.domain.journal.dto.response.MyJournalListResponse;
 import com.cotato.nextstation.domain.journal.dto.response.MyJournalResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.CourseSnapshotView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.UncompletedCourseCardView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.stamp.entity.MemberStamp;
@@ -20,6 +22,15 @@ import java.util.Map;
 
 @Component
 public class JournalConverter {
+
+    // CoursePlace는 Course와 달리 소프트 삭제 대상이 아니라 코스가 삭제돼도 그대로 남아 있다.
+    // CourseConverter.toPlaceInfoResponses()와 같은 변환이지만, 코스 존재 검증(findCourse)을
+    // 거치지 않고 리포지토리 조회 결과를 그대로 받는 호출부(여행일지 조회)를 위해 여기 따로 둔다.
+    public List<CoursePlaceInfoResponse> toPlaceInfoResponses(List<CoursePlace> coursePlaces) {
+        return coursePlaces.stream()
+                .map(coursePlace -> new CoursePlaceInfoResponse(coursePlace.getPlaceId(), coursePlace.getOrderNum()))
+                .toList();
+    }
 
     public JournalWriteInfoResponse toWriteInfoResponse(
             String stationName,
@@ -43,31 +54,37 @@ public class JournalConverter {
         return new JournalWriteInfoResponse(stationName, courseName, tags, places);
     }
 
-        public UncompletedJournalListResponse toUncompletedJournalListResponse(
-                List<MemberStamp> uncompletedStamps,
-                Map<Long, CourseInfoResponse> courseInfoMap,
-                Map<Long, String> stationNameMap,
-                Map<Long, List<String>> tagsByCourse
-        ) {
-            List<UncompletedJournalListResponse.UncompletedCourseResponse> courses =
-                    uncompletedStamps.stream()
-                            .map(stamp -> {
-                                CourseInfoResponse courseInfo = courseInfoMap.get(stamp.getCourseId());
-                                String stationName = stationNameMap.get(courseInfo.stationId());
-                                List<String> tags = tagsByCourse.get(stamp.getCourseId());
+    // uncompletedStamps는 courseCardMap에 카드가 없는 스탬프가 이미 걸러진 상태로 들어온다
+    // (JournalQueryService.getUncompletedJournals 참고). 그래도 이 컨버터만 따로 호출됐을 때
+    // NPE 대신 안전하게 건너뛰도록 한 번 더 방어한다.
+    public UncompletedJournalListResponse toUncompletedJournalListResponse(
+            List<MemberStamp> uncompletedStamps,
+            Map<Long, UncompletedCourseCardView> courseCardMap,
+            Map<Long, List<String>> tagsByCourse
+    ) {
+        List<UncompletedJournalListResponse.UncompletedCourseResponse> courses = uncompletedStamps.stream()
+                .filter(stamp -> courseCardMap.containsKey(stamp.getCourseId()))
+                .map(stamp -> {
+                    UncompletedCourseCardView courseCard = courseCardMap.get(stamp.getCourseId());
+                    LineSummaryResponse line = courseCard.getLineId() == null
+                            ? null
+                            : new LineSummaryResponse(
+                                    courseCard.getLineId(), courseCard.getLineName(), courseCard.getLineCode());
+                    List<String> tags = tagsByCourse.get(stamp.getCourseId());
 
-                                return new UncompletedJournalListResponse.UncompletedCourseResponse(
-                                        stamp.getId(),
-                                        stationName,
-                                        courseInfo.name(),
-                                        tags,
-                                        stamp.getCreatedAt()
-                                );
-                            })
-                            .toList();
+                    return new UncompletedJournalListResponse.UncompletedCourseResponse(
+                            stamp.getId(),
+                            courseCard.getStationName(),
+                            line,
+                            courseCard.getName(),
+                            tags,
+                            stamp.getCreatedAt()
+                    );
+                })
+                .toList();
 
-            return new UncompletedJournalListResponse(courses.size(), courses);
-        }
+        return new UncompletedJournalListResponse(courses.size(), courses);
+    }
 
     public MyJournalListResponse toMyJournalListResponse(
             List<MyJournalCardView> myJournalCards,
@@ -99,7 +116,7 @@ public class JournalConverter {
             Journal journal,
             LineSummaryResponse line,
             String stationName,
-            CourseInfoResponse courseInfo,
+            CourseSnapshotView courseSnapshot,
             int viewCount,
             boolean isMine,
             boolean isLiked,
@@ -123,14 +140,14 @@ public class JournalConverter {
                 journal.getTraveledAt(),
                 line,
                 stationName,
-                courseInfo.courseId(),
-                courseInfo.name(),
+                courseSnapshot.getCourseId(),
+                courseSnapshot.getName(),
                 isMine,
                 isLiked,
                 tags,
                 journal.getTravelDuration(),
                 viewCount,
-                courseInfo.likeCount(),
+                courseSnapshot.getLikeCount(),
                 imageUrls,
                 journal.getOverallReview(),
                 visitedPlaces

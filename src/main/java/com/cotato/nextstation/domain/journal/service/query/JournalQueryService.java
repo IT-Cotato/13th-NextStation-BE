@@ -1,7 +1,8 @@
 package com.cotato.nextstation.domain.journal.service.query;
 
-import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.entity.CoursePlace;
+import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.converter.JournalConverter;
@@ -16,7 +17,9 @@ import com.cotato.nextstation.domain.journal.exception.JournalErrorCode;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository;
 import com.cotato.nextstation.domain.journal.repository.JournalImageRepository.JournalImageView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.CourseSnapshotView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
+import com.cotato.nextstation.domain.journal.repository.JournalRepository.UncompletedCourseCardView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
@@ -31,6 +34,7 @@ import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -40,6 +44,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -54,6 +59,7 @@ public class JournalQueryService {
     private final MemberStampQueryService memberStampQueryService;
     private final CourseQueryService courseQueryService;
     private final CourseCommandService courseCommandService;
+    private final CoursePlaceRepository coursePlaceRepository;
     private final PlaceInfoQueryService placeInfoQueryService;
     private final StationQueryService stationQueryService;
 
@@ -70,14 +76,16 @@ public class JournalQueryService {
         // 1. memberStampId → courseId
         Long courseId = memberStampQueryService.getCourseId(memberId, memberStampId);
 
-        // 2. courseId → 코스 정보 (courseName, stationId)
-        CourseInfoResponse courseInfo = courseQueryService.getCourseInfo(courseId);
+        // 2. courseId → 코스 정보 (courseName, stationId). 완주 후 코스가 삭제됐어도 작성은
+        // 계속할 수 있어야 하므로 삭제 여부와 무관하게 조회한다 (getCourseSnapshot 참고)
+        CourseSnapshotView courseSnapshot = getCourseSnapshot(courseId);
 
         // 3. stationId → stationName
-        String stationName = stationQueryService.getStationName(courseInfo.stationId());
+        String stationName = stationQueryService.getStationName(courseSnapshot.getStationId());
 
-        // 4. courseId → 장소 목록 (placeId + orderNum)
-        List<CoursePlaceInfoResponse> coursePlaces = courseQueryService.getCoursePlaces(courseId);
+        // 4. courseId → 장소 목록 (placeId + orderNum). CoursePlace는 코스가 삭제돼도 남아 있다.
+        List<CoursePlaceInfoResponse> coursePlaces = journalConverter.toPlaceInfoResponses(
+                coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId));
         List<Long> placeIds = coursePlaces.stream()
                 .map(CoursePlaceInfoResponse::placeId)
                 .toList();
@@ -90,7 +98,19 @@ public class JournalQueryService {
         // 6. placeIds → 태그 상위 3개
         List<String> tags = placeInfoQueryService.getTopTagNames(placeIds);
 
-        return journalConverter.toWriteInfoResponse(stationName, courseInfo.name(), tags, coursePlaces, placeInfoMap);
+        return journalConverter.toWriteInfoResponse(
+                stationName, courseSnapshot.getName(), tags, coursePlaces, placeInfoMap);
+    }
+
+    // courseQueryService.getCourseInfo()는 Course의 @SQLRestriction(is_deleted = false) 때문에
+    // 완주 후 코스가 삭제되면 COURSE_NOT_FOUND를 던진다. 여행일지 조회(작성 초기 정보/미작성 목록/상세)는
+    // 코스 삭제와 무관하게 완주 당시 코스 정보를 그대로 보여줘야 해서, journalRepository가 course
+    // 테이블을 직접 조회해 그 제약을 우회한다.
+    // Course 도메인 클래스에 의존하지 않도록 예외는 JournalErrorCode의 로컬 상수로 던진다
+    // (courseId는 이미 소유권 검증을 마친 스탬프에서 나온 값이라 실제로는 거의 발생하지 않는다).
+    private CourseSnapshotView getCourseSnapshot(Long courseId) {
+        return journalRepository.findCourseSnapshotById(courseId)
+                .orElseThrow(() -> new CustomException(JournalErrorCode.COURSE_NOT_FOUND));
     }
 
     // 여행일지 미작성 코스 조회
@@ -111,24 +131,36 @@ public class JournalQueryService {
                 .map(MemberStamp::getCourseId)
                 .toList();
 
-        // 4. courseId → 코스 정보 (courseName, stationId)
-        // TODO: CourseQueryService에 배치 조회 메서드 생기면 N+1 개선 가능
-        Map<Long, CourseInfoResponse> courseInfoMap = courseIds.stream()
-                .map(courseQueryService::getCourseInfo)
-                .collect(Collectors.toMap(CourseInfoResponse::courseId, Function.identity()));
+        // 4. courseId → 코스 카드 정보 (courseName, stationName, line). 완주 당시 스탬프라 코스가
+        // 이후 삭제됐을 수 있어 삭제 여부와 무관하게 한 번에 조회한다(스탬프 하나가 미작성이라도
+        // 전체 목록이 죽지 않도록 개별 조회 대신 배치 조회를 쓴다). course→station→line을 한
+        // 쿼리에서 조인해 가져오므로 stationQueryService는 따로 부르지 않는다.
+        Map<Long, UncompletedCourseCardView> courseCardMap = journalRepository
+                .findUncompletedCourseCardsByIds(courseIds)
+                .stream()
+                .collect(Collectors.toMap(UncompletedCourseCardView::getCourseId, Function.identity()));
 
-        // 5. stationId → stationName
-        Set<Long> stationIds = courseInfoMap.values().stream()
-                .map(CourseInfoResponse::stationId)
-                .collect(Collectors.toSet());
-        Map<Long, String> stationNameMap = stationQueryService.getStationNames(stationIds);
+        // course→station INNER JOIN이라 course나 station이 하드 삭제되면 그 courseId는 결과에서
+        // 통째로 빠진다. 그 스탬프만 목록에서 제외하고, 나머지 스탬프는 정상 응답돼야 한다
+        // (배치 조회를 쓰는 목적 자체가 스탬프 하나 때문에 전체가 죽지 않게 하는 것이다).
+        List<MemberStamp> validStamps = uncompletedStamps.stream()
+                .filter(stamp -> courseCardMap.containsKey(stamp.getCourseId()))
+                .toList();
+        if (validStamps.size() < uncompletedStamps.size()) {
+            log.warn("코스 카드를 찾을 수 없어 미작성 목록에서 제외: missingCourseIds={}",
+                    uncompletedStamps.stream()
+                            .map(MemberStamp::getCourseId)
+                            .filter(courseId -> !courseCardMap.containsKey(courseId))
+                            .toList());
+        }
 
-        // 6. courseId → placeIds → 태그 2개
-        // TODO: CourseQueryService에 배치 조회 메서드 생기면 N+1 개선 가능
+        // 5. courseId → placeIds → 태그 2개. CoursePlace는 코스가 삭제돼도 남아 있다.
+        // TODO: CoursePlaceRepository에 배치 조회 메서드 생기면 N+1 개선 가능
         Map<Long, List<String>> tagsByCourse = new HashMap<>();
-        for (Long courseId : courseIds) {
-            List<Long> placeIds = courseQueryService.getCoursePlaces(courseId).stream()
-                    .map(CoursePlaceInfoResponse::placeId)
+        for (MemberStamp stamp : validStamps) {
+            Long courseId = stamp.getCourseId();
+            List<Long> placeIds = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId).stream()
+                    .map(CoursePlace::getPlaceId)
                     .toList();
             List<String> tags = placeInfoQueryService.getTopTagNames(placeIds).stream()
                     .limit(TAGS_PER_CARD)
@@ -136,9 +168,7 @@ public class JournalQueryService {
             tagsByCourse.put(courseId, tags);
         }
 
-
-        return journalConverter.toUncompletedJournalListResponse(
-                uncompletedStamps, courseInfoMap, stationNameMap, tagsByCourse);
+        return journalConverter.toUncompletedJournalListResponse(validStamps, courseCardMap, tagsByCourse);
     }
 
 
@@ -215,16 +245,17 @@ public class JournalQueryService {
         Long courseId = memberStampQueryService.getCourseId(
                 journal.getMember().getId(), journal.getMemberStampId());
 
-        // 4. courseId → 코스 정보 (courseName, stationId, viewCount, saveCount)
-        CourseInfoResponse courseInfo = courseQueryService.getCourseInfo(courseId);
+        // 4. courseId → 코스 정보 (courseName, stationId, viewCount, saveCount). 이미 작성된
+        // 일지는 코스가 이후 삭제돼도 상세 조회가 계속 가능해야 하므로 삭제 여부와 무관하게 조회한다
+        CourseSnapshotView courseSnapshot = getCourseSnapshot(courseId);
 
         // 5. stationId → stationName, line
-       String stationName = stationQueryService
-                .getStationName(courseInfo.stationId());
-        LineSummaryResponse line = stationQueryService.getLine(courseInfo.stationId());
+        String stationName = stationQueryService.getStationName(courseSnapshot.getStationId());
+        LineSummaryResponse line = stationQueryService.getLine(courseSnapshot.getStationId());
 
-        // 6. courseId → 장소 목록 (placeId + orderNum)
-        List<CoursePlaceInfoResponse> coursePlaces = courseQueryService.getCoursePlaces(courseId);
+        // 6. courseId → 장소 목록 (placeId + orderNum). CoursePlace는 코스가 삭제돼도 남아 있다.
+        List<CoursePlaceInfoResponse> coursePlaces = journalConverter.toPlaceInfoResponses(
+                coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId));
         List<Long> placeIds = coursePlaces.stream()
                 .map(CoursePlaceInfoResponse::placeId)
                 .toList();
@@ -259,16 +290,16 @@ public class JournalQueryService {
 
         // 11. 조회수 반영 (본인 조회는 CourseCommandService 내부에서 제외) + 좋아요 여부
         //
-        // increaseViewCount가 반환하는 값을 그대로 써야 한다. 이 트랜잭션(readOnly)에서 courseInfo를
+        // increaseViewCount가 반환하는 값을 그대로 써야 한다. 이 트랜잭션(readOnly)에서 courseSnapshot을
         // 다시 조회해도 REPEATABLE READ 스냅샷 때문에 증가 전 값이 보인다 — REQUIRES_NEW로 증가를 수행한
-        // 그 트랜잭션 안에서 읽은 값만 증가분을 반영하고 있다. 실패(또는 본인 조회로 no-op)했으면
-        // null이 오므로 4번에서 조회해 둔 courseInfo의 값으로 대체한다.
+        // 그 트랜잭션 안에서 읽은 값만 증가분을 반영하고 있다. 실패(코스가 삭제됐거나 본인 조회로 no-op)했으면
+        // null이 오므로 4번에서 조회해 둔 courseSnapshot의 값으로 대체한다.
         Integer updatedViewCount = courseCommandService.increaseViewCount(courseId, memberId);
         boolean isLiked = courseQueryService.isLikedByMember(courseId, memberId);
-        int viewCount = updatedViewCount != null ? updatedViewCount : courseInfo.viewCount();
+        int viewCount = updatedViewCount != null ? updatedViewCount : courseSnapshot.getViewCount();
 
         return journalConverter.toJournalDetailResponse(
-                journal, line, stationName, courseInfo, viewCount, isOwner, isLiked, tags, imageUrls,
+                journal, line, stationName, courseSnapshot, viewCount, isOwner, isLiked, tags, imageUrls,
                 coursePlaces, placeInfoMap, reviewByPlaceId, imageUrlByReviewId);
     }
 

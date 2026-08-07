@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.journal.dto.response;
 
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,6 +19,9 @@ public record UncompletedJournalListResponse(
 
             @Schema(description = "역 이름", example = "공릉역")
             String stationName,
+
+            @Schema(description = "역의 대표 호선 (없으면 null)")
+            LineSummaryResponse line,
 
             @Schema(description = "코스 이름", example = "철길 따라 은주랑 같이 다녀온 여행")
             String courseName,
