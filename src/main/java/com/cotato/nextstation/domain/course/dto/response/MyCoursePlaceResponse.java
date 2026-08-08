@@ -20,10 +20,7 @@ public record MyCoursePlaceResponse(
         @Schema(description = "카테고리 표시명", example = "문화공간")
         String categoryName,
 
-        @Schema(description = """
-                대표 이미지 URL (장소 이미지가 없으면 카테고리 기본 이미지).
-                카테고리 기본 이미지가 아직 등록되지 않아 null로 내려갈 수 있어, 그때는 categoryCode로 대체 이미지를 그린다.
-                """, nullable = true)
+        @Schema(description = "대표 이미지 URL (장소 이미지가 없으면 카테고리 기본 이미지)")
         String imageUrl,
 
         @Schema(description = "경도(x). 지도 핀 좌표", example = "127.0345")
