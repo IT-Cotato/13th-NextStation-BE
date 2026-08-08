@@ -180,9 +180,9 @@ class MyCourseControllerTest {
                 new LineSummaryResponse(2L, "2호선", LineCode.LINE_2),
                 List.of(
                         new MyCoursePlaceResponse(11L, "보문숲길도서관", "혼자 조용히 머물기 좋은 동네 도서관",
-                                "https://img/1.jpg", 127.0345, 37.5804, 1),
+                                "CULTURE", "문화공간", "https://img/1.jpg", 127.0345, 37.5804, 1),
                         new MyCoursePlaceResponse(12L, "보문사", "천년 고찰",
-                                "https://img/2.jpg", 127.0350, 37.5810, 2))));
+                                "CULTURE", "문화공간", null, 127.0350, 37.5810, 2))));
 
         mockMvc.perform(get("/api/v1/members/me/courses/{courseId}", 1L)
                         .header("Authorization", "Bearer " + TOKEN))
@@ -195,7 +195,11 @@ class MyCourseControllerTest {
                 .andExpect(jsonPath("$.data.places[0].xCoordinate").value(127.0345))
                 .andExpect(jsonPath("$.data.places[0].yCoordinate").value(37.5804))
                 .andExpect(jsonPath("$.data.places[0].orderNum").value(1))
-                .andExpect(jsonPath("$.data.places[1].placeName").value("보문사"));
+                .andExpect(jsonPath("$.data.places[1].placeName").value("보문사"))
+                // 이미지가 없는 장소는 카테고리로 기본 이미지를 그리므로 카테고리가 함께 실려야 한다
+                .andExpect(jsonPath("$.data.places[1].imageUrl").isEmpty())
+                .andExpect(jsonPath("$.data.places[1].categoryCode").value("CULTURE"))
+                .andExpect(jsonPath("$.data.places[1].categoryName").value("문화공간"));
     }
 
     @Test
