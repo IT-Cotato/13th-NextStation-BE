@@ -707,7 +707,7 @@ class CourseQueryServiceTest {
     @DisplayName("둘러보기 메인의 노선 코스는 역 목록을 조회하지 않는다")
     void getLineCourses_noAvailableStations() {
         // given: 메인 화면에는 역 선택이 없어 계산해도 응답에 담기지 않는다
-        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+        given(courseRepository.findExploreCoursesByPopular(any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .willReturn(List.of());
         given(courseConverter.toExploreListResponse(any(), any(), any(), any(), anyBoolean()))
                 .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
@@ -718,6 +718,25 @@ class CourseQueryServiceTest {
         // then
         verify(courseRepository, never()).findDrawableStations(any());
         verify(courseRepository, never()).findStationsWithPublicCourses(any());
+    }
+
+    @Test
+    @DisplayName("둘러보기 메인의 노선 코스는 목록 API와 같은 기본 정렬(인기순)로 조회한다")
+    void getLineCourses_usesDefaultSort() {
+        // given: 여기만 정렬이 다르면 더보기로 넘어갔을 때 미리보기의 코스가 사라진 것처럼 보인다
+        given(courseRepository.findExploreCoursesByPopular(any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(List.of());
+        given(courseConverter.toExploreListResponse(any(), any(), any(), any(), anyBoolean()))
+                .willReturn(new ExploreCourseListResponse(List.of(), List.of(), null, false));
+
+        // when
+        courseQueryService.getLineCourses(null, 6L, 3);
+
+        // then
+        verify(courseRepository)
+                .findExploreCoursesByPopular(any(), any(), any(), any(), any(), any(), any(), any(Pageable.class));
+        verify(courseRepository, never())
+                .findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class));
     }
 
     @Test
@@ -764,10 +783,10 @@ class CourseQueryServiceTest {
     }
 
     @Test
-    @DisplayName("정렬을 생략하면 최신순으로 조회한다")
-    void getExploreCourses_defaultsToLatest() {
+    @DisplayName("정렬을 생략하면 인기순으로 조회한다")
+    void getExploreCourses_defaultsToPopular() {
         // given
-        given(courseRepository.findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+        given(courseRepository.findExploreCoursesByPopular(any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .willReturn(List.of());
 
         // when
@@ -775,9 +794,10 @@ class CourseQueryServiceTest {
                 null, new ExploreCourseCondition(null, null, null, null), null, null, null);
 
         // then: 정렬이 없으면 페이지마다 순서가 흔들려 커서 페이징이 성립하지 않는다
-        verify(courseRepository).findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class));
-        verify(courseRepository, never())
+        verify(courseRepository)
                 .findExploreCoursesByPopular(any(), any(), any(), any(), any(), any(), any(), any(Pageable.class));
+        verify(courseRepository, never())
+                .findExploreCoursesByLatest(any(), any(), any(), any(), any(), any(), any(Pageable.class));
     }
 
     @Test

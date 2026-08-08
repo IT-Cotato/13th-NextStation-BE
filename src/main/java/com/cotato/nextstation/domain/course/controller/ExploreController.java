@@ -78,8 +78,8 @@ public class ExploreController {
                       **첫 페이지에서만** 채워지고 다음 페이지부터는 빈 배열이다.
                     - `keyword`는 **코스 이름과 역명**만 검색한다. 역명은 꼬리의 `역`을 떼고 비교하므로
                       `신림`과 `신림역` 중 무엇을 넣어도 결과가 같다.
-                    - `sort`는 `LATEST`(기본, 최신순) 또는 `POPULAR`(조회수 + 좋아요×2, 동률이면 최신순)다.
-                      화면의 "전체"는 `LATEST`로 보내면 된다.
+                    - `sort`는 `POPULAR`(기본, 조회수 + 좋아요×2, 동률이면 최신순) 또는 `LATEST`(최신순)다.
+                      정렬 토글이 없는 검색 결과 화면은 생략하면 되고, 그때도 인기순으로 나온다.
                     - **정렬을 바꾸면 커서를 버리고 첫 페이지부터 다시 요청해야 한다.** 정렬마다 커서 구조가 달라
                       이전 커서를 그대로 보내면 400이다.
                     - `isLiked`는 요청한 회원의 좋아요 여부다. 둘러보기 탭은 로그인 필수라 항상 채워진다.
@@ -101,7 +101,7 @@ public class ExploreController {
             @RequestParam(required = false) Long stationId,
             @Parameter(description = "검색어 (코스 이름·역명)", example = "신림")
             @RequestParam(required = false) String keyword,
-            @Parameter(description = "정렬 기준 (기본 LATEST)", example = "LATEST")
+            @Parameter(description = "정렬 기준 (기본 POPULAR)", example = "POPULAR")
             @RequestParam(required = false) CourseSort sort,
             @Parameter(description = "다음 페이지 커서 (첫 페이지는 생략)")
             @RequestParam(required = false) String cursor,
