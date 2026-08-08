@@ -1,7 +1,9 @@
 package com.cotato.nextstation.domain.course.converter;
 
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
+import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
+import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
@@ -68,6 +70,39 @@ class CourseConverterTest {
 
         // then: 셋 다 null이므로 노선 객체 자체를 내리지 않는다
         assertThat(response.line()).isNull();
+    }
+
+    @Test
+    @DisplayName("코스 확인 장소 응답에 조회한 장소 정보를 순서와 함께 그대로 담는다")
+    void toMyCoursePlaceResponse() {
+        // given
+        PlaceInfoResponse place = new PlaceInfoResponse(
+                11L, "보문숲길도서관", "혼자 조용히 머물기 좋은 동네 도서관",
+                "CULTURE", "문화공간", "https://img/1.jpg", 127.0345, 37.5804);
+
+        // when
+        MyCoursePlaceResponse response = courseConverter.toMyCoursePlaceResponse(place, 2);
+
+        // then: 필드가 하나라도 누락되면 화면에서 핀/이미지/순서가 어긋난다
+        assertThat(response).isEqualTo(new MyCoursePlaceResponse(
+                11L, "보문숲길도서관", "혼자 조용히 머물기 좋은 동네 도서관",
+                "CULTURE", "문화공간", "https://img/1.jpg", 127.0345, 37.5804, 2));
+    }
+
+    @Test
+    @DisplayName("장소 이미지가 없어도 카테고리는 담아 내린다")
+    void toMyCoursePlaceResponse_withoutImage() {
+        // given: 카테고리 기본 이미지가 아직 없어 imageUrl이 비는 장소
+        PlaceInfoResponse place = new PlaceInfoResponse(
+                12L, "보문사", "천년 고찰", "CULTURE", "문화공간", null, 127.0350, 37.5810);
+
+        // when
+        MyCoursePlaceResponse response = courseConverter.toMyCoursePlaceResponse(place, 1);
+
+        // then: 이 경우 프론트가 카테고리로 대체 이미지를 고른다
+        assertThat(response.imageUrl()).isNull();
+        assertThat(response.categoryCode()).isEqualTo("CULTURE");
+        assertThat(response.categoryName()).isEqualTo("문화공간");
     }
 
     @ParameterizedTest(name = "장소 {0}곳이면 {1}")

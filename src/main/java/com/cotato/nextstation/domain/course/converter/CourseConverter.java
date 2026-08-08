@@ -115,6 +115,8 @@ public class CourseConverter {
                 place.placeId(),
                 place.placeName(),
                 place.description(),
+                place.categoryCode(),
+                place.categoryName(),
                 place.imageUrl(),
                 place.xCoordinate(),
                 place.yCoordinate(),
