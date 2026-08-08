@@ -14,7 +14,16 @@ public record MyCoursePlaceResponse(
         @Schema(description = "장소 설명 (목록에서 한 줄로 표시)", example = "혼자 조용히 머물기 좋은 동네 도서관")
         String description,
 
-        @Schema(description = "대표 이미지 URL (장소 이미지가 없으면 카테고리 기본 이미지)")
+        @Schema(description = "카테고리 코드", example = "CULTURE", allowableValues = {"CAFE", "FOOD", "CULTURE", "WALK"})
+        String categoryCode,
+
+        @Schema(description = "카테고리 표시명", example = "문화공간")
+        String categoryName,
+
+        @Schema(description = """
+                대표 이미지 URL (장소 이미지가 없으면 카테고리 기본 이미지).
+                카테고리 기본 이미지가 아직 등록되지 않아 null로 내려갈 수 있어, 그때는 categoryCode로 대체 이미지를 그린다.
+                """, nullable = true)
         String imageUrl,
 
         @Schema(description = "경도(x). 지도 핀 좌표", example = "127.0345")
