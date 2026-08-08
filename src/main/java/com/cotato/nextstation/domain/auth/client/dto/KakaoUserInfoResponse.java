@@ -18,7 +18,8 @@ public record KakaoUserInfoResponse(
     public record KakaoAccount(
             String email,
 
-            // 이메일 동의 안 하면 카카오가 null로 내려줄 수 있어 Boolean(박싱)으로 받음 - boolean이면 파싱 불가
+            // 이메일은 필수 동의 항목이지만 카카오 계정에 인증된 이메일이 없으면 카카오가 null로 내려줄 수 있어
+            // Boolean(박싱)으로 받음 - boolean이면 파싱 불가
             @JsonProperty("is_email_valid")
             Boolean isEmailValid,
 
@@ -39,7 +40,7 @@ public record KakaoUserInfoResponse(
         }
     }
 
-    // kakao_account/profile 전체가 null일 수 있음(선택 동의 거부) -> 항상 이 메서드로 접근
+    // 닉네임/프로필 이미지는 선택 동의라 거부 시 kakao_account/profile 전체가 null일 수 있음 -> 항상 이 메서드로 접근
     public String extractVerifiedEmail() {
         // isEmailVerified()가 Boolean(nullable)이라 !로 언박싱하면 null일 때 NPE - Boolean.TRUE.equals로 안전하게 비교
         if (kakaoAccount == null || kakaoAccount.email() == null || !Boolean.TRUE.equals(kakaoAccount.isEmailVerified())) {

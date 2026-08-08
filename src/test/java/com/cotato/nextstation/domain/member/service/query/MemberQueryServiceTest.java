@@ -2,12 +2,16 @@ package com.cotato.nextstation.domain.member.service.query;
 
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.member.converter.MemberConverter;
+import com.cotato.nextstation.domain.member.dto.response.AccountInfoResponse;
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
+import com.cotato.nextstation.domain.member.entity.AuthProvider;
 import com.cotato.nextstation.domain.member.dto.response.OtherMemberProfileResponse;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
+import com.cotato.nextstation.domain.member.entity.MemberSocialAccount;
 import com.cotato.nextstation.domain.member.exception.MemberErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
+import com.cotato.nextstation.domain.member.repository.MemberSocialAccountRepository;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +37,9 @@ class MemberQueryServiceTest {
 
     @Mock
     private MemberRepository memberRepository;
+
+    @Mock
+    private MemberSocialAccountRepository memberSocialAccountRepository;
 
     @Mock
     private MemberConverter memberConverter;
@@ -64,6 +71,47 @@ class MemberQueryServiceTest {
 
         // then
         assertThat(response).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("소셜 연동이 없으면 provider가 LOCAL이다")
+    void getMyAccountInfo_local() {
+        // given
+        Member member = activeMember();
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(memberSocialAccountRepository.findFirstByMemberIdOrderByIdAsc(1L)).willReturn(Optional.empty());
+        given(memberConverter.toAccountInfoResponse(member, null))
+                .willReturn(new AccountInfoResponse("LOCAL", "user@example.com"));
+
+        // when
+        AccountInfoResponse response = memberQueryService.getMyAccountInfo(1L);
+
+        // then
+        assertThat(response.provider()).isEqualTo("LOCAL");
+        assertThat(response.email()).isEqualTo("user@example.com");
+    }
+
+    @Test
+    @DisplayName("카카오로 연동된 회원이면 provider가 KAKAO이다")
+    void getMyAccountInfo_kakao() {
+        // given
+        Member member = activeMember();
+        MemberSocialAccount socialAccount = MemberSocialAccount.builder()
+                .memberId(1L)
+                .provider(AuthProvider.KAKAO)
+                .providerUserId("123456")
+                .email("user@example.com")
+                .build();
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(memberSocialAccountRepository.findFirstByMemberIdOrderByIdAsc(1L)).willReturn(Optional.of(socialAccount));
+        given(memberConverter.toAccountInfoResponse(member, socialAccount))
+                .willReturn(new AccountInfoResponse("KAKAO", "user@example.com"));
+
+        // when
+        AccountInfoResponse response = memberQueryService.getMyAccountInfo(1L);
+
+        // then
+        assertThat(response.provider()).isEqualTo("KAKAO");
     }
 
     @Test

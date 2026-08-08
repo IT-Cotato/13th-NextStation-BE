@@ -1,19 +1,7 @@
--- 약관/카테고리/장소태그 마스터 데이터
--- member_terms_agreement/place/place_tag_mapping이 각각 이 테이블들을 FK로 참조하므로
+-- 카테고리/장소태그 마스터 데이터
+-- place/place_tag_mapping이 각각 이 테이블들을 FK로 참조하므로
 -- 재시작마다 DELETE 후 재삽입하면 참조가 생긴 뒤부터는 제약 위반으로 실패한다.
 -- 그래서 PK(id)를 그대로 유지한 채 내용만 갱신하는 INSERT ... ON DUPLICATE KEY UPDATE로 시딩한다.
-
-INSERT INTO terms_consents (title, content, version, is_required, created_at, updated_at)
-VALUES ('서비스 이용약관', '제1조 (목적) ...', 'v1.0', true, NOW(), NOW())
-ON DUPLICATE KEY UPDATE content = VALUES(content), is_required = VALUES(is_required), updated_at = NOW();
-
-INSERT INTO terms_consents (title, content, version, is_required, created_at, updated_at)
-VALUES ('개인정보 수집 및 이용 동의', '제1조 (수집 항목) ...', 'v1.0', true, NOW(), NOW())
-ON DUPLICATE KEY UPDATE content = VALUES(content), is_required = VALUES(is_required), updated_at = NOW();
-
-INSERT INTO terms_consents (title, content, version, is_required, created_at, updated_at)
-VALUES ('마케팅 정보 수신 동의', '제1조 (수신 목적) ...', 'v1.0', false, NOW(), NOW())
-ON DUPLICATE KEY UPDATE content = VALUES(content), is_required = VALUES(is_required), updated_at = NOW();
 
 -- Category/PlaceTag 마스터 데이터.
 -- 둘 다 place가 자연키(code/name)로 참조하므로 PlaceSeeder보다 먼저 시딩돼야 한다.

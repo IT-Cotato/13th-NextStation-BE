@@ -36,6 +36,7 @@ public enum AuthErrorCode implements ErrorCode {
     // 404
     EMAIL_VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CLIENT_ERROR_404_EMAIL_VERIFICATION_NOT_FOUND", "유효한 인증번호 발송 내역이 없습니다. 인증번호를 다시 요청해주세요."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "CLIENT_ERROR_404_MEMBER_NOT_FOUND", "존재하지 않는 회원입니다."),
+    TERMS_NOT_FOUND(HttpStatus.NOT_FOUND, "CLIENT_ERROR_404_TERMS_NOT_FOUND", "존재하지 않는 약관입니다."),
 
     // 409
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "CLIENT_ERROR_409_DUPLICATE_EMAIL", "이미 가입된 이메일입니다."),

@@ -41,4 +41,8 @@ public class TermsConsent extends BaseTimeEntity {
         this.version = version;
         this.isRequired = isRequired;
     }
+
+    public void updateContent(String content) {
+        this.content = content;
+    }
 }

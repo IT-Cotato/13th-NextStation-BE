@@ -4,6 +4,7 @@ import com.cotato.nextstation.domain.auth.util.RefreshTokenCookieFactory;
 import com.cotato.nextstation.domain.course.dto.response.MemberCourseListResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.member.dto.request.MemberProfileUpdateRequest;
+import com.cotato.nextstation.domain.member.dto.response.AccountInfoResponse;
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
 import com.cotato.nextstation.domain.member.dto.response.OtherMemberProfileResponse;
 import com.cotato.nextstation.domain.member.service.MemberWithdrawService;
@@ -65,6 +66,27 @@ public class MemberController {
     public CommonResponse<MemberProfileResponse> getMyProfile(
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal) {
         return CommonResponse.success(memberQueryService.getMyProfile(principal.memberId()));
+    }
+
+    @Operation(
+            summary = "계정 정보(가입한 이메일) 조회",
+            description = """
+                    설정 > 계정 정보 화면에 표시할 가입 경로와 이메일을 조회한다.
+                    - `provider`: 이메일/비밀번호로 가입했으면 `LOCAL`, 소셜 로그인으로 가입했으면 `KAKAO`/`APPLE`.
+                    - `email`: 카카오 이메일은 필수 동의 항목이지만, 카카오 계정에 인증된 이메일이 없으면 제공되지 않아 `null`일 수 있다.
+                    - accessToken 인증 필요. 우측 상단 자물쇠(Authorize) 버튼을 눌러 로그인 API 응답의 accessToken 값을(Bearer 접두사 없이) 넣으면 된다.
+                    """
+    )
+    @SecurityRequirement(name = "accessTokenAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`MemberErrorCode.MEMBER_NOT_FOUND`)"),
+    })
+    @GetMapping("/me/account")
+    public CommonResponse<AccountInfoResponse> getMyAccountInfo(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal) {
+        return CommonResponse.success(memberQueryService.getMyAccountInfo(principal.memberId()));
     }
 
     @Operation(
