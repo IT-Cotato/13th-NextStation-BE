@@ -83,6 +83,9 @@ public class CourseQueryService {
     // "사람들이 많이 찾는 코스"는 상위 30개까지만 보여준다(무한스크롤도 여기서 끝난다).
     private static final int MOST_LIKED_LIMIT = 30;
 
+    // 정렬 토글의 첫 항목이자 화면 진입 시 선택돼 있는 값. 토글이 없는 검색 결과도 이 정렬을 따른다.
+    private static final CourseSort DEFAULT_SORT = CourseSort.POPULAR;
+
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
     private final CourseLikeRepository courseLikeRepository;
@@ -193,7 +196,7 @@ public class CourseQueryService {
      * 공개된 여행일지가 있는 코스만 나온다. 카드를 누르면 여행일지 상세로 가므로
      * 응답에 journalId를 함께 내린다.
      * <p>
-     * 필터·검색어는 모두 선택 사항이고, 정렬은 최신순이 기본이다.
+     * 필터·검색어는 모두 선택 사항이고, 정렬은 인기순이 기본이다.
      * {@code memberId}는 하트를 채울지 판단하는 데만 쓰며 비로그인이면 null이다.
      * <p>
      * "역 선택" 드롭다운에 쓸 availableStations는 최초 조회에서만 채운다(저장 탭 availableLines와 같은 방식).
@@ -216,14 +219,17 @@ public class CourseQueryService {
     }
 
     /**
-     * 둘러보기 메인의 노선 섹션에 넣을 코스(최신순). 더보기부터는 목록 API가 이어받으므로 커서를 받지 않는다.
+     * 둘러보기 메인의 노선 섹션에 넣을 코스. 더보기부터는 목록 API가 이어받으므로 커서를 받지 않는다.
+     * <p>
+     * 정렬을 넘기지 않아 목록 API와 같은 기본 정렬을 쓴다. 여기만 다르게 두면 더보기로 넘어갔을 때
+     * 미리보기에 있던 코스가 첫 화면에서 사라진 것처럼 보인다.
      * <p>
      * 메인 화면에는 "역 선택"이 없어 {@code availableStations}를 계산하지 않는다.
      * 계산해도 메인 응답에 담기지 않아 조회만 두 번 더 나간다.
      */
     public List<ExploreCourseResponse> getLineCourses(Long memberId, Long lineId, Integer size) {
         ExploreCourseCondition condition = new ExploreCourseCondition(lineId, null, null, null);
-        return findExploreCourses(memberId, condition, CourseSort.LATEST, null, size, false).courses();
+        return findExploreCourses(memberId, condition, null, null, size, false).courses();
     }
 
     private ExploreCourseListResponse findExploreCourses(Long memberId, ExploreCourseCondition condition,
@@ -231,7 +237,7 @@ public class CourseQueryService {
                                                          boolean withStationFilter) {
         int pageSize = resolvePageSize(size);
         Pageable pageable = PageRequest.of(0, pageSize + 1); // hasNext 판단용 1개 더 조회
-        CourseSort resolvedSort = (sort == null) ? CourseSort.LATEST : sort;
+        CourseSort resolvedSort = (sort == null) ? DEFAULT_SORT : sort;
 
         CursorData cursorData = CursorData.decode(cursor);
         List<ExploreCourseView> courses = fetchExploreCourses(condition, resolvedSort, cursorData, pageable);
