@@ -58,9 +58,8 @@ public class ConceptTourController {
     @Operation(
             summary = "컨셉별 코스 목록 조회",
             description = """
-                    컨셉 상세 화면의 코스 목록이다. 정렬 토글(전체/최신순/인기순)에 대응한다.
-                    - `sort`는 `LATEST`(기본, 최신순) 또는 `POPULAR`(조회수 + 좋아요×2)다.
-                      화면의 "전체"는 `LATEST`로 보내면 된다.
+                    컨셉 상세 화면의 코스 목록이다. 정렬 토글(인기순/최신순)에 대응한다.
+                    - `sort`는 `POPULAR`(기본, 조회수 + 좋아요×2) 또는 `LATEST`(최신순)다.
                     - 카드 구조와 커서 사용법은 둘러보기 목록(`GET /api/v1/explore/courses`)과 같다.
                     - 이 화면에는 정렬 토글만 있고 노선·역 필터가 없어 `availableStations`는 항상 빈 배열이다.
                     - **정렬을 바꾸면 커서를 버리고 첫 페이지부터 다시 요청해야 한다.**
@@ -79,7 +78,7 @@ public class ConceptTourController {
             @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
             @Parameter(description = "컨셉투어 ID", example = "1")
             @PathVariable Long conceptTourId,
-            @Parameter(description = "정렬 기준 (기본 LATEST)", example = "LATEST")
+            @Parameter(description = "정렬 기준 (기본 POPULAR)", example = "POPULAR")
             @RequestParam(required = false) CourseSort sort,
             @Parameter(description = "다음 페이지 커서 (첫 페이지는 생략)")
             @RequestParam(required = false) String cursor,
