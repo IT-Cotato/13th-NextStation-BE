@@ -1067,7 +1067,8 @@ class CourseQueryServiceTest {
         given(courseConverter.toMyCoursePlaceResponse(any(), anyInt())).willAnswer(invocation -> {
             PlaceInfoResponse place = invocation.getArgument(0);
             return new MyCoursePlaceResponse(place.placeId(), place.placeName(), place.description(),
-                    place.imageUrl(), place.xCoordinate(), place.yCoordinate(), invocation.getArgument(1));
+                    place.categoryCode(), place.categoryName(), place.imageUrl(),
+                    place.xCoordinate(), place.yCoordinate(), invocation.getArgument(1));
         });
 
         // when
@@ -1094,7 +1095,8 @@ class CourseQueryServiceTest {
         given(courseConverter.toMyCoursePlaceResponse(any(), anyInt())).willAnswer(invocation -> {
             PlaceInfoResponse place = invocation.getArgument(0);
             return new MyCoursePlaceResponse(place.placeId(), place.placeName(), place.description(),
-                    place.imageUrl(), place.xCoordinate(), place.yCoordinate(), invocation.getArgument(1));
+                    place.categoryCode(), place.categoryName(), place.imageUrl(),
+                    place.xCoordinate(), place.yCoordinate(), invocation.getArgument(1));
         });
 
         // when
