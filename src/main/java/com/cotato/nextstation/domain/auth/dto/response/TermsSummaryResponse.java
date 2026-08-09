@@ -12,7 +12,8 @@ public record TermsSummaryResponse(
         @Schema(description = "약관 종류. 단건 조회 경로에 쓴다. 시더가 만들지 않은 약관은 null", example = "SERVICE")
         TermsType type,
 
-        @Schema(description = "약관 제목", example = "서비스 이용약관")
+        @Schema(description = "동의 항목 이름. 동의 화면 목록에 쓴다. 원문 화면의 문서 제목과 다를 수 있다",
+                example = "개인정보 수집 및 이용 동의")
         String title,
 
         @Schema(description = "약관 버전", example = "v1.0")

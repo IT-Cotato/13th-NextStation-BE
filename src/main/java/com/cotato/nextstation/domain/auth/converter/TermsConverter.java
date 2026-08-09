@@ -11,11 +11,16 @@ import java.util.List;
 @Component
 public class TermsConverter {
 
+    /**
+     * 원문 조회 응답. 화면이 문서 전문을 보여주므로 동의 항목 이름이 아니라 문서 제목을 내려준다.
+     * 시더가 만들지 않은 약관은 종류를 알 수 없어 저장된 제목을 그대로 쓴다.
+     */
     public TermsResponse toResponse(TermsConsent termsConsent) {
+        TermsType type = TermsType.fromTitle(termsConsent.getTitle());
         return new TermsResponse(
                 termsConsent.getId(),
-                TermsType.fromTitle(termsConsent.getTitle()),
-                termsConsent.getTitle(),
+                type,
+                type == null ? termsConsent.getTitle() : type.getDocumentTitle(),
                 termsConsent.getContent(),
                 termsConsent.getVersion(),
                 termsConsent.isRequired()

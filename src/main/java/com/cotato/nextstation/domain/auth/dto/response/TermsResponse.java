@@ -12,7 +12,8 @@ public record TermsResponse(
         @Schema(description = "약관 종류", example = "SERVICE")
         TermsType type,
 
-        @Schema(description = "약관 제목", example = "서비스 이용약관")
+        @Schema(description = "문서 제목. 원문 화면의 헤더에 쓴다. 목록 응답의 동의 항목 이름과 다를 수 있다",
+                example = "개인정보처리방침")
         String title,
 
         @Schema(description = "약관 내용(마크다운 원문)", example = "# 환승여행 서비스 이용약관 ...")
