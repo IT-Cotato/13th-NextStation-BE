@@ -130,109 +130,114 @@ public final class PlaceImageFetchBatch {
         int downloadedPlaceCount = 0;
         int alreadyHaveCount = 0;
 
-        for (SeedRow row : rows) {
-            Path placeDir = photoDir.resolve(row.kakaoPlaceId());
-            if (Files.isDirectory(placeDir) || alreadyTried.contains(row.kakaoPlaceId())) {
-                alreadyHaveCount++;
-                continue;
-            }
+        // 사진 파일은 내려받는 즉시 디스크에 남고 증분 판정은 폴더 유무를 본다. 루프 도중 예외가 나서
+        // 출처를 기록하지 못하면 다음 실행이 그 장소를 건너뛰어 출처 없는 사진이 영구히 남는다.
+        try {
+            for (SeedRow row : rows) {
+                Path placeDir = photoDir.resolve(row.kakaoPlaceId());
+                if (Files.isDirectory(placeDir) || alreadyTried.contains(row.kakaoPlaceId())) {
+                    alreadyHaveCount++;
+                    continue;
+                }
 
-            // 매칭에 성공하면 상세 이미지 조회까지 2회를 사용한다. 조회 도중 한도를 넘지 않도록 미리 중단한다.
-            if (callCount + 2 > callLimit) {
-                log.warn("일일 호출 상한에 도달해 중단합니다. 내일 다시 실행하면 남은 곳부터 이어집니다. callCount={}", callCount);
-                break;
-            }
+                // 매칭에 성공하면 상세 이미지 조회까지 2회를 사용한다. 조회 도중 한도를 넘지 않도록 미리 중단한다.
+                if (callCount + 2 > callLimit) {
+                    log.warn("일일 호출 상한에 도달해 중단합니다. 내일 다시 실행하면 남은 곳부터 이어집니다. callCount={}", callCount);
+                    break;
+                }
 
-            JsonNode matched = null;
-            if (areaDump) {
-                // 이미 받아둔 목록에서 조회하므로 API를 호출하지 않는다.
-                matched = findInDump(row, dumped);
-            } else if (!galleryOnly) {
-                matched = findNearbyContent(httpClient, objectMapper, baseUrl, serviceKey, row);
-                callCount++;
-                Thread.sleep(REQUEST_INTERVAL_MILLIS);
-            }
-
-            if (matched == null) {
+                JsonNode matched = null;
                 if (areaDump) {
-                    // 덤프 모드에서는 관광사진 갤러리를 별도 실행으로 이미 처리했으므로 재조회하지 않는다.
-                    reviewRows.add(List.of(row.kakaoPlaceId(), row.placeName(), row.stationName(), "덤프에서 매칭 실패"));
+                    // 이미 받아둔 목록에서 조회하므로 API를 호출하지 않는다.
+                    matched = findInDump(row, dumped);
+                } else if (!galleryOnly) {
+                    matched = findNearbyContent(httpClient, objectMapper, baseUrl, serviceKey, row);
+                    callCount++;
+                    Thread.sleep(REQUEST_INTERVAL_MILLIS);
+                }
+
+                if (matched == null) {
+                    if (areaDump) {
+                        // 덤프 모드에서는 관광사진 갤러리를 별도 실행으로 이미 처리했으므로 재조회하지 않는다.
+                        reviewRows.add(List.of(row.kakaoPlaceId(), row.placeName(), row.stationName(), "덤프에서 매칭 실패"));
+                        continue;
+                    }
+
+                    // 좌표 조회로 찾지 못한 장소는 관광사진 갤러리에서 이름으로 재시도한다. 두 서비스의 수록 범위가 다르다.
+                    int saved = fetchFromGallery(httpClient, objectMapper, galleryBaseUrl, serviceKey, row,
+                            placeDir, sourceRows);
+                    callCount++;
+                    Thread.sleep(REQUEST_INTERVAL_MILLIS);
+
+                    if (saved > 0) {
+                        downloadedPlaceCount++;
+                        log.info("관광사진 {}장 저장: {}", saved, row.placeName());
+                    } else {
+                        reviewRows.add(List.of(row.kakaoPlaceId(), row.placeName(), row.stationName(),
+                                "관광정보·관광사진 모두 매칭 실패"));
+                    }
                     continue;
                 }
 
-                // 좌표 조회로 찾지 못한 장소는 관광사진 갤러리에서 이름으로 재시도한다. 두 서비스의 수록 범위가 다르다.
-                int saved = fetchFromGallery(httpClient, objectMapper, galleryBaseUrl, serviceKey, row,
-                        placeDir, sourceRows);
+                String contentId = matched.path("contentid").asText("");
+                List<JsonNode> images = fetchImages(httpClient, objectMapper, baseUrl, serviceKey, contentId);
                 callCount++;
                 Thread.sleep(REQUEST_INTERVAL_MILLIS);
 
-                if (saved > 0) {
-                    downloadedPlaceCount++;
-                    log.info("관광사진 {}장 저장: {}", saved, row.placeName());
-                } else {
+                // 저작권 유형은 콘텐츠 단위가 아니라 이미지 단위로 내려온다. 목록 API 값이 아닌 이 값을 기준으로 거른다.
+                List<JsonNode> usable = images.stream()
+                        .filter(image -> allowedCopyright.contains(image.path("cpyrhtDivCd").asText("")))
+                        .filter(image -> !image.path("originimgurl").asText("").isBlank())
+                        .limit(MAX_IMAGES_PER_PLACE)
+                        .toList();
+
+                if (usable.isEmpty()) {
                     reviewRows.add(List.of(row.kakaoPlaceId(), row.placeName(), row.stationName(),
-                            "관광정보·관광사진 모두 매칭 실패"));
-                }
-                continue;
-            }
-
-            String contentId = matched.path("contentid").asText("");
-            List<JsonNode> images = fetchImages(httpClient, objectMapper, baseUrl, serviceKey, contentId);
-            callCount++;
-            Thread.sleep(REQUEST_INTERVAL_MILLIS);
-
-            // 저작권 유형은 콘텐츠 단위가 아니라 이미지 단위로 내려온다. 목록 API 값이 아닌 이 값을 기준으로 거른다.
-            List<JsonNode> usable = images.stream()
-                    .filter(image -> allowedCopyright.contains(image.path("cpyrhtDivCd").asText("")))
-                    .filter(image -> !image.path("originimgurl").asText("").isBlank())
-                    .limit(MAX_IMAGES_PER_PLACE)
-                    .toList();
-
-            if (usable.isEmpty()) {
-                reviewRows.add(List.of(row.kakaoPlaceId(), row.placeName(), row.stationName(),
-                        images.isEmpty()
-                                ? "상세 이미지 없음 (contentid=" + contentId + ")"
-                                : "저작권 유형이 허용 범위 밖 (contentid=" + contentId + ")"));
-                continue;
-            }
-
-            int sortOrder = 1;
-            for (JsonNode image : usable) {
-                String imageUrl = image.path("originimgurl").asText("");
-                Path target = placeDir.resolve(sortOrder + "." + extensionOf(imageUrl));
-                if (!download(httpClient, imageUrl, target)) {
+                            images.isEmpty()
+                                    ? "상세 이미지 없음 (contentid=" + contentId + ")"
+                                    : "저작권 유형이 허용 범위 밖 (contentid=" + contentId + ")"));
                     continue;
                 }
 
-                sourceRows.add(List.of(
-                        row.kakaoPlaceId(),
-                        row.placeName(),
-                        String.valueOf(sortOrder),
-                        target.toString(),
-                        image.path("cpyrhtDivCd").asText(""),
-                        "한국관광공사 TourAPI",
-                        imageUrl,
-                        image.path("imgname").asText(""),
-                        contentId,
-                        matched.path("contenttypeid").asText(""),
-                        matched.path("title").asText(""),
-                        matched.path("dist").asText("")
-                ));
-                sortOrder++;
-            }
+                int sortOrder = 1;
+                for (JsonNode image : usable) {
+                    String imageUrl = image.path("originimgurl").asText("");
+                    Path target = placeDir.resolve(sortOrder + "." + extensionOf(imageUrl));
+                    if (!download(httpClient, imageUrl, target)) {
+                        continue;
+                    }
 
-            if (sortOrder > 1) {
-                downloadedPlaceCount++;
-                log.info("사진 {}장 저장: {} <- {} ({}m)", sortOrder - 1, row.placeName(),
-                        matched.path("title").asText(""), matched.path("dist").asText(""));
-            } else {
-                reviewRows.add(List.of(row.kakaoPlaceId(), row.placeName(), row.stationName(), "이미지 내려받기 실패"));
+                    sourceRows.add(List.of(
+                            row.kakaoPlaceId(),
+                            row.placeName(),
+                            String.valueOf(sortOrder),
+                            target.toString(),
+                            image.path("cpyrhtDivCd").asText(""),
+                            "한국관광공사 TourAPI",
+                            imageUrl,
+                            image.path("imgname").asText(""),
+                            contentId,
+                            matched.path("contenttypeid").asText(""),
+                            matched.path("title").asText(""),
+                            matched.path("dist").asText("")
+                    ));
+                    sortOrder++;
+                }
+
+                if (sortOrder > 1) {
+                    downloadedPlaceCount++;
+                    log.info("사진 {}장 저장: {} <- {} ({}m)", sortOrder - 1, row.placeName(),
+                            matched.path("title").asText(""), matched.path("dist").asText(""));
+                } else {
+                    reviewRows.add(List.of(row.kakaoPlaceId(), row.placeName(), row.stationName(), "이미지 내려받기 실패"));
+                }
             }
+        } finally {
+            writeCsv(PHOTO_SOURCE_OUTPUT, PHOTO_SOURCE_HEADERS, sourceRows, true);
+            // 실패 목록은 이어 붙인다. 덮어쓰면 다음 실행이 이전 실패 장소를 다시 조회해 호출 한도를 소모한다.
+            writeCsv(REVIEW_OUTPUT, REVIEW_HEADERS, reviewRows, true);
         }
 
-        writeCsv(PHOTO_SOURCE_OUTPUT, PHOTO_SOURCE_HEADERS, sourceRows, true);
-        // 실패 목록은 이어 붙인다. 덮어쓰면 다음 실행이 이전 실패 장소를 다시 조회해 호출 한도를 소모한다.
-        writeCsv(REVIEW_OUTPUT, REVIEW_HEADERS, reviewRows, true);
         log.info("사진 수집 완료: 받은 장소={} (사진 {}장), 이미 있어 건너뜀={}, 못 받음={}, API 호출={}",
                 downloadedPlaceCount, sourceRows.size(), alreadyHaveCount, reviewRows.size(), callCount);
         log.info("사람 검수 후 placeImageUploadBatch로 올리세요. 출처 기록={}, 실패 사유={}",
@@ -364,8 +369,8 @@ public final class PlaceImageFetchBatch {
      */
     private static JsonNode findInDump(SeedRow row, List<JsonNode> dumped) {
         String target = normalizePlaceName(row.placeName());
-        double placeLat = Double.parseDouble(row.yCoordinate());
-        double placeLon = Double.parseDouble(row.xCoordinate());
+        double placeLat = row.yCoordinate();
+        double placeLon = row.xCoordinate();
 
         JsonNode best = null;
         double bestDistance = Double.MAX_VALUE;
@@ -544,7 +549,21 @@ public final class PlaceImageFetchBatch {
     }
 
     private record SeedRow(String kakaoPlaceId, String placeName, String stationName,
-                           String xCoordinate, String yCoordinate) {
+                           double xCoordinate, double yCoordinate) {
+    }
+
+    /** 좌표가 숫자가 아니면 그 행만 제외한다. 반환값 null이 제외 신호다. */
+    private static Double parseCoordinate(String value, String placeName, String columnName) {
+        String trimmed = value.trim();
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        try {
+            return Double.valueOf(trimmed);
+        } catch (NumberFormatException e) {
+            log.warn("{}가 숫자가 아니라 수집에서 제외합니다: 장소명={}, 값={}", columnName, placeName, trimmed);
+            return null;
+        }
     }
 
     /**
@@ -568,16 +587,22 @@ public final class PlaceImageFetchBatch {
                 if (!PROGRESS_STATUS_DONE.equals(record.get("진행 상태").trim())) {
                     continue;
                 }
+                String placeName = record.get("장소명").trim();
                 String kakaoPlaceUrl = record.get("카카오맵 URL").trim();
-                String xCoordinate = record.get("x좌표").trim();
-                String yCoordinate = record.get("y좌표").trim();
-                if (kakaoPlaceUrl.isBlank() || xCoordinate.isBlank() || yCoordinate.isBlank()) {
+                if (kakaoPlaceUrl.isBlank()) {
+                    continue;
+                }
+
+                // 시트에서 온 값이라 숫자가 아닐 수 있다. 여기서 걸러야 한 행 때문에 배치 전체가 멈추지 않는다.
+                Double xCoordinate = parseCoordinate(record.get("x좌표"), placeName, "x좌표");
+                Double yCoordinate = parseCoordinate(record.get("y좌표"), placeName, "y좌표");
+                if (xCoordinate == null || yCoordinate == null) {
                     continue;
                 }
 
                 rows.add(new SeedRow(
                         kakaoPlaceUrl.substring(kakaoPlaceUrl.lastIndexOf('/') + 1),
-                        record.get("장소명").trim(),
+                        placeName,
                         record.get("역명").trim(),
                         xCoordinate,
                         yCoordinate

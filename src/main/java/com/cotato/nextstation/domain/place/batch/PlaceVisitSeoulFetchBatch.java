@@ -93,50 +93,55 @@ public final class PlaceVisitSeoulFetchBatch {
         List<List<String>> partialRows = new ArrayList<>();
         int downloadedPlaceCount = 0;
 
-        for (SeedRow row : rows) {
-            String key = normalize(row.placeName());
-            SiteEntry entry = byName.get(key);
+        // 사진 파일은 내려받는 즉시 디스크에 남고 증분 판정은 폴더 유무를 본다. 루프 도중 예외가 나서
+        // 출처를 기록하지 못하면 다음 실행이 그 장소를 건너뛰어 출처 없는 사진이 영구히 남는다.
+        try {
+            for (SeedRow row : rows) {
+                String key = normalize(row.placeName());
+                SiteEntry entry = byName.get(key);
 
-            if (entry == null) {
-                // 완전일치가 없으면 부분일치 후보만 기록한다. 오매칭 비율이 높아 자동으로 채택하지 않는다.
-                findPartial(byName, key).ifPresent(candidate -> partialRows.add(List.of(
-                        row.kakaoPlaceId(), row.placeName(), row.stationName(), row.categoryText(),
-                        candidate.title(), candidate.url())));
-                continue;
-            }
-
-            List<String> imageUrls = extractImageUrls(httpClient, entry.url());
-            Thread.sleep(REQUEST_INTERVAL_MILLIS);
-            if (imageUrls.isEmpty()) {
-                log.warn("상세 페이지에 이미지가 없습니다: {} ({})", row.placeName(), entry.url());
-                continue;
-            }
-
-            Path placeDir = photoDir.resolve(row.kakaoPlaceId());
-            int sortOrder = 1;
-            for (String imageUrl : imageUrls) {
-                if (sortOrder > MAX_IMAGES_PER_PLACE) {
-                    break;
-                }
-                Path target = placeDir.resolve(sortOrder + ".jpg");
-                if (!download(httpClient, imageUrl, target)) {
+                if (entry == null) {
+                    // 완전일치가 없으면 부분일치 후보만 기록한다. 오매칭 비율이 높아 자동으로 채택하지 않는다.
+                    findPartial(byName, key).ifPresent(candidate -> partialRows.add(List.of(
+                            row.kakaoPlaceId(), row.placeName(), row.stationName(), row.categoryText(),
+                            candidate.title(), candidate.url())));
                     continue;
                 }
-                sourceRows.add(List.of(
-                        row.kakaoPlaceId(), row.placeName(), String.valueOf(sortOrder), target.toString(),
-                        "", SOURCE_LABEL, imageUrl, entry.title(), "", "", entry.category(), ""));
-                sortOrder++;
-                Thread.sleep(REQUEST_INTERVAL_MILLIS);
-            }
 
-            if (sortOrder > 1) {
-                downloadedPlaceCount++;
-                log.info("사진 {}장 저장: {} <- {}", sortOrder - 1, row.placeName(), entry.title());
+                List<String> imageUrls = extractImageUrls(httpClient, entry.url());
+                Thread.sleep(REQUEST_INTERVAL_MILLIS);
+                if (imageUrls.isEmpty()) {
+                    log.warn("상세 페이지에 이미지가 없습니다: {} ({})", row.placeName(), entry.url());
+                    continue;
+                }
+
+                Path placeDir = photoDir.resolve(row.kakaoPlaceId());
+                int sortOrder = 1;
+                for (String imageUrl : imageUrls) {
+                    if (sortOrder > MAX_IMAGES_PER_PLACE) {
+                        break;
+                    }
+                    Path target = download(httpClient, imageUrl, placeDir, sortOrder);
+                    if (target == null) {
+                        continue;
+                    }
+                    sourceRows.add(List.of(
+                            row.kakaoPlaceId(), row.placeName(), String.valueOf(sortOrder), target.toString(),
+                            "", SOURCE_LABEL, imageUrl, entry.title(), "", "", entry.category(), ""));
+                    sortOrder++;
+                    Thread.sleep(REQUEST_INTERVAL_MILLIS);
+                }
+
+                if (sortOrder > 1) {
+                    downloadedPlaceCount++;
+                    log.info("사진 {}장 저장: {} <- {}", sortOrder - 1, row.placeName(), entry.title());
+                }
             }
+        } finally {
+            appendCsv(PHOTO_SOURCE_OUTPUT, PHOTO_SOURCE_HEADERS, sourceRows);
+            writeCsv(PARTIAL_MATCH_OUTPUT, PARTIAL_HEADERS, partialRows);
         }
 
-        appendCsv(PHOTO_SOURCE_OUTPUT, PHOTO_SOURCE_HEADERS, sourceRows);
-        writeCsv(PARTIAL_MATCH_OUTPUT, PARTIAL_HEADERS, partialRows);
         log.info("비짓서울 수집 완료: 받은 장소={} (사진 {}장), 부분일치 후보={}건",
                 downloadedPlaceCount, sourceRows.size(), partialRows.size());
         log.info("부분일치는 오매칭이 섞여 있어 자동 채택하지 않았습니다. {} 확인 후 필요한 것만 수동으로 받으세요.",
@@ -227,7 +232,13 @@ public final class PlaceVisitSeoulFetchBatch {
         }
     }
 
-    private static boolean download(HttpClient httpClient, String imageUrl, Path target) {
+    /**
+     * 이미지를 내려받아 저장하고 저장 경로를 반환한다. 실패하면 null.
+     *
+     * <p>{@code /comm/getImage}는 URL에 확장자가 없어 응답 바이트로 형식을 판별한다.
+     * 확장자를 jpg로 고정하면 PNG 파일이 {@code image/jpeg}로 업로드된다.
+     */
+    private static Path download(HttpClient httpClient, String imageUrl, Path placeDir, int sortOrder) {
         try {
             HttpResponse<byte[]> response = httpClient.send(
                     HttpRequest.newBuilder(URI.create(imageUrl))
@@ -236,23 +247,47 @@ public final class PlaceVisitSeoulFetchBatch {
                     HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() != 200 || response.body().length < 1024) {
                 log.warn("이미지 내려받기 실패: status={}, url={}", response.statusCode(), imageUrl);
-                return false;
+                return null;
             }
             if (isPlaceholder(response.body())) {
                 log.warn("사진이 아닌 사이트 로고라 제외합니다: url={}", imageUrl);
-                return false;
+                return null;
             }
             // 폴더는 내려받기에 성공한 뒤에 만든다. 미리 만들면 실패 시 빈 폴더가 남아 이후 실행에서 계속 제외된다.
-            Files.createDirectories(target.getParent());
+            Path target = placeDir.resolve(sortOrder + "." + extensionOf(response.body()));
+            Files.createDirectories(placeDir);
             Files.write(target, response.body());
-            return true;
+            return target;
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
             log.warn("이미지 내려받기 중 오류: url={}, message={}", imageUrl, e.getMessage());
+            return null;
+        }
+    }
+
+    /** 매직 바이트로 이미지 형식을 판별한다. 알 수 없으면 jpg로 둔다. */
+    private static String extensionOf(byte[] body) {
+        if (startsWith(body, 0x89, 'P', 'N', 'G')) {
+            return "png";
+        }
+        if (startsWith(body, 'R', 'I', 'F', 'F')) {
+            return "webp";
+        }
+        return "jpg";
+    }
+
+    private static boolean startsWith(byte[] body, int... prefix) {
+        if (body.length < prefix.length) {
             return false;
         }
+        for (int i = 0; i < prefix.length; i++) {
+            if ((body[i] & 0xFF) != prefix[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
