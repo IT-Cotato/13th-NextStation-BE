@@ -50,7 +50,14 @@ public class MemberStampQueryService {
     }
 
     // memberStampId → courseId (소유권 검증 포함)
+    // memberStampId는 정상 플로우(여행일지 작성 시 검증된 값)라면 null일 수 없지만,
+    // JpaRepository.findById(null)은 Optional.empty()가 아니라 예외를 던져 그대로 두면 500이 된다.
+    // 데이터가 불완전한 경우(예: 시드 데이터)까지 방어하기 위해 미리 걸러 404로 응답한다.
     public Long getCourseId(Long memberId, Long memberStampId) {
+        if (memberStampId == null) {
+            throw new CustomException(StampErrorCode.MEMBER_STAMP_NOT_FOUND);
+        }
+
         MemberStamp memberStamp = memberStampRepository.findById(memberStampId)
                 .orElseThrow(() -> new CustomException(StampErrorCode.MEMBER_STAMP_NOT_FOUND));
 
