@@ -1,12 +1,15 @@
 package com.cotato.nextstation.domain.course.converter;
 
+import com.cotato.nextstation.domain.course.dto.response.MemberCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,20 @@ class CourseConverterTest {
         given(view.getLineId()).willReturn(6L);
         given(view.getLineName()).willReturn("6호선");
         given(view.getLineCode()).willReturn(LineCode.LINE_6);
+        return view;
+    }
+
+    private MemberCourseCardView memberCourseCardView() {
+        MemberCourseCardView view = mock(MemberCourseCardView.class);
+        given(view.getCourseId()).willReturn(7L);
+        given(view.getJournalId()).willReturn(20L);
+        given(view.getName()).willReturn("보문역 환승여행 코스");
+        given(view.getStationId()).willReturn(6L);
+        given(view.getStationName()).willReturn("보문역");
+        given(view.getLineId()).willReturn(6L);
+        given(view.getLineName()).willReturn("6호선");
+        given(view.getLineCode()).willReturn(LineCode.LINE_6);
+        given(view.getLikeCount()).willReturn(12);
         return view;
     }
 
@@ -162,5 +179,36 @@ class CourseConverterTest {
         assertThat(response.placeCount()).isEqualTo(4);
         assertThat(response.tags()).containsExactly("자연과함께", "사진찍기좋은");
         assertThat(response.imageUrl()).isEqualTo("cover.jpg");
+    }
+
+    @Test
+    @DisplayName("다른 회원 공개 코스 카드에 journalId·imageUrl·likeCount를 담는다")
+    void toMemberCourseCardResponse() {
+        // when
+        MemberCourseCardResponse response = courseConverter.toMemberCourseCardResponse(
+                memberCourseCardView(), "journal-cover.jpg");
+
+        // then: 필드가 하나라도 어긋나면 카드 이동(journalId)이나 디자인(imageUrl/likeCount)이 깨진다
+        assertThat(response).isEqualTo(new MemberCourseCardResponse(
+                7L, 20L, "보문역 환승여행 코스", 6L, "보문역",
+                new LineSummaryResponse(6L, "6호선", LineCode.LINE_6),
+                "journal-cover.jpg", 12));
+    }
+
+    @Test
+    @DisplayName("다른 회원 공개 코스 카드는 대표 호선이 없으면 line을 null로 내린다")
+    void toMemberCourseCardResponse_withoutLine() {
+        // given
+        MemberCourseCardView view = memberCourseCardView();
+        given(view.getLineId()).willReturn(null);
+        given(view.getLineName()).willReturn(null);
+        given(view.getLineCode()).willReturn(null);
+
+        // when
+        MemberCourseCardResponse response = courseConverter.toMemberCourseCardResponse(view, null);
+
+        // then
+        assertThat(response.line()).isNull();
+        assertThat(response.imageUrl()).isNull();
     }
 }

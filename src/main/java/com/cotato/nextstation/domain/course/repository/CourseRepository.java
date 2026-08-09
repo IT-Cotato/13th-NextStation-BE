@@ -166,9 +166,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "WHERE c.memberId = :memberId AND j.isPublic = true")
     long countPublicCoursesByMemberId(@Param("memberId") Long memberId);
 
-    // 다른 회원의 공개코스 탭 - 공개 코스 목록(최신순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다.
+    // 다른 회원의 공개코스 탭 - 공개 코스 목록(최신순). 카드에 필요한 역/대표 호선·journalId·좋아요 수까지
+    // 한 번에 가져온다(코스마다 조회하면 N+1). journalId는 코스 상세 라우트가 이 값 기준으로 열려
+    // 카드 이동에 필수다. imageUrl은 이 쿼리로 가져오지 않고, 서비스에서 journalId를 모아
+    // JournalCardQueryService로 배치 조회한다(썸네일이 Journal 쪽 데이터라 여기서 조인하지 않는다).
     // 조회 대상 회원의 것이 아니라 요청자가 로그인만 하면 되므로 소유권 검증은 하지 않는다.
-    @Query("SELECT c.id AS courseId, c.name AS name, c.createdAt AS createdAt, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, c.createdAt AS createdAt, " +
+            "c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
@@ -177,10 +181,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "LEFT JOIN s.drawLine l " +
             "WHERE c.memberId = :memberId AND j.isPublic = true " +
             "ORDER BY c.createdAt DESC, c.id DESC")
-    List<MyCourseView> findPublicCoursesByMemberId(@Param("memberId") Long memberId, Pageable pageable);
+    List<MemberCourseCardView> findPublicCoursesByMemberId(@Param("memberId") Long memberId, Pageable pageable);
 
     // 다음 페이지. 생성 시각이 같을 수 있어 id를 tie-breaker로 함께 비교한다.
-    @Query("SELECT c.id AS courseId, c.name AS name, c.createdAt AS createdAt, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, c.createdAt AS createdAt, " +
+            "c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
@@ -190,7 +195,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "WHERE c.memberId = :memberId AND j.isPublic = true " +
             "AND (c.createdAt < :createdAt OR (c.createdAt = :createdAt AND c.id < :courseId)) " +
             "ORDER BY c.createdAt DESC, c.id DESC")
-    List<MyCourseView> findPublicCoursesByMemberIdAfterCursor(@Param("memberId") Long memberId,
+    List<MemberCourseCardView> findPublicCoursesByMemberIdAfterCursor(@Param("memberId") Long memberId,
                                                                @Param("createdAt") LocalDateTime createdAt,
                                                                @Param("courseId") Long courseId,
                                                                Pageable pageable);
@@ -417,6 +422,19 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         Long getCourseId();
         String getName();
         LocalDateTime getCreatedAt();
+        Long getStationId();
+        String getStationName();
+        Long getLineId();
+        String getLineName();
+        LineCode getLineCode();
+    }
+
+    interface MemberCourseCardView {
+        Long getCourseId();
+        Long getJournalId();
+        String getName();
+        LocalDateTime getCreatedAt();
+        int getLikeCount();
         Long getStationId();
         String getStationName();
         Long getLineId();

@@ -90,6 +90,17 @@ class MemberStampQueryServiceTest {
     }
 
     @Test
+    @DisplayName("memberStampId가 null이면 조회 없이 바로 404를 던진다")
+    void getCourseId_nullMemberStampId_throwsWithoutQuery() {
+        // when & then: JpaRepository.findById(null)은 Optional.empty()가 아니라 예외를 던지므로
+        // 그대로 두면 시드 데이터처럼 memberStampId가 없는 경우 500이 된다. 미리 걸러야 한다.
+        assertThatThrownBy(() -> memberStampQueryService.getCourseId(1L, null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(StampErrorCode.MEMBER_STAMP_NOT_FOUND.getMessage());
+        verify(memberStampRepository, never()).findById(any());
+    }
+
+    @Test
     @DisplayName("코스 목록이 비어 있으면 조회하지 않고 빈 집합을 반환한다")
     void getCompletedCourseIds_emptyInputSkipsQuery() {
         // when: 코스가 없는 페이지에서 IN () 쿼리를 날릴 이유가 없다

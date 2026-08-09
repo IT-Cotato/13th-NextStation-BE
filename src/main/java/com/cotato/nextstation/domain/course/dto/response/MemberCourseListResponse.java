@@ -8,7 +8,7 @@ import java.util.List;
 public record MemberCourseListResponse(
 
         @Schema(description = "공개 코스 목록 (최신순)")
-        List<CourseCardResponse> courses,
+        List<MemberCourseCardResponse> courses,
 
         @Schema(description = "다음 페이지 커서 (없으면 마지막 페이지)")
         String nextCursor,
