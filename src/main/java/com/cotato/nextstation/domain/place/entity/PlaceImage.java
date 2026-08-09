@@ -1,7 +1,7 @@
 package com.cotato.nextstation.domain.place.entity;
 
 import com.cotato.nextstation.domain.place.enums.ImageSourceType;
-import com.cotato.nextstation.global.entity.BaseEntity;
+import com.cotato.nextstation.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -25,7 +25,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "place_image")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PlaceImage extends BaseEntity {
+public class PlaceImage extends BaseTimeEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id", nullable = false)
@@ -45,13 +45,21 @@ public class PlaceImage extends BaseEntity {
     @Column(name = "source_type", nullable = false)
     private ImageSourceType sourceType;
 
+    /**
+     * 사진의 출처 (공공누리 1유형, CC BY, 비짓서울, 직접 촬영 등).
+     * 공공누리 제1유형 등은 출처표시가 이용 조건이므로 이 값으로 출처 목록을 만들 수 있어야 한다.
+     */
+    @Column(name = "source")
+    private String source;
+
     @Builder
     public PlaceImage(Place place, PlaceReview placeReview, String imageUrl,
-                      int sortOrder, ImageSourceType sourceType) {
+                      int sortOrder, ImageSourceType sourceType, String source) {
         this.place = place;
         this.placeReview = placeReview;
         this.imageUrl = imageUrl;
         this.sortOrder = sortOrder;
         this.sourceType = sourceType;
+        this.source = source;
     }
 }

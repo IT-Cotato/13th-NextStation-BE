@@ -2,9 +2,11 @@ package com.cotato.nextstation.domain.place.init;
 
 import com.cotato.nextstation.domain.place.entity.Category;
 import com.cotato.nextstation.domain.place.entity.Place;
+import com.cotato.nextstation.domain.place.entity.PlaceImage;
 import com.cotato.nextstation.domain.place.entity.PlaceTag;
 import com.cotato.nextstation.domain.place.entity.PlaceTagMapping;
 import com.cotato.nextstation.domain.place.enums.CategoryCode;
+import com.cotato.nextstation.domain.place.enums.ImageSourceType;
 import com.cotato.nextstation.domain.place.enums.PlaceTagName;
 import com.cotato.nextstation.domain.place.repository.CategoryRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceImageRepository;
@@ -26,8 +28,10 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * ApplicationRunner에서 파일 IO(CSV 파싱)와 트랜잭션 범위를 분리하기 위해 DB 저장 로직만 별도 빈으로 분리한다.
- * 같은 클래스 내 self-invocation으로는 @Transactional 프록시가 적용되지 않아 별도 빈으로 둔다.
+ * 시딩 데이터를 DB에 적재하는 컴포넌트.
+ *
+ * <p>CSV 파싱은 트랜잭션 밖에서 수행하고 저장만 트랜잭션으로 묶기 위해 {@link PlaceSeeder}에서 분리했다.
+ * 같은 클래스 안에서 호출하면 {@code @Transactional} 프록시가 적용되지 않으므로 별도 빈으로 둔다.
  */
 @Slf4j
 @Component
@@ -65,7 +69,7 @@ class PlaceSeedWriter {
 
     @Transactional
     public void write(List<PlaceSeedRow> rows) {
-        // place를 참조하는 자식(place_image, place_review_image/like -> place_review -> place) 먼저 정리해야 FK 위반 없이 재시딩된다.
+        // place를 참조하는 자식 테이블부터 삭제한다. 순서를 지키지 않으면 FK 제약에 걸린다.
         placeImageRepository.deleteAllInBatch();
         placeReviewImageRepository.deleteAllInBatch();
         placeReviewLikeRepository.deleteAllInBatch();
@@ -77,6 +81,7 @@ class PlaceSeedWriter {
         Map<PlaceTagName, PlaceTag> tagCache = new HashMap<>();
         int placeCount = 0;
         int tagMappingCount = 0;
+        int imageCount = 0;
         int skippedCount = 0;
 
         for (PlaceSeedRow row : rows) {
@@ -116,10 +121,23 @@ class PlaceSeedWriter {
                 placeTagMappingRepository.save(PlaceTagMapping.of(place, placeTag));
                 tagMappingCount++;
             }
+
+            // place-images.csv의 순서는 S3 파일명에 맞춰 1부터 시작한다. sortOrder는 0이 대표 이미지이므로 0부터 매긴다.
+            int imageOrder = 0;
+            for (PlaceSeedImage image : row.images()) {
+                placeImageRepository.save(PlaceImage.builder()
+                        .place(place)
+                        .imageUrl(image.imageUrl())
+                        .source(image.source())
+                        .sortOrder(imageOrder++)
+                        .sourceType(ImageSourceType.PLACE)
+                        .build());
+                imageCount++;
+            }
         }
 
-        log.info("place 시딩 완료: placeCount={}, tagMappingCount={}, skippedCount={}",
-                placeCount, tagMappingCount, skippedCount);
+        log.info("place 시딩 완료: placeCount={}, tagMappingCount={}, imageCount={}, skippedCount={}",
+                placeCount, tagMappingCount, imageCount, skippedCount);
     }
 
     private Category findCategory(String categoryText) {

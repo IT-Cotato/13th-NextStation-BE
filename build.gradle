@@ -71,6 +71,20 @@ dependencies {
 	testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
+def dotenv = {
+    def envFile = file('.env.local')
+    if (!envFile.exists()) return [:]
+    envFile.readLines()
+            .findAll { !it.trim().startsWith('#') && it.contains('=') }
+            .collectEntries {
+                def i = it.indexOf('=')
+                def key = it.substring(0, i).trim().replaceFirst(/^export\s+/, '')
+                // 값을 감싼 따옴표를 벗긴다. 남겨두면 인증키에 그대로 섞여 들어가 인증 실패로만 드러난다.
+                def value = it.substring(i + 1).trim().replaceAll(/^(["'])(.*)\1$/, '$2')
+                [(key): value]
+            }
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
 }
@@ -80,5 +94,29 @@ tasks.register('placeGeocodingBatch', JavaExec) {
 	description = '1차 수집 장소 데이터를 카카오 API로 보강하는 1회성 배치 (KAKAO_REST_API_KEY, PLACE_SHEET_CSV_URL 필요)'
 	mainClass = 'com.cotato.nextstation.domain.place.batch.PlaceGeocodingBatch'
 	classpath = sourceSets.main.runtimeClasspath
+}
+
+tasks.register('placeImageFetchBatch', JavaExec) {
+	group = 'application'
+	description = 'TourAPI에서 장소 사진을 받아 place-photos/에 내려받는 1회성 배치 (TOUR_API_SERVICE_KEY 필요)'
+	mainClass = 'com.cotato.nextstation.domain.place.batch.PlaceImageFetchBatch'
+	classpath = sourceSets.main.runtimeClasspath
+    environment dotenv()
+}
+
+tasks.register('placeVisitSeoulFetchBatch', JavaExec) {
+	group = 'application'
+	description = '비짓서울 사이트맵으로 장소 사진을 받아 place-photos/에 내려받는 1회성 배치'
+	mainClass = 'com.cotato.nextstation.domain.place.batch.PlaceVisitSeoulFetchBatch'
+	classpath = sourceSets.main.runtimeClasspath
+	environment dotenv()
+}
+
+tasks.register('placeImageUploadBatch', JavaExec) {
+	group = 'application'
+	description = 'place-photos/{카카오 place id}/ 사진을 S3에 올리고 place-images.csv를 만드는 1회성 배치'
+	mainClass = 'com.cotato.nextstation.domain.place.batch.PlaceImageUploadBatch'
+	classpath = sourceSets.main.runtimeClasspath
+    environment dotenv()
 }
 

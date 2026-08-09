@@ -34,6 +34,11 @@ out/
 *.log
 *.exe
 
+# 장소 사진 파이프라인 산출물
+place-photos/
+place-photo-output/
+src/main/resources/data/place-images.csv
+
 # Environment
 .env
 .env.local

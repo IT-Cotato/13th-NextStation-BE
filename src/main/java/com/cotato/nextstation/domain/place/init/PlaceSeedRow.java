@@ -12,6 +12,7 @@ record PlaceSeedRow(
         String contactNumber,
         Double xCoordinate,
         Double yCoordinate,
-        String kakaoPlaceUrl
+        String kakaoPlaceUrl,
+        List<PlaceSeedImage> images
 ) {
 }
