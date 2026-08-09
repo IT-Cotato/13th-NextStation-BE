@@ -23,16 +23,27 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.stream.Stream;
 
 /**
- * 구글 시트("장소 데이터")를 카카오맵 API로 보강해 정제한 resources/data/places.csv를 읽어 Place/PlaceTagMapping을 시딩한다.
- * places.csv 내용의 해시를 {@link #SEED_HASH_MARKER}에 저장해두고, 이전 해시와 다르면(=csv가 갱신됐으면) 기존 데이터를 지우고 다시 채운다.
- * csv가 안 바뀐 재기동에는 스킵하므로 로컬 테스트 데이터가 매번 날아가지 않는다.
- * Station을 자연키(역명)로, Category/PlaceTag를 자연키(코드/이름)로 참조하므로 StationDataSeeder와 data.sql(Category/PlaceTag 마스터)이 먼저 실행되어 있어야 한다.
- * 파일 IO는 트랜잭션 밖에서 수행하고, DB 저장만 {@link PlaceSeedWriter}의 트랜잭션으로 묶는다.
+ * 정제된 CSV를 읽어 장소 데이터를 시딩하는 러너.
+ *
+ * <p>{@code resources/data/places.csv}에서 Place와 PlaceTagMapping을 적재한다. 사진은
+ * {@code PlaceImageUploadBatch}가 생성한 {@code resources/data/place-images.csv}를 카카오 place id로
+ * 조인해 PlaceImage로 저장한다.
+ *
+ * <p>두 CSV의 해시를 {@link #SEED_HASH_MARKER}에 기록해두고 이전 해시와 다를 때만 기존 데이터를 지우고
+ * 다시 적재한다. 이미지 CSV만 변경된 경우도 감지해야 하므로 해시는 두 파일을 함께 계산한다.
+ * 변경이 없으면 건너뛰므로 재기동할 때마다 로컬 테스트 데이터가 사라지지 않는다.
+ *
+ * <p>Station은 역명, Category와 PlaceTag는 코드와 이름으로 참조한다. 따라서 StationDataSeeder와
+ * 마스터 데이터를 넣는 data.sql이 먼저 실행되어야 한다.
  */
 @Slf4j
 @Component
@@ -42,8 +53,9 @@ import java.util.stream.Stream;
 public class PlaceSeeder implements ApplicationRunner {
 
     private static final String SEED_CSV_PATH = "data/places.csv";
+    private static final String SEED_IMAGE_CSV_PATH = "data/place-images.csv";
     private static final String PROGRESS_STATUS_DONE = "검수 완료";
-    // csv 해시를 기록해두는 마커 파일. build/는 이미 gitignore 대상이라 별도 설정 불필요.
+    // CSV 해시를 기록하는 마커 파일. build/는 이미 gitignore 대상이라 별도 설정이 필요하지 않다.
     private static final Path SEED_HASH_MARKER = Path.of("build", "place-seed.sha256");
 
     private static final String[] CSV_HEADERS = {
@@ -61,18 +73,21 @@ public class PlaceSeeder implements ApplicationRunner {
         try (InputStream csvStream = new ClassPathResource(SEED_CSV_PATH).getInputStream()) {
             csvBytes = csvStream.readAllBytes();
         }
+        byte[] imageCsvBytes = readImageCsvBytes();
 
-        String currentHash = sha256(csvBytes);
+        String currentHash = sha256(csvBytes, imageCsvBytes);
         boolean csvChanged = !currentHash.equals(readStoredHash());
 
         if (placeRepository.count() > 0 && !csvChanged) {
-            log.info("places.csv 변경 없음, place 시딩을 건너뜁니다. count={}", placeRepository.count());
+            log.info("places.csv/place-images.csv 변경 없음, place 시딩을 건너뜁니다. count={}", placeRepository.count());
             return;
         }
 
-        log.info("place 시딩 시작(csvChanged={}): source={}", csvChanged, SEED_CSV_PATH);
+        log.info("place 시딩 시작(csvChanged={}): source={}, imageSource={}",
+                csvChanged, SEED_CSV_PATH, SEED_IMAGE_CSV_PATH);
 
-        List<PlaceSeedRow> rows = readSeedRows(csvBytes);
+        Map<String, List<PlaceSeedImage>> imagesByKakaoPlaceId = readImages(imageCsvBytes);
+        List<PlaceSeedRow> rows = readSeedRows(csvBytes, imagesByKakaoPlaceId);
         placeSeedWriter.write(rows);
         writeStoredHash(currentHash);
     }
@@ -89,16 +104,80 @@ public class PlaceSeeder implements ApplicationRunner {
         Files.writeString(SEED_HASH_MARKER, hash, StandardCharsets.UTF_8);
     }
 
-    private String sha256(byte[] bytes) {
+    private String sha256(byte[]... contents) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
-            return HexFormat.of().formatHex(digest);
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (byte[] content : contents) {
+                digest.update(content);
+            }
+            return HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 알고리즘을 찾을 수 없습니다.", e);
         }
     }
 
-    private List<PlaceSeedRow> readSeedRows(byte[] csvBytes) throws IOException {
+    /** 이미지 목록 CSV는 사진 수집 전에는 존재하지 않는다. 파일이 없으면 이미지 없이 시딩한다. */
+    private byte[] readImageCsvBytes() throws IOException {
+        ClassPathResource resource = new ClassPathResource(SEED_IMAGE_CSV_PATH);
+        if (!resource.exists()) {
+            log.info("{} 없음, 장소 이미지 없이 시딩합니다.", SEED_IMAGE_CSV_PATH);
+            return new byte[0];
+        }
+        try (InputStream stream = resource.getInputStream()) {
+            return stream.readAllBytes();
+        }
+    }
+
+    /**
+     * 카카오 place id별로 노출 순서대로 정렬된 이미지 목록을 반환한다.
+     * 헤더 위치가 바뀌어도 영향을 받지 않도록 이름 기반으로 조회한다.
+     */
+    Map<String, List<PlaceSeedImage>> readImages(byte[] imageCsvBytes) throws IOException {
+        if (imageCsvBytes.length == 0) {
+            return Map.of();
+        }
+
+        CSVFormat format = CSVFormat.DEFAULT.builder()
+                .setHeader()
+                .setSkipHeaderRecord(true)
+                .setIgnoreSurroundingSpaces(true)
+                .build();
+
+        Map<String, SortedMap<Integer, PlaceSeedImage>> imagesByPlaceId = new HashMap<>();
+        try (CSVParser parser = CSVParser.parse(
+                new InputStreamReader(new ByteArrayInputStream(imageCsvBytes), StandardCharsets.UTF_8),
+                format)) {
+            for (CSVRecord record : parser) {
+                String kakaoPlaceId = record.get("카카오 place id").trim();
+                String imageUrl = record.get("이미지 URL").trim();
+                if (kakaoPlaceId.isBlank() || imageUrl.isBlank()) {
+                    continue;
+                }
+                // 출처 컬럼은 뒤에 추가되어 이전 버전 파일에는 없다. 컬럼이 없으면 빈 값으로 처리한다.
+                String source = record.isMapped("출처") ? record.get("출처").trim() : "";
+                imagesByPlaceId
+                        .computeIfAbsent(kakaoPlaceId, id -> new TreeMap<>())
+                        .put(Integer.valueOf(record.get("순서").trim()),
+                                new PlaceSeedImage(imageUrl, source.isBlank() ? null : source));
+            }
+        }
+
+        Map<String, List<PlaceSeedImage>> result = new HashMap<>();
+        imagesByPlaceId.forEach((placeId, images) -> result.put(placeId, List.copyOf(images.values())));
+        log.info("장소 이미지 목록 로드 완료: placeCount={}", result.size());
+        return result;
+    }
+
+    // 카카오맵 URL은 https://place.map.kakao.com/{id} 형식이므로 마지막 경로 조각이 place id다.
+    String extractKakaoPlaceId(String kakaoPlaceUrl) {
+        if (kakaoPlaceUrl == null || kakaoPlaceUrl.isBlank()) {
+            return null;
+        }
+        return kakaoPlaceUrl.substring(kakaoPlaceUrl.lastIndexOf('/') + 1);
+    }
+
+    private List<PlaceSeedRow> readSeedRows(byte[] csvBytes,
+                                            Map<String, List<PlaceSeedImage>> imagesByKakaoPlaceId) throws IOException {
         CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setHeader(CSV_HEADERS)
                 .setSkipHeaderRecord(true)
@@ -130,6 +209,12 @@ public class PlaceSeeder implements ApplicationRunner {
                         .filter(tag -> !tag.isBlank())
                         .toList();
 
+                String kakaoPlaceUrl = blankToNull(record.get("카카오맵 URL"));
+                String kakaoPlaceId = extractKakaoPlaceId(kakaoPlaceUrl);
+                List<PlaceSeedImage> images = kakaoPlaceId == null
+                        ? List.of()
+                        : imagesByKakaoPlaceId.getOrDefault(kakaoPlaceId, List.of());
+
                 rows.add(new PlaceSeedRow(
                         record.get("역명").trim(),
                         record.get("카테고리").trim(),
@@ -140,7 +225,8 @@ public class PlaceSeeder implements ApplicationRunner {
                         blankToNull(record.get("전화번호")),
                         Double.valueOf(xCoordText),
                         Double.valueOf(yCoordText),
-                        blankToNull(record.get("카카오맵 URL"))
+                        kakaoPlaceUrl,
+                        images
                 ));
             }
         }
