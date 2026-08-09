@@ -35,8 +35,9 @@ public enum S3Folder {
 
     /**
      * 서비스가 제공하는 장소 사진
-     * 최종 키: {@code images/static/places/{placeId}/{n}.{ext}}
-     * Presigned URL 발급 대상이 아니다.
+     * 최종 키: {@code images/static/places/{카카오 place id}/{n}.{ext}} (n은 1부터)
+     * DB의 placeId가 아니라 카카오 place id를 쓴다 — 재시딩마다 placeId가 새로 발급돼 키가 어긋나기 때문.
+     * {@code PlaceImageUploadBatch}가 일괄 업로드하며 Presigned URL 발급 대상이 아니다.
      */
     STATIC_PLACE("images/static/places"),
     ;
