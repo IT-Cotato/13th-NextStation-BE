@@ -21,6 +21,7 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
@@ -300,6 +301,13 @@ class CourseQueryServiceTest {
 
     private MyCourseView myView(Long courseId, LocalDateTime createdAt) {
         MyCourseView view = mock(MyCourseView.class);
+        lenient().when(view.getCourseId()).thenReturn(courseId);
+        lenient().when(view.getCreatedAt()).thenReturn(createdAt);
+        return view;
+    }
+
+    private MemberCourseCardView memberCourseCardView(Long courseId, LocalDateTime createdAt) {
+        MemberCourseCardView view = mock(MemberCourseCardView.class);
         lenient().when(view.getCourseId()).thenReturn(courseId);
         lenient().when(view.getCreatedAt()).thenReturn(createdAt);
         return view;
@@ -1189,7 +1197,7 @@ class CourseQueryServiceTest {
     void getMemberPublicCourses_nextCursor() {
         // given: size 1 요청 → 2개 조회되어 다음 페이지 있음
         LocalDateTime createdAt = LocalDateTime.of(2026, 7, 23, 12, 0);
-        List<MyCourseView> views = List.of(myView(3L, createdAt), myView(2L, createdAt));
+        List<MemberCourseCardView> views = List.of(memberCourseCardView(3L, createdAt), memberCourseCardView(2L, createdAt));
         given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
         given(courseRepository.findPublicCoursesByMemberId(eq(2L), any(Pageable.class))).willReturn(views);
 

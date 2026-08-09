@@ -9,6 +9,7 @@ import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreStationResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
+import com.cotato.nextstation.domain.course.dto.response.MemberCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MemberCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
@@ -25,6 +26,7 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
@@ -161,18 +163,24 @@ public class CourseConverter {
         return new MyCourseListResponse(lineFilters, cards, nextCursor, hasNext);
     }
 
-    // 다른 회원의 공개코스 탭 카드. 좋아요한 코스 카드(CourseCardResponse)와 모양이 같아 그대로 재사용한다.
-    public MemberCourseListResponse toMemberCourseListResponse(List<MyCourseView> courses,
+    // 다른 회원의 공개코스 탭 카드. journalId로 코스 상세 라우트를 열고, imageUrl·likeCount로
+    // 마이페이지와 같은 카드 디자인을 쓸 수 있어 좋아요한 코스 카드(CourseCardResponse)와는 모양이 다르다.
+    public MemberCourseListResponse toMemberCourseListResponse(List<MemberCourseCardResponse> courses,
                                                                 String nextCursor, boolean hasNext) {
-        List<CourseCardResponse> cards = courses.stream()
-                .map(course -> new CourseCardResponse(
-                        course.getCourseId(),
-                        course.getName(),
-                        course.getStationId(),
-                        course.getStationName(),
-                        toLine(course.getLineId(), course.getLineName(), course.getLineCode())))
-                .toList();
-        return new MemberCourseListResponse(cards, nextCursor, hasNext);
+        return new MemberCourseListResponse(courses, nextCursor, hasNext);
+    }
+
+    // imageUrl은 journalId로 배치 조회한 값을 호출부가 넘겨준다(코스마다 조회하면 N+1).
+    public MemberCourseCardResponse toMemberCourseCardResponse(MemberCourseCardView course, String imageUrl) {
+        return new MemberCourseCardResponse(
+                course.getCourseId(),
+                course.getJournalId(),
+                course.getName(),
+                course.getStationId(),
+                course.getStationName(),
+                toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
+                imageUrl,
+                course.getLikeCount());
     }
 
     // 대표 호선(station.draw_line)은 뽑기 대상이 아닌 역에서 비어 있을 수 있어 LEFT JOIN으로 조회한다.

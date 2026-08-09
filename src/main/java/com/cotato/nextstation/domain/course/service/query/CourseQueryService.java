@@ -13,6 +13,7 @@ import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
+import com.cotato.nextstation.domain.course.dto.response.MemberCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MemberCourseListResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
@@ -24,6 +25,7 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
@@ -622,27 +624,40 @@ public class CourseQueryService {
         Pageable pageable = PageRequest.of(0, pageSize + 1); // hasNext 판단용 1개 더 조회
 
         CursorData cursorData = CursorData.decode(cursor);
-        List<MyCourseView> courses = fetchMemberPublicCourses(memberId, cursorData, pageable);
+        List<MemberCourseCardView> courses = fetchMemberPublicCourses(memberId, cursorData, pageable);
 
         boolean hasNext = courses.size() > pageSize;
-        List<MyCourseView> pageContent = hasNext ? courses.subList(0, pageSize) : courses;
+        List<MemberCourseCardView> pageContent = hasNext ? courses.subList(0, pageSize) : courses;
 
         String nextCursor = null;
         if (hasNext) {
-            MyCourseView last = pageContent.get(pageContent.size() - 1);
+            MemberCourseCardView last = pageContent.get(pageContent.size() - 1);
             nextCursor = new CursorData(last.getCourseId(), null, last.getCreatedAt()).encode();
         }
 
-        return courseConverter.toMemberCourseListResponse(pageContent, nextCursor, hasNext);
+        List<MemberCourseCardResponse> cards = toMemberCourseCards(pageContent);
+
+        return courseConverter.toMemberCourseListResponse(cards, nextCursor, hasNext);
     }
 
-    private List<MyCourseView> fetchMemberPublicCourses(Long memberId, CursorData cursorData, Pageable pageable) {
+    private List<MemberCourseCardView> fetchMemberPublicCourses(Long memberId, CursorData cursorData, Pageable pageable) {
         if (cursorData == null) {
             return courseRepository.findPublicCoursesByMemberId(memberId, pageable);
         }
         validateTimeCursor(cursorData);
         return courseRepository.findPublicCoursesByMemberIdAfterCursor(
                 memberId, cursorData.dateTimeValue(), cursorData.id(), pageable);
+    }
+
+    // journalId를 모아 한 번에 imageUrl을 조회한다(코스마다 조회하면 N+1).
+    private List<MemberCourseCardResponse> toMemberCourseCards(List<MemberCourseCardView> courses) {
+        Map<Long, JournalCardInfoResponse> journalInfos = resolveJournalCardInfos(
+                courses.stream().map(MemberCourseCardView::getJournalId).toList());
+
+        return courses.stream()
+                .map(course -> courseConverter.toMemberCourseCardResponse(
+                        course, resolveJournalImageUrl(journalInfos, course.getJournalId())))
+                .toList();
     }
 
     public CourseInfoResponse getCourseInfo(Long courseId) {
