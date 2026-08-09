@@ -46,8 +46,8 @@ public class PlaceImage extends BaseTimeEntity {
     private ImageSourceType sourceType;
 
     /**
-     * 사진의 출처 (공공누리 1유형, CC BY, 비짓서울 등).
-     * 직접 촬영본처럼 출처표시 의무가 없으면 null.
+     * 사진의 출처 (공공누리 1유형, CC BY, 비짓서울, 직접 촬영 등).
+     * 공공누리 제1유형 등은 출처표시가 이용 조건이므로 이 값으로 출처 목록을 만들 수 있어야 한다.
      */
     @Column(name = "source")
     private String source;

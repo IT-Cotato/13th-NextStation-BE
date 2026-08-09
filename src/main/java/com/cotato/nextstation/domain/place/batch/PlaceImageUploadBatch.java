@@ -52,6 +52,9 @@ public final class PlaceImageUploadBatch {
     // PlaceSeeder가 헤더명으로 조회하므로 문자열을 변경하면 시더도 함께 수정해야 한다.
     private static final String[] IMAGE_LIST_HEADERS = {"카카오 place id", "순서", "이미지 URL", "출처"};
 
+    /** 수집 경로를 거치지 않은 사진의 출처. 표기 의무는 없지만 출처 목록을 뽑을 수 있어야 하므로 값을 남긴다. */
+    private static final String SELF_TAKEN_SOURCE = "직접 촬영";
+
     /** 수집 배치가 남긴 출처 기록. 공공누리 출처표시 의무가 있어 DB까지 이어져야 한다. */
     private static final Path PHOTO_SOURCE_INPUT = Path.of("place-photo-output/place_photo_source.csv");
 
@@ -73,7 +76,7 @@ public final class PlaceImageUploadBatch {
         List<List<String>> imageListRows = new ArrayList<>();
         int uploadedCount = 0;
         int skippedCount = 0;
-        int missingSourceCount = 0;
+        int selfTakenCount = 0;
 
         try (S3Client s3Client = S3Client.builder().region(Region.of(region)).build()) {
             for (Path placeDir : listSorted(photoDir)) {
@@ -102,11 +105,12 @@ public final class PlaceImageUploadBatch {
                         continue;
                     }
 
-                    // 직접 촬영본은 출처표시 의무가 없어 비어 있을 수 있다. API로 수집한 사진이면 출처가 존재해야 한다.
+                    // 수집 배치를 거치지 않고 폴더에 직접 넣은 사진은 출처 기록이 없다.
+                    // 수집 경로의 출처가 유실되는 사고는 CSV 파싱 예외 전파와 finally 기록으로 따로 막고 있다.
                     String source = sourceByFile.getOrDefault(normalizePath(photo.toString()), "");
                     if (source.isBlank()) {
-                        log.warn("출처 기록이 없습니다(직접 촬영본이 아니라면 확인 필요): {}", photo);
-                        missingSourceCount++;
+                        source = SELF_TAKEN_SOURCE;
+                        selfTakenCount++;
                     }
 
                     String key = "%s/%s/%d.%s".formatted(S3_KEY_PREFIX, kakaoPlaceId, sortOrder, extension);
@@ -128,8 +132,8 @@ public final class PlaceImageUploadBatch {
         }
 
         writeImageList(imageListRows);
-        log.info("장소 사진 업로드 완료: uploadedCount={}, skippedCount={}, 출처없음={}, output={}",
-                uploadedCount, skippedCount, missingSourceCount, IMAGE_LIST_OUTPUT);
+        log.info("장소 사진 업로드 완료: uploadedCount={}, skippedCount={}, 직접촬영={}, output={}",
+                uploadedCount, skippedCount, selfTakenCount, IMAGE_LIST_OUTPUT);
     }
 
     /**
