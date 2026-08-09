@@ -1,7 +1,7 @@
 package com.cotato.nextstation.domain.place.entity;
 
 import com.cotato.nextstation.domain.place.enums.ImageSourceType;
-import com.cotato.nextstation.global.entity.BaseEntity;
+import com.cotato.nextstation.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -25,7 +25,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "place_image")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PlaceImage extends BaseEntity {
+public class PlaceImage extends BaseTimeEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id", nullable = false)
