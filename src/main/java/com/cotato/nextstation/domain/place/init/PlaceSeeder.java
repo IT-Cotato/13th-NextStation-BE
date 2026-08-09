@@ -151,14 +151,24 @@ public class PlaceSeeder implements ApplicationRunner {
                 String kakaoPlaceId = record.get("카카오 place id").trim();
                 String imageUrl = record.get("이미지 URL").trim();
                 if (kakaoPlaceId.isBlank() || imageUrl.isBlank()) {
+                    log.warn("카카오 place id 또는 이미지 URL이 비어 있어 제외합니다. row={}", record.getRecordNumber());
                     continue;
                 }
+
+                Integer sortOrder = parseSortOrder(record, kakaoPlaceId);
+                if (sortOrder == null) {
+                    continue;
+                }
+
                 // 출처 컬럼은 뒤에 추가되어 이전 버전 파일에는 없다. 컬럼이 없으면 빈 값으로 처리한다.
                 String source = record.isMapped("출처") ? record.get("출처").trim() : "";
-                imagesByPlaceId
+                PlaceSeedImage replaced = imagesByPlaceId
                         .computeIfAbsent(kakaoPlaceId, id -> new TreeMap<>())
-                        .put(Integer.valueOf(record.get("순서").trim()),
-                                new PlaceSeedImage(imageUrl, source.isBlank() ? null : source));
+                        .put(sortOrder, new PlaceSeedImage(imageUrl, source.isBlank() ? null : source));
+                if (replaced != null) {
+                    log.warn("같은 순서의 이미지가 중복되어 앞의 것을 덮어씁니다. kakaoPlaceId={}, 순서={}, 이전={}",
+                            kakaoPlaceId, sortOrder, replaced.imageUrl());
+                }
             }
         }
 
@@ -168,12 +178,29 @@ public class PlaceSeeder implements ApplicationRunner {
         return result;
     }
 
-    // 카카오맵 URL은 https://place.map.kakao.com/{id} 형식이므로 마지막 경로 조각이 place id다.
+    /** 순서 컬럼이 숫자가 아니면 그 행만 제외한다. 시딩 전체를 세우지 않는다. */
+    private Integer parseSortOrder(CSVRecord record, String kakaoPlaceId) {
+        String value = record.get("순서").trim();
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException e) {
+            log.warn("순서가 숫자가 아니라 제외합니다. kakaoPlaceId={}, 순서={}, row={}",
+                    kakaoPlaceId, value, record.getRecordNumber());
+            return null;
+        }
+    }
+
+    /**
+     * 카카오맵 URL은 {@code https://place.map.kakao.com/{id}} 형식이므로 마지막 경로 조각이 place id다.
+     * 끝의 슬래시와 쿼리·프래그먼트를 떼어내지 않으면 조인 키가 어긋나 사진이 조용히 붙지 않는다.
+     */
     String extractKakaoPlaceId(String kakaoPlaceUrl) {
         if (kakaoPlaceUrl == null || kakaoPlaceUrl.isBlank()) {
             return null;
         }
-        return kakaoPlaceUrl.substring(kakaoPlaceUrl.lastIndexOf('/') + 1);
+        String url = kakaoPlaceUrl.trim().split("[?#]")[0].replaceAll("/+$", "");
+        String id = url.substring(url.lastIndexOf('/') + 1);
+        return id.isBlank() ? null : id;
     }
 
     private List<PlaceSeedRow> readSeedRows(byte[] csvBytes,

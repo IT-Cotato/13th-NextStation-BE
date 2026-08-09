@@ -31,8 +31,12 @@ import java.util.stream.Stream;
  * 읽어 {@code place_image}로 적재하므로, 헤더는 시더와의 계약으로 취급한다.
  *
  * <p>파일명 오름차순이 노출 순서이며 첫 장이 썸네일이 된다. 사진의 출처는 수집 배치가 남긴
- * {@code place_photo_source.csv}에서 가져와 함께 기록한다. 동일한 키에 덮어쓰므로 반복 실행해도
- * 안전하며, 사진을 교체한 뒤 다시 실행하면 그대로 반영된다.
+ * {@code place_photo_source.csv}에서 저장 파일 경로로 조회해 함께 기록한다.
+ *
+ * <p>같은 키에 덮어쓰므로 사진을 추가하거나 교체한 뒤 다시 실행하면 그대로 반영된다.
+ * 다만 <b>삭제는 반영되지 않는다.</b> 사진을 3장에서 2장으로 줄이거나 확장자를 바꾸면 이전 객체가
+ * S3에 남아 과금된다. {@code place-images.csv}에는 포함되지 않아 DB로는 넘어가지 않으므로,
+ * 정리가 필요하면 콘솔에서 해당 접두사를 확인한다.
  *
  * <p>실행: {@code ./gradlew placeImageUploadBatch} (환경변수 {@code AWS_S3_BUCKET_NAME} 필요)
  */
@@ -63,8 +67,8 @@ public final class PlaceImageUploadBatch {
             throw new IllegalStateException("사진 디렉터리가 없습니다: " + photoDir.toAbsolutePath());
         }
 
-        Map<String, String> sourceByPlaceId = readPhotoSources();
-        log.info("출처 기록 로드: {}곳", sourceByPlaceId.size());
+        Map<String, String> sourceByFile = readPhotoSources();
+        log.info("출처 기록 로드: 사진 {}장", sourceByFile.size());
 
         List<List<String>> imageListRows = new ArrayList<>();
         int uploadedCount = 0;
@@ -84,13 +88,6 @@ public final class PlaceImageUploadBatch {
                     continue;
                 }
 
-                // 직접 촬영본은 출처표시 의무가 없어 비어 있을 수 있다. API로 수집한 사진이면 출처가 존재해야 한다.
-                String source = sourceByPlaceId.getOrDefault(kakaoPlaceId, "");
-                if (source.isBlank()) {
-                    log.warn("출처 기록이 없습니다(직접 촬영본이 아니라면 확인 필요): {}", kakaoPlaceId);
-                    missingSourceCount++;
-                }
-
                 int sortOrder = 1;
                 for (Path photo : listSorted(placeDir)) {
                     if (!Files.isRegularFile(photo)) {
@@ -103,6 +100,13 @@ public final class PlaceImageUploadBatch {
                         log.warn("지원하지 않는 확장자라 건너뜁니다: {}", photo);
                         skippedCount++;
                         continue;
+                    }
+
+                    // 직접 촬영본은 출처표시 의무가 없어 비어 있을 수 있다. API로 수집한 사진이면 출처가 존재해야 한다.
+                    String source = sourceByFile.getOrDefault(normalizePath(photo.toString()), "");
+                    if (source.isBlank()) {
+                        log.warn("출처 기록이 없습니다(직접 촬영본이 아니라면 확인 필요): {}", photo);
+                        missingSourceCount++;
                     }
 
                     String key = "%s/%s/%d.%s".formatted(S3_KEY_PREFIX, kakaoPlaceId, sortOrder, extension);
@@ -129,8 +133,10 @@ public final class PlaceImageUploadBatch {
     }
 
     /**
-     * 수집 배치가 남긴 출처 기록을 카카오 place id별로 읽는다.
-     * 한 장소에 여러 장이 있어도 출처는 같으므로 첫 값만 쓴다.
+     * 수집 배치가 남긴 출처 기록을 저장 파일 경로별로 읽는다.
+     *
+     * <p>여러 수집 배치가 같은 파일에 이어 붙이므로 한 장소에 서로 다른 출처의 행이 섞일 수 있다.
+     * 장소 단위로 묶으면 먼저 기록된 배치의 출처가 실제와 다른 사진에 붙으므로 파일 단위로 조인한다.
      * 파일이 없으면 빈 맵 — 직접 촬영본만 올리는 경우다.
      */
     private static Map<String, String> readPhotoSources() throws IOException {
@@ -148,16 +154,22 @@ public final class PlaceImageUploadBatch {
         Map<String, String> sources = new HashMap<>();
         try (CSVParser parser = CSVParser.parse(CsvFiles.bomSafeReader(PHOTO_SOURCE_INPUT), format)) {
             for (CSVRecord record : parser) {
-                String id = record.get("카카오 place id").trim();
+                String savedFile = record.get("저장 파일").trim();
                 String source = record.get("출처").trim();
-                if (!id.isBlank() && !source.isBlank()) {
-                    sources.putIfAbsent(id, source);
+                if (!savedFile.isBlank() && !source.isBlank()) {
+                    // 나중에 기록된 행이 최신이다. 사진을 다시 받으면 같은 경로에 새 출처가 남는다.
+                    sources.put(normalizePath(savedFile), source);
                 }
             }
         }
         // 파싱 예외를 처리하지 않고 전파한다. 예외를 무시하면 출처가 비어 있는 목록이 그대로 생성되는데,
         // 공공누리 제1유형은 출처표시가 의무이므로 잘못된 상태로 진행하는 것보다 중단하는 편이 안전하다.
         return sources;
+    }
+
+    /** 수집 배치는 OS 구분자로 경로를 남긴다. 실행 환경이 달라도 맞도록 구분자를 통일한다. */
+    private static String normalizePath(String path) {
+        return path.replace('\\', '/');
     }
 
     private static List<Path> listSorted(Path dir) throws IOException {
