@@ -313,6 +313,12 @@ class CourseQueryServiceTest {
         return view;
     }
 
+    private MemberCourseCardView memberCourseCardView(Long courseId, Long journalId, LocalDateTime createdAt) {
+        MemberCourseCardView view = memberCourseCardView(courseId, createdAt);
+        lenient().when(view.getJournalId()).thenReturn(journalId);
+        return view;
+    }
+
     @Test
     @DisplayName("좋아요 목록은 요청 크기보다 1개 더 조회해 다음 페이지 여부를 판단하고, 초과분은 잘라낸다")
     void getLikedCourses_hasNext() {
@@ -1210,6 +1216,31 @@ class CourseQueryServiceTest {
         CursorData nextCursor = CursorData.decode(cursorCaptor.getValue());
         assertThat(nextCursor.id()).isEqualTo(3L);
         assertThat(nextCursor.dateTimeValue()).isEqualTo(createdAt);
+    }
+
+    @Test
+    @DisplayName("공개 코스 카드는 journalId를 모아 한 번에 조회해 이미지를 붙인다")
+    void getMemberPublicCourses_batchesJournalImages() {
+        // given: 21번 일지는 사진이 있고, 22번은 없다
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 23, 12, 0);
+        List<MemberCourseCardView> views = List.of(
+                memberCourseCardView(3L, 21L, createdAt),
+                memberCourseCardView(2L, 22L, createdAt));
+        given(memberExistenceQueryService.existsMember(2L)).willReturn(true);
+        given(courseRepository.findPublicCoursesByMemberId(eq(2L), any(Pageable.class))).willReturn(views);
+        given(journalCardQueryService.getJournalCourseCardInfos(List.of(21L, 22L)))
+                .willReturn(Map.of(
+                        21L, new JournalCardInfoResponse(21L, "cover.jpg", null),
+                        22L, new JournalCardInfoResponse(22L, null, null)));
+
+        // when
+        courseQueryService.getMemberPublicCourses(2L, null, 10);
+
+        // then: 카드마다 조회했다면 journalId별로 여러 번 불렸겠지만, 모아서 한 번만 부른다
+        verify(journalCardQueryService).getJournalCourseCardInfos(List.of(21L, 22L));
+        ArgumentCaptor<String> imageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(courseConverter, times(2)).toMemberCourseCardResponse(any(), imageCaptor.capture());
+        assertThat(imageCaptor.getAllValues()).containsExactly("cover.jpg", null);
     }
 
     @Test
