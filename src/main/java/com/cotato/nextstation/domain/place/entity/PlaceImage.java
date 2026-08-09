@@ -45,13 +45,21 @@ public class PlaceImage extends BaseEntity {
     @Column(name = "source_type", nullable = false)
     private ImageSourceType sourceType;
 
+    /**
+     * 사진의 출처 (공공누리 1유형, CC BY, 비짓서울 등).
+     * 직접 촬영본처럼 출처표시 의무가 없으면 null.
+     */
+    @Column(name = "source")
+    private String source;
+
     @Builder
     public PlaceImage(Place place, PlaceReview placeReview, String imageUrl,
-                      int sortOrder, ImageSourceType sourceType) {
+                      int sortOrder, ImageSourceType sourceType, String source) {
         this.place = place;
         this.placeReview = placeReview;
         this.imageUrl = imageUrl;
         this.sortOrder = sortOrder;
         this.sourceType = sourceType;
+        this.source = source;
     }
 }
