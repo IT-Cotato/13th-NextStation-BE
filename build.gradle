@@ -78,7 +78,10 @@ def dotenv = {
             .findAll { !it.trim().startsWith('#') && it.contains('=') }
             .collectEntries {
                 def i = it.indexOf('=')
-                [(it.substring(0, i).trim()): it.substring(i + 1).trim()]
+                def key = it.substring(0, i).trim().replaceFirst(/^export\s+/, '')
+                // 값을 감싼 따옴표를 벗긴다. 남겨두면 인증키에 그대로 섞여 들어가 인증 실패로만 드러난다.
+                def value = it.substring(i + 1).trim().replaceAll(/^(["'])(.*)\1$/, '$2')
+                [(key): value]
             }
 }
 
