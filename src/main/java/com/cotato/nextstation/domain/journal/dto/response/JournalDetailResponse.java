@@ -9,6 +9,9 @@ import java.util.List;
 
 @Schema(description = "여행일지 상세 조회 응답")
 public record JournalDetailResponse(
+        @Schema(description = "작성자 회원 ID. 프로필 클릭 시 이동에 쓴다")
+        Long writerId,
+
         @Schema(description = "작성자 닉네임")
         String writerName,
 

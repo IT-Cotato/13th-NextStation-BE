@@ -135,6 +135,7 @@ public class JournalConverter {
                 toVisitedPlaceResponses(coursePlaces, placeInfoMap, reviewByPlaceId, imageUrlByReviewId);
 
         return new JournalDetailResponse(
+                journal.getMember().getId(),
                 journal.getMember().getNickname(),
                 writerProfileImageUrl,
                 journal.getTraveledAt(),

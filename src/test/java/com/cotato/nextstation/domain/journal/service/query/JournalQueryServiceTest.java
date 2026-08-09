@@ -221,6 +221,7 @@ class JournalQueryServiceTest {
             JournalDetailResponse response = journalQueryService.getJournalDetail(OWNER_ID, JOURNAL_ID);
 
             // then
+            assertThat(response.writerId()).isEqualTo(OWNER_ID);
             assertThat(response.courseId()).isEqualTo(COURSE_ID);
             assertThat(response.isMine()).isTrue();
             assertThat(response.isLiked()).isFalse();
