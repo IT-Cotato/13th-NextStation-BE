@@ -88,21 +88,38 @@ public class PlaceReviewCommandService {
         // 리뷰 일괄 저장
         List<PlaceReview> savedReviews = placeReviewRepository.saveAll(placeReviews);
 
-        // 리뷰 이미지 일괄 저장
-        List<PlaceReviewImage> reviewImages = IntStream.range(0, requests.size())
+        // 리뷰 이미지는 리뷰마다 별도 트랜잭션(REQUIRES_NEW)으로 저장한다. 하나가 실패해도
+        // 이미 저장된 리뷰 텍스트와 다른 이미지들이 함께 롤백되지 않게 하기 위함이다.
+        IntStream.range(0, requests.size())
                 .filter(i -> requests.get(i).imageUrl() != null)
-                .mapToObj(i -> PlaceReviewImage.builder()
-                .placeReview(savedReviews.get(i))
-                .imageUrl(requests.get(i).imageUrl())
-                        .build())
-                .toList();
+                .forEach(i -> saveReviewImage(savedReviews.get(i), requests.get(i).imageUrl()));
+    }
 
-            if (!reviewImages.isEmpty()) {
-                placeReviewImageRepository.saveAll(reviewImages);
-            };
+    // 코스에 속하지 않은 장소는 리뷰를 남길 수 없다. 코스에 속한 placeId 집합과 요청을 대조한다.
+    private void validatePlacesInCourse(Long courseId, List<Long> placeIds) {
+        Set<Long> coursePlaceIds = courseQueryService.getCoursePlaces(courseId).stream()
+                .map(CoursePlaceInfoResponse::placeId)
+                .collect(Collectors.toSet());
+        placeIds.stream()
+                .filter(placeId -> !coursePlaceIds.contains(placeId))
+                .findFirst()
+                .ifPresent(placeId -> {
+                    log.warn("코스에 속하지 않은 장소의 리뷰 작성 시도: courseId={}, placeId={}", courseId, placeId);
+                    throw new CustomException(PlaceErrorCode.PLACE_NOT_IN_COURSE);
+                });
+    }
 
-
-            // PlaceReviewImage 저장 실패 시 PlaceReview도 함께 롤백되는 상황
+    /**
+     * 이미지 저장 실패는 조용히 삼키고 로그만 남긴다. 사용자에게는 여행일지/리뷰가 정상
+     * 저장된 걸로 보여야 하며, 이미지 한 장이 실패했다고 이미 작성한 리뷰까지 잃으면 안 된다.
+     * PlaceReviewImageSaver가 REQUIRES_NEW + flush로 이 시점에 예외를 던지도록 보장한다.
+     */
+    private void saveReviewImage(PlaceReview placeReview, String imageUrl) {
+        try {
+            placeReviewImageSaver.save(placeReview, imageUrl);
+        } catch (Exception e) {
+            log.error("장소 리뷰 이미지 저장 실패: placeReviewId={}, imageUrl={}", placeReview.getId(), imageUrl, e);
+        }
     }
 
     // 여행일지 수정 시 장소 리뷰 수정
