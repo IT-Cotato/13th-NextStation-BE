@@ -591,7 +591,7 @@ class CourseQueryServiceTest {
         // 프로젝션 mock에 스터빙이 들어 있어 given(...) 밖에서 미리 만든다
         LineView line1 = lineView(4L, "1호선", LineCode.LINE_1);
         LineView line2 = lineView(9L, "2호선", LineCode.LINE_2);
-        given(courseRepository.findDrawableLines()).willReturn(List.of(line1, line2));
+        given(courseRepository.findDrawableLines(any())).willReturn(List.of(line1, line2));
         given(courseRepository.findLinesWithPublicCourses()).willReturn(List.of(line2));
 
         // when
@@ -600,6 +600,22 @@ class CourseQueryServiceTest {
         // then
         assertThat(result).extracting(ExploreLineResponse::id, ExploreLineResponse::hasCourses)
                 .containsExactly(tuple(4L, false), tuple(9L, true));
+    }
+
+    @Test
+    @DisplayName("노선 칩은 화면에 칩이 있는 1~9호선만 조회한다")
+    void getExploreLines_limitsToChipLines() {
+        // given: 뽑기 역 중 환승역이 경의중앙선·우이신설선에도 속하지만 그 두 노선은 칩이 없다
+        given(courseRepository.findDrawableLines(any())).willReturn(List.of());
+        given(courseRepository.findLinesWithPublicCourses()).willReturn(List.of());
+
+        // when
+        courseQueryService.getExploreLines();
+
+        // then: 경의중앙선·우이신설선은 조회 조건에서 빠진다
+        verify(courseRepository).findDrawableLines(Set.of(LineCode.LINE_1, LineCode.LINE_2,
+                LineCode.LINE_3, LineCode.LINE_4, LineCode.LINE_5, LineCode.LINE_6,
+                LineCode.LINE_7, LineCode.LINE_8, LineCode.LINE_9));
     }
 
     @Test
