@@ -323,28 +323,33 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<ExploreCourseView> findMostLikedCourses(Pageable pageable);
 
     /**
-     * 노선 칩으로 그릴 후보 노선. 뽑기 역이 속한 노선 전체를 내려준다.
+     * 노선 칩으로 그릴 후보 노선. 뽑기 역이 속한 노선 중 {@code lineCodes}에 해당하는 것만 내려준다.
      * <p>
      * 코스는 뽑기 역에만 붙으므로 이 집합이 곧 "코스가 존재할 수 있는 노선"이다.
      * {@code line} 테이블 전체를 쓰면 코스가 생길 수 없는 노선까지 칩으로 뜨고,
      * 공개 코스가 있는 노선만 쓰면 데이터가 쌓일 때마다 칩이 늘어나 노선도가 흔들려 보인다.
      * <p>
+     * 소속 호선({@code StationLine}) 기준이라 노선 필터·활성 판정과 기준이 같다.
+     * 화면에 칩이 있는 노선만 남기는 것은 호출부가 {@code lineCodes}로 정한다.
+     * <p>
      * 뽑기 역이 늘어나면 노선도 자연히 늘어나므로 목록을 하드코딩하지 않고 데이터에서 유도한다.
-     * 환승역이 있어 1~9호선 외 노선(경의중앙선 등)도 포함될 수 있다.
      */
     @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Station s " +
             "JOIN StationLine sl ON sl.station.id = s.id " +
             "JOIN sl.line l " +
-            "WHERE s.isDrawable = true " +
+            "WHERE s.isDrawable = true AND l.code IN :lineCodes " +
             "ORDER BY l.name")
-    List<LineView> findDrawableLines();
+    List<LineView> findDrawableLines(@Param("lineCodes") Collection<LineCode> lineCodes);
 
     /**
      * 공개 코스가 하나라도 있는 노선. 칩의 활성/비활성을 가르는 데 쓴다.
      * <p>
      * 노선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
      * "칩은 비활성인데 필터를 걸면 결과가 나오는" 불일치가 생긴다.
+     * <p>
+     * 칩으로 그리지 않는 노선까지 섞여 나오지만, 활성 여부를 가리는 데만 쓰는 값이라
+     * 칩에 없는 노선의 id는 조회되지 않아 결과가 달라지지 않는다.
      */
     @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
