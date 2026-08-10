@@ -339,6 +339,30 @@ class JournalQueryServiceTest {
 
             verify(courseCommandService, never()).increaseViewCount(anyLong(), any());
         }
+
+        @Test
+        @DisplayName("본인이 비공개 일지를 조회하면 정상적으로 조회되고 isPublic=false가 채워진다")
+        void ownerViewsPrivateJournal_fillsIsPublicFalse() {
+            // given: setUp의 journal은 공개 상태라, 이 테스트만 비공개로 재정의한다
+            Journal privateJournal = Journal.builder()
+                    .member(journal.getMember())
+                    .memberStampId(MEMBER_STAMP_ID)
+                    .title("보문 골목 산책")
+                    .traveledAt(LocalDate.of(2026, 7, 8))
+                    .travelDuration(TravelDuration.HALF_DAY)
+                    .isPublic(false)
+                    .build();
+            ReflectionTestUtils.setField(privateJournal, "id", JOURNAL_ID);
+            given(journalRepository.findById(JOURNAL_ID)).willReturn(Optional.of(privateJournal));
+            given(courseQueryService.isLikedByMember(COURSE_ID, OWNER_ID)).willReturn(false);
+
+            // when
+            JournalDetailResponse response = journalQueryService.getJournalDetail(OWNER_ID, JOURNAL_ID);
+
+            // then: 본인 조회라 비공개여도 막히지 않고, 공개 범위가 그대로 응답에 반영된다
+            assertThat(response.isMine()).isTrue();
+            assertThat(response.isPublic()).isFalse();
+        }
     }
 
     @Nested
