@@ -145,6 +145,7 @@ public class JournalConverter {
                 courseSnapshot.getName(),
                 isMine,
                 isLiked,
+                journal.isPublic(),
                 tags,
                 journal.getTravelDuration(),
                 viewCount,

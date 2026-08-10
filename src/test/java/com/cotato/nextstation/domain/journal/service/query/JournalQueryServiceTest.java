@@ -225,6 +225,7 @@ class JournalQueryServiceTest {
             assertThat(response.courseId()).isEqualTo(COURSE_ID);
             assertThat(response.isMine()).isTrue();
             assertThat(response.isLiked()).isFalse();
+            assertThat(response.isPublic()).isTrue();
             // 본인 조회라 실제로 증가하지 않아야 하지만, 그 판단은 CourseRepository의 SQL 조건
             // (c.memberId <> viewerMemberId)이 담당한다. 여기서는 위임(호출) 자체만 검증할 수 있고,
             // "정말 증가하지 않는지"는 이 유닛 테스트로는(courseCommandService가 목이라) 검증 대상이 아니다.

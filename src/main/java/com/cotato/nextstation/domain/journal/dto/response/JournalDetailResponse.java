@@ -39,6 +39,9 @@ public record JournalDetailResponse(
         @Schema(description = "이 코스에 좋아요를 눌러 뒀는지 여부")
         boolean isLiked,
 
+        @Schema(description = "이 여행일지의 공개 범위. true면 공개, false면 비공개")
+        boolean isPublic,
+
         @Schema(description = "태그 상위 3개")
         List<String> tags,
 
