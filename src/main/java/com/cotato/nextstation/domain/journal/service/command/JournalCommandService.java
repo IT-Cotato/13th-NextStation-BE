@@ -44,8 +44,8 @@ public class JournalCommandService {
 
     // 여행일지 작성
     public Long createJournal(Long memberId, JournalCreateRequest request) {
-        // memberStamp 소유권 검증
-        memberStampQueryService.getCourseId(memberId, request.memberStampId());
+        // memberStamp 소유권 검증 + courseId 확보 (장소 리뷰의 코스 소속 검증에 사용)
+        Long courseId = memberStampQueryService.getCourseId(memberId, request.memberStampId());
 
         Member member = memberRepository.getReferenceById(memberId);
 
@@ -99,7 +99,7 @@ public class JournalCommandService {
                                 .toList();
 
 
-        placeReviewCommandService.createPlaceReviews(journal, reviewRequests);
+        placeReviewCommandService.createPlaceReviews(journal, courseId, reviewRequests);
 
         log.info("여행일지 작성 완료: memberId={}, journalId={}", memberId, journal.getId());
 

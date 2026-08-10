@@ -1,5 +1,7 @@
 package com.cotato.nextstation.domain.place.service.command;
 
+import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
 import com.cotato.nextstation.domain.journal.entity.Journal;
 import com.cotato.nextstation.domain.journal.enums.ImageAction;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -43,10 +46,12 @@ public class PlaceReviewCommandService {
     private final PlaceRepository placeRepository;
     private final PlaceReviewRepository placeReviewRepository;
     private final PlaceReviewImageRepository placeReviewImageRepository;
+    private final CourseQueryService courseQueryService;
+    private final PlaceReviewImageSaver placeReviewImageSaver;
 
 
     // 여행일지 작성 시 장소 리뷰 일괄 저장
-    public void createPlaceReviews(Journal journal, List<PlaceReviewCreateRequest> requests) {
+    public void createPlaceReviews(Journal journal, Long courseId, List<PlaceReviewCreateRequest> requests) {
         if (requests == null || requests.isEmpty()) {
             return;
         }
@@ -57,6 +62,9 @@ public class PlaceReviewCommandService {
         List<Long> placeIds = requests.stream()
                 .map(PlaceReviewCreateRequest::placeId)
                 .toList();
+
+        // 이 코스에 포함된 장소만 리뷰 작성을 허용한다 (실존 여부와는 별개 검증).
+        validatePlacesInCourse(courseId, placeIds);
 
         Map<Long, Place> placeMap = placeRepository.findAllById(placeIds).stream()
                         .collect(Collectors.toMap(Place::getId, Function.identity()));

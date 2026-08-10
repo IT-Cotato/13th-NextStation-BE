@@ -128,7 +128,8 @@ class JournalCommandServiceTest {
             // then
             verify(journalRepository).save(any(Journal.class));
             verify(journalImageRepository, times(2)).save(any(JournalImage.class));
-            verify(placeReviewCommandService).createPlaceReviews(any(Journal.class), argThat(reviews -> reviews.size() == 1));
+            verify(placeReviewCommandService)
+                    .createPlaceReviews(any(Journal.class), eq(COURSE_ID), argThat(reviews -> reviews.size() == 1));
         }
 
         @Test
@@ -145,7 +146,7 @@ class JournalCommandServiceTest {
                     .isInstanceOf(CustomException.class);
 
             verify(journalRepository, never()).save(any());
-            verify(placeReviewCommandService, never()).createPlaceReviews(any(), any());
+            verify(placeReviewCommandService, never()).createPlaceReviews(any(), any(), any());
         }
 
         @Test
@@ -181,7 +182,7 @@ class JournalCommandServiceTest {
             // then
             verify(journalImageRepository, never()).save(any());
             // placeReviews가 null이면 빈 리스트로 변환되어 호출된다
-            verify(placeReviewCommandService).createPlaceReviews(any(Journal.class), eq(List.of()));
+            verify(placeReviewCommandService).createPlaceReviews(any(Journal.class), eq(COURSE_ID), eq(List.of()));
         }
     }
 
