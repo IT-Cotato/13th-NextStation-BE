@@ -101,8 +101,10 @@ public class CourseCommandService {
             throw new IllegalArgumentException("journalId는 필수입니다.");
         }
 
-        courseRepository.findByJournalId(journalId)
-                .ifPresent(Course::unlinkJournal);
+        courseRepository.findByJournalId(journalId).ifPresentOrElse(
+                Course::unlinkJournal,
+                () -> log.warn("연결된 코스가 없어 여행일지 해제를 건너뜀: journalId={}", journalId)
+        );
     }
 
     public CourseCreateResponse createCourse(Long memberId, CourseCreateRequest request) {
