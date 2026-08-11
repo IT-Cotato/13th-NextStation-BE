@@ -44,9 +44,9 @@ public class KakaoLoginQueryService {
     private final MemberCommandService memberCommandService;
 
     // 인가코드로 토큰교환 + 사용자 조회 후 신규/PENDING/기존 회원 3분기 판별, Member 생성은 여기서 하지 않는다(KakaoSignupCommandService 담당)
-    public KakaoLoginResult login(String code) {
+    public KakaoLoginResult login(String code, String redirectUri) {
 
-        KakaoTokenResponse token = kakaoOAuthClient.exchangeToken(code);
+        KakaoTokenResponse token = kakaoOAuthClient.exchangeToken(code, redirectUri);
         KakaoUserInfoResponse userInfo = kakaoOAuthClient.fetchUserInfo(token.accessToken());
         String providerUserId = userInfo.id().toString();
 

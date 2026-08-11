@@ -46,6 +46,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "LEFT JOIN s.drawLine l " +
             "WHERE c.id = :courseId AND j.isPublic = true")
     Optional<CourseDetailView> findPublicCourseDetail(@Param("courseId") Long courseId);
+    // 여행일지 삭제 시 참조를 끊을 코스를 찾는다.
+    // 일지는 삭제되면서 member_stamp_id를 비우므로(재작성 허용), 그 뒤에는 일지에서 코스를
+    // 역산할 수 없다. 그래서 삭제 시점에 journalId로 직접 찾아야 한다.
+    // 삭제된 코스는 @SQLRestriction으로 조회되지 않는데, 어차피 둘러보기 대상이 아니라 무시해도 된다.
+    Optional<Course> findByJournalId(Long journalId);
 
     // 좋아요 가능한 코스인지 확인한다.
     // Journal을 INNER JOIN 하므로 journalId가 NULL인 코스는 자동 제외되고,

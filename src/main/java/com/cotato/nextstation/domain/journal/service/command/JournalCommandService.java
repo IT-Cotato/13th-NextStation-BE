@@ -1,6 +1,7 @@
 package com.cotato.nextstation.domain.journal.service.command;
 
 
+import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.journal.dto.request.JournalCreateRequest;
 import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
 import com.cotato.nextstation.domain.journal.enums.ImageAction;
@@ -41,11 +42,12 @@ public class JournalCommandService {
 
     private final MemberStampQueryService memberStampQueryService;
     private final PlaceReviewCommandService placeReviewCommandService;
+    private final CourseCommandService courseCommandService;
 
     // 여행일지 작성
     public Long createJournal(Long memberId, JournalCreateRequest request) {
-        // memberStamp 소유권 검증
-        memberStampQueryService.getCourseId(memberId, request.memberStampId());
+        // memberStamp 소유권 검증 (반환값은 아래에서 코스에 일지를 연결하는 데 쓴다)
+        Long courseId = memberStampQueryService.getCourseId(memberId, request.memberStampId());
 
         Member member = memberRepository.getReferenceById(memberId);
 
@@ -100,6 +102,10 @@ public class JournalCommandService {
 
 
         placeReviewCommandService.createPlaceReviews(journal, reviewRequests);
+
+        // 코스에 이 일지를 연결한다. 둘러보기·검색·좋아요·"내 코스로 만들기"가
+        // course.journal_id로 공개 여부를 판정하므로, 연결하지 않으면 공개로 써도 어디에도 노출되지 않는다.
+        courseCommandService.linkJournal(courseId, journal.getId());
 
         log.info("여행일지 작성 완료: memberId={}, journalId={}", memberId, journal.getId());
 
@@ -167,6 +173,9 @@ public class JournalCommandService {
         // 여행일지 대표 사진 soft delete S3 추적을 위해 DB 레코드 유지, 배치로 N일 뒤 정리 예정)
         journalImageRepository.findByJournalId(journalId)
                 .forEach(JournalImage::delete);
+
+        // 코스와의 연결을 끊는다. 코스 자체는 일지와 별개라 그대로 남아 "내가 만든 코스"에서 계속 보인다.
+        courseCommandService.unlinkJournal(journalId);
 
         // 여행일지 soft delete
         // PlaceReview/PlaceReviewImage는 유지
