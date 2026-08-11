@@ -14,10 +14,12 @@ import java.util.Optional;
 public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> {
 
     // 장소 상세 조회 - 공개(삭제되지 않은 journal) 기준 리뷰 목록 조회
+    // 리뷰 내용은 여행일지 작성 시 선택 입력이라 비어 있을 수 있으므로, 내용 없는 리뷰는 노출하지 않는다
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
+            "AND pr.review IS NOT NULL AND TRIM(pr.review) <> '' " +
             "ORDER BY pr.createdAt DESC")
     List<PlaceReview> findVisibleReviewsByPlaceId(@Param("placeId") Long placeId, Pageable pageable);
 
@@ -33,10 +35,12 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
 
 
     // 장소 리뷰 목록 - 최신순, 최초 페이지
+    // 리뷰 내용은 여행일지 작성 시 선택 입력이라 비어 있을 수 있으므로, 내용 없는 리뷰는 노출하지 않는다
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
+            "AND pr.review IS NOT NULL AND TRIM(pr.review) <> '' " +
             "ORDER BY pr.createdAt DESC, pr.id DESC")
     List<PlaceReview> findByPlaceIdOrderByLatest(@Param("placeId") Long placeId, Pageable pageable);
 
@@ -45,6 +49,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "JOIN FETCH pr.journal j " +
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
+            "AND pr.review IS NOT NULL AND TRIM(pr.review) <> '' " +
             "AND (pr.createdAt < :createdAt OR (pr.createdAt = :createdAt AND pr.id < :reviewId)) " +
             "ORDER BY pr.createdAt DESC, pr.id DESC")
     List<PlaceReview> findByPlaceIdOrderByLatestAfterCursor(
@@ -58,6 +63,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "JOIN FETCH pr.journal j " +
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
+            "AND pr.review IS NOT NULL AND TRIM(pr.review) <> '' " +
             "ORDER BY pr.likeCount DESC, pr.id DESC")
     List<PlaceReview> findByPlaceIdOrderByRecommend(@Param("placeId") Long placeId, Pageable pageable);
 
@@ -66,6 +72,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "JOIN FETCH pr.journal j " +
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
+            "AND pr.review IS NOT NULL AND TRIM(pr.review) <> '' " +
             "AND (pr.likeCount < :likeCount OR (pr.likeCount = :likeCount AND pr.id < :reviewId)) " +
             "ORDER BY pr.likeCount DESC, pr.id DESC")
     List<PlaceReview> findByPlaceIdOrderByRecommendAfterCursor(
@@ -74,10 +81,12 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             @Param("reviewId") Long reviewId,
             Pageable pageable);
 
-    // 장소 리뷰 총 개수 (삭제된 journal의 리뷰도 카운트에 포함되지 않도록 journal 조인 추가)
+    // 장소 리뷰 총 개수 (삭제된 journal의 리뷰도 카운트에 포함되지 않도록 journal 조인 추가,
+    // 내용 없는 리뷰는 노출되지 않으므로 카운트에서도 제외)
     @Query("SELECT COUNT(pr) FROM PlaceReview pr " +
             "JOIN pr.journal j " +
-            "WHERE pr.place.id = :placeId")
+            "WHERE pr.place.id = :placeId " +
+            "AND pr.review IS NOT NULL AND TRIM(pr.review) <> ''")
     long countByPlaceId(@Param("placeId") Long placeId);
 
     // 여행일지에 연결된 장소 리뷰 리스트
