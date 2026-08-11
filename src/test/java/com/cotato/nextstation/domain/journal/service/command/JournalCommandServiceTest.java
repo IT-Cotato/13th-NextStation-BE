@@ -119,6 +119,12 @@ class JournalCommandServiceTest {
             when(memberStampQueryService.getCourseId(MEMBER_ID, MEMBER_STAMP_ID)).thenReturn(COURSE_ID);
             when(memberRepository.getReferenceById(MEMBER_ID)).thenReturn(member);
             when(journalRepository.existsByMemberStampId(MEMBER_STAMP_ID)).thenReturn(false);
+            // 저장 시 id가 부여되는 실제 동작을 흉내낸다. 코스에 연결되는 값이 이 id여야 한다.
+            when(journalRepository.save(any(Journal.class))).thenAnswer(invocation -> {
+                Journal saved = invocation.getArgument(0);
+                ReflectionTestUtils.setField(saved, "id", JOURNAL_ID);
+                return saved;
+            });
 
             JournalCreateRequest request = createRequest(
                     List.of("image1.jpg", "image2.jpg"),
@@ -133,7 +139,7 @@ class JournalCommandServiceTest {
             verify(journalImageRepository, times(2)).save(any(JournalImage.class));
             verify(placeReviewCommandService).createPlaceReviews(any(Journal.class), argThat(reviews -> reviews.size() == 1));
             // 연결하지 않으면 공개로 써도 둘러보기·검색·좋아요·복제에서 공개 코스로 잡히지 않는다
-            verify(courseCommandService).linkJournal(eq(COURSE_ID), any());
+            verify(courseCommandService).linkJournal(COURSE_ID, JOURNAL_ID);
         }
 
         @Test
