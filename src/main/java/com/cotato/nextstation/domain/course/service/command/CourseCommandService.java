@@ -59,6 +59,52 @@ public class CourseCommandService {
         }
     }
 
+    /**
+     * 여행일지를 코스에 연결한다. 일지를 작성할 때 여행일지 도메인이 호출한다.
+     * <p>
+     * 코스는 이 값으로 공개 여부를 판정한다(둘러보기·검색·좋아요·복제). 연결되지 않으면
+     * 공개 일지를 써도 그 코스는 어느 목록에도 나오지 않는다.
+     * <p>
+     * 코스가 없으면 아무것도 하지 않는다. 완주 후 코스를 지우고 일지를 쓰는 흐름이 가능한데,
+     * 그때 일지 작성을 실패시키면 안 된다 — 삭제된 코스는 어차피 둘러보기 대상이 아니라
+     * 연결할 필요도 없다.
+     */
+    public void linkJournal(Long courseId, Long journalId) {
+        if (journalId == null) {
+            throw new IllegalArgumentException("journalId는 필수입니다.");
+        }
+
+        courseRepository.findById(courseId).ifPresentOrElse(
+                course -> {
+                    // 코스 하나에 일지도 하나다(스탬프가 코스당 1개, 일지가 스탬프당 1개).
+                    // 다른 일지가 걸려 있다면 그 전제가 깨진 것이라 남겨서 확인할 수 있게 한다.
+                    if (course.getJournalId() != null && !course.getJournalId().equals(journalId)) {
+                        log.warn("이미 다른 여행일지가 연결된 코스: courseId={}, 기존 journalId={}, 새 journalId={}",
+                                courseId, course.getJournalId(), journalId);
+                    }
+                    course.linkJournal(journalId);
+                },
+                () -> log.warn("연결할 코스가 없어 여행일지 연결을 건너뜀: courseId={}, journalId={}", courseId, journalId)
+        );
+    }
+
+    /**
+     * 여행일지 삭제 시 코스와의 연결을 끊는다. 여행일지 도메인이 호출한다.
+     * <p>
+     * 끊지 않으면 삭제된 일지를 가리킨 채로 남아 둘러보기 조회가 조인에 실패하고,
+     * 같은 스탬프로 일지를 다시 쓰면 코스가 옛 일지를 가리키게 된다.
+     * <p>
+     * 연결된 코스가 없으면 아무것도 하지 않는다(애초에 연결된 적 없거나 코스가 이미 삭제된 경우).
+     */
+    public void unlinkJournal(Long journalId) {
+        if (journalId == null) {
+            throw new IllegalArgumentException("journalId는 필수입니다.");
+        }
+
+        courseRepository.findByJournalId(journalId)
+                .ifPresent(Course::unlinkJournal);
+    }
+
     public CourseCreateResponse createCourse(Long memberId, CourseCreateRequest request) {
         validateDistinctPlaces(request.placeIds());
         validateDrawableStation(request.stationId());
