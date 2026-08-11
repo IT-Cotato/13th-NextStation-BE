@@ -1,6 +1,9 @@
 package com.cotato.nextstation.domain.course.converter;
 
+import com.cotato.nextstation.domain.course.dto.response.CourseCardResponse;
+import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.MemberCourseCardResponse;
+import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
@@ -179,6 +182,29 @@ class CourseConverterTest {
         assertThat(response.placeCount()).isEqualTo(4);
         assertThat(response.tags()).containsExactly("자연과함께", "사진찍기좋은");
         assertThat(response.imageUrl()).isEqualTo("cover.jpg");
+    }
+
+    @Test
+    @DisplayName("좋아요한 코스 카드에 여행일지 ID를 담는다")
+    void toLikedListResponse() {
+        // given
+        LikedCourseView view = mock(LikedCourseView.class);
+        given(view.getCourseId()).willReturn(7L);
+        given(view.getJournalId()).willReturn(20L);
+        given(view.getName()).willReturn("보문역 환승여행 코스");
+        given(view.getStationId()).willReturn(6L);
+        given(view.getStationName()).willReturn("보문역");
+        given(view.getLineId()).willReturn(6L);
+        given(view.getLineName()).willReturn("6호선");
+        given(view.getLineCode()).willReturn(LineCode.LINE_6);
+
+        // when
+        LikedCourseListResponse response = courseConverter.toLikedListResponse(List.of(view), "cursor", true);
+
+        // then: journalId가 빠지면 카드를 눌러도 여행일지 상세를 열 수 없다
+        assertThat(response.courses()).containsExactly(new CourseCardResponse(
+                7L, 20L, "보문역 환승여행 코스", 6L, "보문역",
+                new LineSummaryResponse(6L, "6호선", LineCode.LINE_6)));
     }
 
     @Test
