@@ -8,6 +8,7 @@ import com.cotato.nextstation.domain.place.entity.Place;
 import com.cotato.nextstation.domain.place.entity.PlaceReview;
 import com.cotato.nextstation.domain.place.repository.PlaceRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewLikeRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -42,6 +43,8 @@ class PlaceReviewCommandServiceTest {
     private PlaceReviewRepository placeReviewRepository;
     @Mock
     private PlaceReviewImageRepository placeReviewImageRepository;
+    @Mock
+    private PlaceReviewLikeRepository placeReviewLikeRepository;
 
     private static final Long PLACE_ID = 10L;
 
@@ -100,7 +103,7 @@ class PlaceReviewCommandServiceTest {
     class UpdatePlaceReviews {
 
         @Test
-        @DisplayName("수정 결과 텍스트와 사진이 모두 없으면 리뷰를 소프트 삭제한다")
+        @DisplayName("수정 결과 텍스트와 사진이 모두 없으면 리뷰를 소프트 삭제하고 걸려있던 좋아요도 정리한다")
         void softDeletesWhenTextAndImageBothCleared() {
             // given
             Journal journal = mock(Journal.class);
@@ -120,6 +123,8 @@ class PlaceReviewCommandServiceTest {
 
             // then
             assertThat(placeReview.isDeleted()).isTrue();
+            assertThat(placeReview.getLikeCount()).isZero();
+            verify(placeReviewLikeRepository).deleteByPlaceReview(placeReview);
         }
 
         @Test
@@ -143,6 +148,7 @@ class PlaceReviewCommandServiceTest {
             // then
             assertThat(placeReview.isDeleted()).isFalse();
             assertThat(placeReview.getReview()).isEqualTo("여전히 좋았어요");
+            verify(placeReviewLikeRepository, never()).deleteByPlaceReview(placeReview);
         }
     }
 }

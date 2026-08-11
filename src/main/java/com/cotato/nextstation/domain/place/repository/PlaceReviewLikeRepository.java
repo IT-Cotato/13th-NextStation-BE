@@ -34,6 +34,11 @@ public interface PlaceReviewLikeRepository extends JpaRepository<PlaceReviewLike
     @Query("DELETE FROM PlaceReviewLike prl WHERE prl.memberId = :memberId AND prl.placeReview = :placeReview")
     int deleteByMemberIdAndPlaceReview(@Param("memberId") Long memberId, @Param("placeReview") PlaceReview placeReview);
 
+    // 리뷰가 삭제될 때(텍스트/사진이 모두 사라진 경우) 걸려있던 좋아요를 정리해 고아 데이터가 남지 않게 한다
+    @Modifying
+    @Query("DELETE FROM PlaceReviewLike prl WHERE prl.placeReview = :placeReview")
+    void deleteByPlaceReview(@Param("placeReview") PlaceReview placeReview);
+
     interface ReviewLikeCount {
         Long getReviewId();
         Long getLikeCount();

@@ -11,6 +11,7 @@ import com.cotato.nextstation.domain.place.entity.PlaceReviewImage;
 import com.cotato.nextstation.domain.place.exception.PlaceErrorCode;
 import com.cotato.nextstation.domain.place.repository.PlaceRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewLikeRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class PlaceReviewCommandService {
     private final PlaceRepository placeRepository;
     private final PlaceReviewRepository placeReviewRepository;
     private final PlaceReviewImageRepository placeReviewImageRepository;
+    private final PlaceReviewLikeRepository placeReviewLikeRepository;
 
 
     // 여행일지 작성 시 장소 리뷰 일괄 저장
@@ -157,9 +159,12 @@ public class PlaceReviewCommandService {
                 }
             };
 
-            // 수정 결과 텍스트/사진이 모두 없으면 더 이상 리뷰로 볼 수 없으므로 소프트 삭제한다
+            // 수정 결과 텍스트/사진이 모두 없으면 더 이상 리뷰로 볼 수 없으므로 소프트 삭제한다.
+            // 걸려 있던 좋아요는 고아 데이터로 남지 않도록 함께 정리한다.
             boolean hasReview = request.review() != null && !request.review().isBlank();
             if (!hasReview && !hasImage) {
+                placeReviewLikeRepository.deleteByPlaceReview(placeReview);
+                placeReview.resetLikeCount();
                 placeReview.delete();
             }
         });
