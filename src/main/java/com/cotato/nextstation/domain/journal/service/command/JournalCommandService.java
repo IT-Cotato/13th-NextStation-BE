@@ -42,7 +42,6 @@ public class JournalCommandService {
 
     private final MemberStampQueryService memberStampQueryService;
     private final PlaceReviewCommandService placeReviewCommandService;
-    // 코스는 Course 도메인 소유라 여기서 직접 수정하지 않고 창구를 통해 연결/해제만 요청한다.
     private final CourseCommandService courseCommandService;
 
     // 여행일지 작성
@@ -175,9 +174,7 @@ public class JournalCommandService {
         journalImageRepository.findByJournalId(journalId)
                 .forEach(JournalImage::delete);
 
-        // 코스와의 연결을 끊는다. 남겨두면 삭제된 일지를 가리킨 채로 둘러보기 조회에 걸리고,
-        // 같은 스탬프로 일지를 다시 쓰면 코스가 옛 일지를 가리키게 된다.
-        // 코스 자체는 일지와 별개라 그대로 남아 "내가 만든 코스"에서 계속 보인다.
+        // 코스와의 연결을 끊는다. 코스 자체는 일지와 별개라 그대로 남아 "내가 만든 코스"에서 계속 보인다.
         courseCommandService.unlinkJournal(journalId);
 
         // 여행일지 soft delete
