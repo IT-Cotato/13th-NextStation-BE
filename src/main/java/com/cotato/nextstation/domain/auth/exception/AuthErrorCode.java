@@ -16,6 +16,7 @@ public enum AuthErrorCode implements ErrorCode {
     PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_PASSWORD_CONFIRMATION_MISMATCH", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
     INVALID_KAKAO_CODE(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_INVALID_KAKAO_CODE", "유효하지 않거나 만료된 카카오 인가코드입니다."),
     KAKAO_OAUTH_MISCONFIGURED(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_KAKAO_OAUTH_MISCONFIGURED", "카카오 로그인 연동에 문제가 있습니다. 잠시 후 다시 시도해주세요."),
+    UNREGISTERED_REDIRECT_URI(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_UNREGISTERED_REDIRECT_URI", "허용되지 않은 redirect_uri입니다."),
     SOCIAL_ONLY_ACCOUNT(HttpStatus.BAD_REQUEST, "CLIENT_ERROR_400_SOCIAL_ONLY_ACCOUNT", "소셜 로그인 전용 계정은 비밀번호를 재설정할 수 없습니다."),
 
     // 401

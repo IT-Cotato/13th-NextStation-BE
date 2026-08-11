@@ -45,11 +45,14 @@ public class KakaoAuthController {
                     - `resultType=LOGIN_SUCCESS`: 기존 ACTIVE 회원. accessToken은 응답 body로, refreshToken은 httpOnly 쿠키로 내려간다(로그인 API와 동일).
                     - `resultType=PENDING_PROFILE`: 프로필 설정이 끝나지 않은 회원. `signupToken`이 발급되며, 이후 흐름은 회원가입의 `/profile` 호출과 동일하다.
                     - `resultType=NEW_MEMBER`: 처음 보는 카카오 계정. `kakaoSignupToken`이 발급된다. 이 값을 들고 약관 동의 화면을 보여준 뒤 `/kakao/signup`을 호출해야 한다.
+
+                    `redirectUri`는 인가코드를 발급받을 때 사용한 값을 그대로 보낸다. 다른 값을 보내면 카카오가 인가코드를 거부한다(KOE303).
+                    생략하면 서버에 설정된 대표 URI를 사용하므로, 프론트가 여러 도메인에서 서비스되는 경우에는 반드시 함께 보내야 한다.
                     """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "판별 성공 (resultType으로 분기)"),
-            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 유효하지 않거나 만료된 인가코드 (`GlobalErrorCode.VALIDATION_ERROR`, `AuthErrorCode.INVALID_KAKAO_CODE`)"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 유효하지 않거나 만료된 인가코드, 또는 허용되지 않은 redirectUri (`GlobalErrorCode.VALIDATION_ERROR`, `AuthErrorCode.INVALID_KAKAO_CODE`, `AuthErrorCode.UNREGISTERED_REDIRECT_URI`)"),
             @ApiResponse(responseCode = "403", description = "이용이 제한된 계정 (`AuthErrorCode.KAKAO_MEMBER_NOT_ACTIVE`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (`AuthErrorCode.MEMBER_NOT_FOUND`)"),
             @ApiResponse(responseCode = "502", description = "카카오 서버 통신 오류 (`GlobalErrorCode.EXTERNAL_API_ERROR`)"),
@@ -57,7 +60,7 @@ public class KakaoAuthController {
     @PostMapping("/login")
     public CommonResponse<KakaoLoginResponse> kakaoLogin(@Valid @RequestBody KakaoLoginRequest request,
                                                           HttpServletResponse httpResponse) {
-        KakaoLoginResult result = kakaoLoginQueryService.login(request.code());
+        KakaoLoginResult result = kakaoLoginQueryService.login(request.code(), request.redirectUri());
 
         if (result.resultType() == KakaoLoginResultType.LOGIN_SUCCESS) {
             ResponseCookie refreshTokenCookie = refreshTokenCookieFactory.create(result.refreshToken());
