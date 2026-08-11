@@ -4,10 +4,15 @@ import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
+import com.cotato.nextstation.domain.station.entity.LineCode;
+import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
+import com.cotato.nextstation.domain.course.dto.response.CoursePlaceDetailResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseCopyPreviewResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
+import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
 import com.cotato.nextstation.global.jwt.JwtProvider;
@@ -35,6 +40,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -56,6 +62,9 @@ class CourseControllerTest {
 
     @MockitoBean
     CourseLikeCommandService courseLikeCommandService;
+
+    @MockitoBean
+    CourseQueryService courseQueryService;
 
     // WebConfig가 등록하는 JwtPrincipalArgumentResolver가 필요로 해서 @WebMvcTest 슬라이스에도 목이 필요하다
     @MockitoBean
@@ -359,6 +368,41 @@ class CourseControllerTest {
                                 new CourseCreateRequest("보문역 코스", 1L, List.of(1L, 2L, 3L)))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_401_UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("내 코스로 만들기 화면 조회는 200과 코스 구성/장소 설명을 반환한다")
+    void getCourseCopyPreview_success() throws Exception {
+        given(courseQueryService.getCourseCopyPreview(7L)).willReturn(
+                new CourseCopyPreviewResponse(7L, "보문역 환승여행 코스", 123L, "보문역",
+                        new LineSummaryResponse(6L, "6호선", LineCode.LINE_6),
+                        List.of(new CoursePlaceDetailResponse(11L, "보문숲길도서관",
+                                "혼자 조용히 머물기 좋은 동네 도서관", "CULTURE", "문화공간",
+                                null, 127.0345, 37.5804, 1))));
+
+        mockMvc.perform(get("/api/v1/courses/{courseId}/copy-preview", 7L)
+                        .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.courseId").value(7))
+                .andExpect(jsonPath("$.data.name").value("보문역 환승여행 코스"))
+                .andExpect(jsonPath("$.data.stationName").value("보문역"))
+                .andExpect(jsonPath("$.data.line.code").value("LINE_6"))
+                // 이 화면 카드의 부제로 쓰는 값이라 빠지면 안 된다
+                .andExpect(jsonPath("$.data.places[0].description").value("혼자 조용히 머물기 좋은 동네 도서관"))
+                .andExpect(jsonPath("$.data.places[0].xCoordinate").value(127.0345))
+                .andExpect(jsonPath("$.data.places[0].orderNum").value(1));
+    }
+
+    @Test
+    @DisplayName("공개되지 않은 코스의 내 코스로 만들기 화면을 조회하면 404를 반환한다")
+    void getCourseCopyPreview_notPublic() throws Exception {
+        given(courseQueryService.getCourseCopyPreview(7L))
+                .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/courses/{courseId}/copy-preview", 7L)
+                        .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_NOT_FOUND"));
     }
 
 }
