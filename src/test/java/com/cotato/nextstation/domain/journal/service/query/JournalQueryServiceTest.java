@@ -223,6 +223,10 @@ class JournalQueryServiceTest {
             // then
             assertThat(response.writerId()).isEqualTo(OWNER_ID);
             assertThat(response.courseId()).isEqualTo(COURSE_ID);
+            // https://github.com/IT-Cotato/13th-NextStation-BE/issues/171
+            // journalTitle은 여행일지 자체 제목(journal.title)이어야 하고, courseName(코스 이름)과는 별개다
+            assertThat(response.journalTitle()).isEqualTo("보문 골목 산책");
+            assertThat(response.courseName()).isEqualTo("보문에 살어리랏다");
             assertThat(response.isMine()).isTrue();
             assertThat(response.isLiked()).isFalse();
             // 본인 조회라 실제로 증가하지 않아야 하지만, 그 판단은 CourseRepository의 SQL 조건

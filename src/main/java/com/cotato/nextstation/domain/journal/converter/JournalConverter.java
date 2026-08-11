@@ -141,6 +141,7 @@ public class JournalConverter {
                 journal.getTraveledAt(),
                 line,
                 stationName,
+                journal.getTitle(),
                 courseSnapshot.getCourseId(),
                 courseSnapshot.getName(),
                 isMine,
