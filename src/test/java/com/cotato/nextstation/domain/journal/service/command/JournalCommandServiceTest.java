@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.journal.service.command;
 
+import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.journal.dto.request.JournalCreateRequest;
 import com.cotato.nextstation.domain.journal.dto.request.JournalUpdateRequest;
 import com.cotato.nextstation.domain.journal.entity.Journal;
@@ -58,6 +59,8 @@ class JournalCommandServiceTest {
     private MemberStampQueryService memberStampQueryService;
     @Mock
     private PlaceReviewCommandService placeReviewCommandService;
+    @Mock
+    private CourseCommandService courseCommandService;
 
     @InjectMocks
     private JournalCommandService journalCommandService;
@@ -129,6 +132,8 @@ class JournalCommandServiceTest {
             verify(journalRepository).save(any(Journal.class));
             verify(journalImageRepository, times(2)).save(any(JournalImage.class));
             verify(placeReviewCommandService).createPlaceReviews(any(Journal.class), argThat(reviews -> reviews.size() == 1));
+            // 연결하지 않으면 공개로 써도 둘러보기·검색·좋아요·복제에서 공개 코스로 잡히지 않는다
+            verify(courseCommandService).linkJournal(eq(COURSE_ID), any());
         }
 
         @Test
@@ -146,6 +151,8 @@ class JournalCommandServiceTest {
 
             verify(journalRepository, never()).save(any());
             verify(placeReviewCommandService, never()).createPlaceReviews(any(), any());
+            // 일지가 만들어지지 않았으므로 코스에도 연결되면 안 된다
+            verify(courseCommandService, never()).linkJournal(any(), any());
         }
 
         @Test
@@ -414,6 +421,9 @@ class JournalCommandServiceTest {
             verify(journalImageRepository).findByJournalId(JOURNAL_ID);
             assertThat(journal.isDeleted()).isTrue();
             assertThat(journal.getDeletedAt()).isNotNull();
+
+            // 연결을 끊지 않으면 삭제된 일지를 가리킨 채로 둘러보기 조회에 걸린다
+            verify(courseCommandService).unlinkJournal(JOURNAL_ID);
 
             // PlaceReview/PlaceReviewImage는 건드리지 않음 (의도한 동작)
             // journal.isDeleted=true + @SQLRestriction으로 장소 상세 조회에서 자동 필터링됨
