@@ -50,11 +50,20 @@ public class PlaceReviewCommandService {
         if (requests == null || requests.isEmpty()) {
             return;
         }
+
+        // 리뷰 텍스트/사진 중 하나라도 있어야 리뷰로 저장한다. 둘 다 없는 요청은 저장하지 않는다.
+        List<PlaceReviewCreateRequest> validRequests = requests.stream()
+                .filter(PlaceReviewCommandService::hasContent)
+                .toList();
+        if (validRequests.isEmpty()) {
+            return;
+        }
+
         // findById + save 조합은 N+1 쿼리 문제가 발생함.
         // findAllById로 배치 조회하고 saveAll로 배치 저장하도록 함
 
         // placeId 목록 한 번에 조회
-        List<Long> placeIds = requests.stream()
+        List<Long> placeIds = validRequests.stream()
                 .map(PlaceReviewCreateRequest::placeId)
                 .toList();
 
@@ -62,7 +71,7 @@ public class PlaceReviewCommandService {
                         .collect(Collectors.toMap(Place::getId, Function.identity()));
 
 
-        List<PlaceReview> placeReviews = requests.stream()
+        List<PlaceReview> placeReviews = validRequests.stream()
                 .map(request -> {
                     Place place = placeMap.get(request.placeId());
                     if (place == null) {
@@ -81,11 +90,11 @@ public class PlaceReviewCommandService {
         List<PlaceReview> savedReviews = placeReviewRepository.saveAll(placeReviews);
 
         // 리뷰 이미지 일괄 저장
-        List<PlaceReviewImage> reviewImages = IntStream.range(0, requests.size())
-                .filter(i -> requests.get(i).imageUrl() != null)
+        List<PlaceReviewImage> reviewImages = IntStream.range(0, validRequests.size())
+                .filter(i -> validRequests.get(i).imageUrl() != null)
                 .mapToObj(i -> PlaceReviewImage.builder()
                 .placeReview(savedReviews.get(i))
-                .imageUrl(requests.get(i).imageUrl())
+                .imageUrl(validRequests.get(i).imageUrl())
                         .build())
                 .toList();
 
@@ -95,6 +104,13 @@ public class PlaceReviewCommandService {
 
 
             // PlaceReviewImage 저장 실패 시 PlaceReview도 함께 롤백되는 상황
+    }
+
+    // 리뷰 텍스트, 사진 둘 다 없으면 내용 없는 리뷰로 간주한다
+    private static boolean hasContent(PlaceReviewCreateRequest request) {
+        boolean hasReview = request.review() != null && !request.review().isBlank();
+        boolean hasImage = request.imageUrl() != null;
+        return hasReview || hasImage;
     }
 
     // 여행일지 수정 시 장소 리뷰 수정
@@ -117,13 +133,12 @@ public class PlaceReviewCommandService {
                     ? request.imageAction()
                     : ImageAction.KEEP;
 
-            switch (action) {
-                case KEEP -> {
-                    // 이미지 유지, 아무것도 안 함
-                }
+            boolean hasImage = switch (action) {
+                case KEEP -> !placeReviewImageRepository.findByPlaceReview(placeReview).isEmpty();
                 case DELETE -> {
                     // 리뷰 이미지만 DB에서 삭제 (S3는 배치 잡으로 정리)
                     placeReviewImageRepository.deleteByPlaceReviewId(placeReview.getId());
+                    yield false;
                 }
                 case UPDATE -> {
                     // 기존 이미지 삭제 후 새 이미지 저장
@@ -138,7 +153,14 @@ public class PlaceReviewCommandService {
                                     .imageUrl(request.imageUrl())
                                     .build()
                     );
+                    yield true;
                 }
+            };
+
+            // 수정 결과 텍스트/사진이 모두 없으면 더 이상 리뷰로 볼 수 없으므로 소프트 삭제한다
+            boolean hasReview = request.review() != null && !request.review().isBlank();
+            if (!hasReview && !hasImage) {
+                placeReview.delete();
             }
         });
 
