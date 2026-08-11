@@ -27,6 +27,9 @@ public record JournalDetailResponse(
         @Schema(description = "역 이름", example = "보문역")
         String stationName,
 
+        @Schema(description = "여행일지 제목", example = "보문에서 보낸 하루")
+        String journalTitle,
+
         @Schema(description = "코스 ID. 본인 코스면 '내 코스로 만들기' 호출에 쓰지 않는다")
         Long courseId,
 
