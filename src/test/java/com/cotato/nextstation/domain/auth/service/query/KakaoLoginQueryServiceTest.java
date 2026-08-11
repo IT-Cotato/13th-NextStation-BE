@@ -67,6 +67,7 @@ class KakaoLoginQueryServiceTest {
     private MemberCommandService memberCommandService;
 
     private static final String CODE = "auth-code";
+    private static final String REDIRECT_URI = "https://app.example.com/auth/kakao/callback";
     private static final String KAKAO_ACCESS_TOKEN = "kakao-access-token";
     private static final String PROVIDER_USER_ID = "555";
 
@@ -87,7 +88,7 @@ class KakaoLoginQueryServiceTest {
     }
 
     private void givenTokenExchangeSucceeds(KakaoUserInfoResponse userInfoResponse) {
-        given(kakaoOAuthClient.exchangeToken(CODE)).willReturn(kakaoTokenResponse());
+        given(kakaoOAuthClient.exchangeToken(CODE, REDIRECT_URI)).willReturn(kakaoTokenResponse());
         given(kakaoOAuthClient.fetchUserInfo(KAKAO_ACCESS_TOKEN)).willReturn(userInfoResponse);
     }
 
@@ -131,7 +132,7 @@ class KakaoLoginQueryServiceTest {
                 .willReturn("kakao-signup-token");
 
         // when
-        KakaoLoginResult result = kakaoLoginQueryService.login(CODE);
+        KakaoLoginResult result = kakaoLoginQueryService.login(CODE, REDIRECT_URI);
 
         // then
         assertThat(result.resultType()).isEqualTo(KakaoLoginResultType.NEW_MEMBER);
@@ -153,7 +154,7 @@ class KakaoLoginQueryServiceTest {
                 .willReturn("kakao-signup-token");
 
         // when
-        KakaoLoginResult result = kakaoLoginQueryService.login(CODE);
+        KakaoLoginResult result = kakaoLoginQueryService.login(CODE, REDIRECT_URI);
 
         // then
         assertThat(result.resultType()).isEqualTo(KakaoLoginResultType.NEW_MEMBER);
@@ -180,7 +181,7 @@ class KakaoLoginQueryServiceTest {
                 .willReturn("reissued-signup-token");
 
         // when
-        KakaoLoginResult result = kakaoLoginQueryService.login(CODE);
+        KakaoLoginResult result = kakaoLoginQueryService.login(CODE, REDIRECT_URI);
 
         // then
         assertThat(result.resultType()).isEqualTo(KakaoLoginResultType.PENDING_PROFILE);
@@ -199,7 +200,7 @@ class KakaoLoginQueryServiceTest {
         given(authTokenIssuer.issue(1L)).willReturn(new IssuedTokens("access-token", "refresh-token"));
 
         // when
-        KakaoLoginResult result = kakaoLoginQueryService.login(CODE);
+        KakaoLoginResult result = kakaoLoginQueryService.login(CODE, REDIRECT_URI);
 
         // then
         assertThat(result.resultType()).isEqualTo(KakaoLoginResultType.LOGIN_SUCCESS);
@@ -218,7 +219,7 @@ class KakaoLoginQueryServiceTest {
         given(memberRepository.findById(1L)).willReturn(Optional.of(withdrawnMember(LocalDateTime.now().minusDays(8))));
 
         // when & then
-        assertThatThrownBy(() -> kakaoLoginQueryService.login(CODE))
+        assertThatThrownBy(() -> kakaoLoginQueryService.login(CODE, REDIRECT_URI))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.KAKAO_MEMBER_NOT_ACTIVE.getMessage());
 
@@ -237,7 +238,7 @@ class KakaoLoginQueryServiceTest {
         given(authTokenIssuer.issue(1L)).willReturn(new IssuedTokens("access-token", "refresh-token"));
 
         // when
-        KakaoLoginResult result = kakaoLoginQueryService.login(CODE);
+        KakaoLoginResult result = kakaoLoginQueryService.login(CODE, REDIRECT_URI);
 
         // then
         assertThat(result.resultType()).isEqualTo(KakaoLoginResultType.LOGIN_SUCCESS);
@@ -255,7 +256,7 @@ class KakaoLoginQueryServiceTest {
         given(memberRepository.findById(999L)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> kakaoLoginQueryService.login(CODE))
+        assertThatThrownBy(() -> kakaoLoginQueryService.login(CODE, REDIRECT_URI))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(AuthErrorCode.MEMBER_NOT_FOUND.getMessage());
     }
