@@ -9,7 +9,8 @@ import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
-import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseCopyPreviewResponse;
+import com.cotato.nextstation.domain.course.dto.response.CoursePlaceDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
@@ -23,7 +24,7 @@ import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
-import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.CourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
@@ -498,16 +499,33 @@ public class CourseQueryService {
      * 공개 조건은 걸지 않는다. 일지를 아직 안 썼거나 비공개인 코스도 본인에게는 보여야 한다.
      */
     public MyCourseDetailResponse getMyCourseDetail(Long memberId, Long courseId) {
-        MyCourseDetailView course = courseRepository.findMyCourseDetail(memberId, courseId)
+        CourseDetailView course = courseRepository.findMyCourseDetail(memberId, courseId)
                 .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
 
         List<CoursePlace> coursePlaces = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId);
         return courseConverter.toMyCourseDetailResponse(course, resolveCoursePlaces(coursePlaces));
     }
 
+    /**
+     * "내 코스로 만들기" 화면. 타인의 공개 코스를 가져오기 직전에 구성을 확인하는 단계다.
+     * <p>
+     * 여행일지 상세와 같은 코스를 보지만, 이 화면에는 사진·후기·작성자·태그가 없고
+     * 지도와 순서 목록만 있어 코스 구성만 내린다.
+     * <p>
+     * 비공개이거나 없는 코스는 404다(복제와 같은 조건). 본인 코스인지는 보지 않는다 —
+     * 조회는 부작용이 없고, 진입 자체는 프론트가 {@code isMine}으로 막는다.
+     */
+    public CourseCopyPreviewResponse getCourseCopyPreview(Long courseId) {
+        CourseDetailView course = courseRepository.findPublicCourseDetail(courseId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        List<CoursePlace> coursePlaces = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId);
+        return courseConverter.toCourseCopyPreviewResponse(course, resolveCoursePlaces(coursePlaces));
+    }
+
     // 코스에 담긴 장소를 순서대로 채운다.
     // 장소 조회 결과는 요청 순서를 보장하지 않아 id로 묶은 뒤 order_num 순으로 다시 세운다.
-    private List<MyCoursePlaceResponse> resolveCoursePlaces(List<CoursePlace> coursePlaces) {
+    private List<CoursePlaceDetailResponse> resolveCoursePlaces(List<CoursePlace> coursePlaces) {
         if (coursePlaces.isEmpty()) {
             return List.of();
         }
@@ -532,7 +550,7 @@ public class CourseQueryService {
         // 조회되지 않은 장소는 지도 핀도 못 찍고 목록에도 채울 내용이 없어 제외한다.
         return coursePlaces.stream()
                 .filter(coursePlace -> placeById.containsKey(coursePlace.getPlaceId()))
-                .map(coursePlace -> courseConverter.toMyCoursePlaceResponse(
+                .map(coursePlace -> courseConverter.toCoursePlaceDetailResponse(
                         placeById.get(coursePlace.getPlaceId()), coursePlace.getOrderNum()))
                 .toList();
     }
