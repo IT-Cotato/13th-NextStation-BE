@@ -73,10 +73,4 @@ public class PlaceReview extends BaseTimeEntity {
         this.deletedAt = LocalDateTime.now();
     }
 
-    // 리뷰가 삭제되면 여기 걸려 있던 좋아요는 의미가 없어지므로 캐시 카운트도 함께 초기화한다
-    // (PlaceReviewLike row 자체는 PlaceReviewCommandService가 삭제한다)
-    public void resetLikeCount() {
-        this.likeCount = 0;
-    }
-
 }
