@@ -354,4 +354,66 @@ class CourseCommandServiceTest {
         assertThatCode(() -> courseCommandService.increaseViewCount(1L, 2L))
                 .doesNotThrowAnyException();
     }
+
+    // ---------- 여행일지 연결/해제 ----------
+
+    @Test
+    @DisplayName("여행일지를 작성하면 코스가 그 일지를 가리킨다")
+    void linkJournal_success() {
+        // given
+        Course course = course("보문역 코스");
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course));
+
+        // when
+        courseCommandService.linkJournal(1L, 50L);
+
+        // then: 이 값이 있어야 둘러보기·검색·좋아요·복제에서 공개 코스로 판정된다
+        assertThat(course.getJournalId()).isEqualTo(50L);
+    }
+
+    @Test
+    @DisplayName("코스가 없으면 여행일지 연결을 건너뛰고 예외를 던지지 않는다")
+    void linkJournal_skipsWhenCourseMissing() {
+        // given: 완주 후 코스를 지우고 일지를 쓸 수 있는데, 그때 일지 작성이 실패하면 안 된다
+        given(courseRepository.findById(1L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatCode(() -> courseCommandService.linkJournal(1L, 50L))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("journalId 없이 연결을 시도하면 예외가 발생한다")
+    void linkJournal_rejectsNullJournalId() {
+        // when & then: 호출부의 실수라 조용히 넘기지 않는다
+        assertThatThrownBy(() -> courseCommandService.linkJournal(1L, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(courseRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("여행일지를 삭제하면 코스의 연결이 끊긴다")
+    void unlinkJournal_success() {
+        // given
+        Course course = course("보문역 코스");
+        course.linkJournal(50L);
+        given(courseRepository.findByJournalId(50L)).willReturn(Optional.of(course));
+
+        // when
+        courseCommandService.unlinkJournal(50L);
+
+        // then: 일지가 사라진 코스는 둘러보기에서 빠지고 "내가 만든 코스"에만 남는다
+        assertThat(course.getJournalId()).isNull();
+    }
+
+    @Test
+    @DisplayName("연결된 코스가 없으면 여행일지 해제는 아무것도 하지 않는다")
+    void unlinkJournal_skipsWhenNoLinkedCourse() {
+        // given
+        given(courseRepository.findByJournalId(50L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatCode(() -> courseCommandService.unlinkJournal(50L))
+                .doesNotThrowAnyException();
+    }
 }
