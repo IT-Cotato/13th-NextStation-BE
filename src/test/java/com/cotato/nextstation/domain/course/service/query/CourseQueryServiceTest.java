@@ -8,7 +8,7 @@ import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListRespon
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
-import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
+import com.cotato.nextstation.domain.course.dto.response.CoursePlaceDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.entity.Course;
 import com.cotato.nextstation.domain.course.entity.CoursePlace;
@@ -19,7 +19,7 @@ import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
-import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.CourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
@@ -1073,7 +1073,7 @@ class CourseQueryServiceTest {
     @DisplayName("코스 확인은 역의 대표 호선을 함께 내려준다")
     void getMyCourseDetail_includesLine() {
         // given: 화면 상단 배지가 호선에 따라 달라져서 대표 호선이 필요하다
-        MyCourseDetailView view = mock(MyCourseDetailView.class);
+        CourseDetailView view = mock(CourseDetailView.class);
         given(courseRepository.findMyCourseDetail(1L, 1L)).willReturn(Optional.of(view));
         given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(List.of());
 
@@ -1085,18 +1085,46 @@ class CourseQueryServiceTest {
     }
 
     @Test
+    @DisplayName("내 코스로 만들기 화면은 공개 코스만 조회한다")
+    void getCourseCopyPreview_success() {
+        // given
+        CourseDetailView view = mock(CourseDetailView.class);
+        given(courseRepository.findPublicCourseDetail(7L)).willReturn(Optional.of(view));
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(7L)).willReturn(List.of());
+
+        // when
+        courseQueryService.getCourseCopyPreview(7L);
+
+        // then: 소유자 조건 없이 공개 조건만 걸린 조회를 쓴다
+        verify(courseRepository).findPublicCourseDetail(7L);
+        verify(courseConverter).toCourseCopyPreviewResponse(view, List.of());
+    }
+
+    @Test
+    @DisplayName("공개되지 않은 코스의 내 코스로 만들기 화면을 조회하면 예외가 발생한다")
+    void getCourseCopyPreview_notPublic() {
+        // given: 비공개·일지 없음·삭제는 조회 단계에서 함께 걸러진다
+        given(courseRepository.findPublicCourseDetail(7L)).willReturn(Optional.empty());
+
+        // when & then: 남의 비공개 코스가 존재한다는 사실을 드러내지 않도록 404다
+        assertThatThrownBy(() -> courseQueryService.getCourseCopyPreview(7L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
+
+    @Test
     @DisplayName("코스 확인은 장소 조회 결과 순서와 무관하게 order_num 순으로 채운다")
     void getMyCourseDetail_ordersPlacesByOrderNum() {
         // given: 코스 순서는 20 -> 10 인데 장소 조회는 10 -> 20 으로 돌려준다
-        MyCourseDetailView view = mock(MyCourseDetailView.class);
+        CourseDetailView view = mock(CourseDetailView.class);
         given(courseRepository.findMyCourseDetail(1L, 1L)).willReturn(Optional.of(view));
         given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L))
                 .willReturn(List.of(coursePlace(1L, 20L, 1), coursePlace(1L, 10L, 2)));
         given(placeInfoQueryService.getPlaceInfos(List.of(20L, 10L)))
                 .willReturn(List.of(placeInfo(10L, 127.1, 37.1), placeInfo(20L, 127.2, 37.2)));
-        given(courseConverter.toMyCoursePlaceResponse(any(), anyInt())).willAnswer(invocation -> {
+        given(courseConverter.toCoursePlaceDetailResponse(any(), anyInt())).willAnswer(invocation -> {
             PlaceInfoResponse place = invocation.getArgument(0);
-            return new MyCoursePlaceResponse(place.placeId(), place.placeName(), place.description(),
+            return new CoursePlaceDetailResponse(place.placeId(), place.placeName(), place.description(),
                     place.categoryCode(), place.categoryName(), place.imageUrl(),
                     place.xCoordinate(), place.yCoordinate(), invocation.getArgument(1));
         });
@@ -1105,10 +1133,10 @@ class CourseQueryServiceTest {
         courseQueryService.getMyCourseDetail(1L, 1L);
 
         // then: 지도 핀 번호와 목록 순서가 어긋나지 않도록 코스 순서를 따른다
-        ArgumentCaptor<List<MyCoursePlaceResponse>> placesCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<CoursePlaceDetailResponse>> placesCaptor = ArgumentCaptor.forClass(List.class);
         verify(courseConverter).toMyCourseDetailResponse(eq(view), placesCaptor.capture());
         assertThat(placesCaptor.getValue())
-                .extracting(MyCoursePlaceResponse::placeId, MyCoursePlaceResponse::orderNum)
+                .extracting(CoursePlaceDetailResponse::placeId, CoursePlaceDetailResponse::orderNum)
                 .containsExactly(tuple(20L, 1), tuple(10L, 2));
     }
 
@@ -1116,15 +1144,15 @@ class CourseQueryServiceTest {
     @DisplayName("코스 확인에서 조회되지 않는 장소는 응답에서 빠진다")
     void getMyCourseDetail_skipsMissingPlaces() {
         // given: 코스에 담긴 장소 중 10번만 조회된다
-        MyCourseDetailView view = mock(MyCourseDetailView.class);
+        CourseDetailView view = mock(CourseDetailView.class);
         given(courseRepository.findMyCourseDetail(1L, 1L)).willReturn(Optional.of(view));
         given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L))
                 .willReturn(List.of(coursePlace(1L, 10L, 1), coursePlace(1L, 99L, 2)));
         given(placeInfoQueryService.getPlaceInfos(List.of(10L, 99L)))
                 .willReturn(List.of(placeInfo(10L, 127.1, 37.1)));
-        given(courseConverter.toMyCoursePlaceResponse(any(), anyInt())).willAnswer(invocation -> {
+        given(courseConverter.toCoursePlaceDetailResponse(any(), anyInt())).willAnswer(invocation -> {
             PlaceInfoResponse place = invocation.getArgument(0);
-            return new MyCoursePlaceResponse(place.placeId(), place.placeName(), place.description(),
+            return new CoursePlaceDetailResponse(place.placeId(), place.placeName(), place.description(),
                     place.categoryCode(), place.categoryName(), place.imageUrl(),
                     place.xCoordinate(), place.yCoordinate(), invocation.getArgument(1));
         });
@@ -1133,9 +1161,9 @@ class CourseQueryServiceTest {
         courseQueryService.getMyCourseDetail(1L, 1L);
 
         // then: 좌표가 없으면 지도 핀도 못 찍고 목록에 채울 내용도 없다
-        ArgumentCaptor<List<MyCoursePlaceResponse>> placesCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<CoursePlaceDetailResponse>> placesCaptor = ArgumentCaptor.forClass(List.class);
         verify(courseConverter).toMyCourseDetailResponse(eq(view), placesCaptor.capture());
-        assertThat(placesCaptor.getValue()).extracting(MyCoursePlaceResponse::placeId).containsExactly(10L);
+        assertThat(placesCaptor.getValue()).extracting(CoursePlaceDetailResponse::placeId).containsExactly(10L);
     }
 
     @Test
@@ -1155,7 +1183,7 @@ class CourseQueryServiceTest {
     @DisplayName("장소가 없는 코스도 코스 확인은 빈 목록으로 응답한다")
     void getMyCourseDetail_noPlaces() {
         // given
-        MyCourseDetailView view = mock(MyCourseDetailView.class);
+        CourseDetailView view = mock(CourseDetailView.class);
         given(courseRepository.findMyCourseDetail(1L, 1L)).willReturn(Optional.of(view));
         given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(1L)).willReturn(List.of());
 
