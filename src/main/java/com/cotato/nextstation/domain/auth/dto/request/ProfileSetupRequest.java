@@ -17,7 +17,7 @@ public record ProfileSetupRequest(
         @NotBlank(message = "닉네임은 필수입니다.")
         String nickname,
 
-        @Schema(description = "프로필 이미지 URL. presigned URL로 업로드 완료 후 받은 imageUrl을 그대로 전달(선택)", example = "https://bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid.jpg")
+        @Schema(description = "프로필 이미지 URL. presigned URL로 업로드 완료 후 받은 imageUrl, 또는 카카오 로그인 응답으로 받은 profileImageUrl을 그대로 전달(선택)", example = "https://bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/uuid.jpg")
         @Size(max = 1000, message = "프로필 이미지 URL은 1000자를 초과할 수 없습니다.") // Member.profileImageUrl 컬럼 길이와 동일
         String profileImageUrl,
 
