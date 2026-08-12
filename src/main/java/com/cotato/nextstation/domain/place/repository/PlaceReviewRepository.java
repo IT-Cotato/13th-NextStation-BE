@@ -84,11 +84,14 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             @Param("reviewId") Long reviewId,
             Pageable pageable);
 
-    // 장소 리뷰 총 개수 (삭제된 journal의 리뷰도 카운트에 포함되지 않도록 journal 조인 추가,
-    // 내용 없는 리뷰는 노출되지 않으므로 카운트에서도 제외)
+    // 장소 리뷰 총 개수 (내용 없는 리뷰는 카운트에서도 제외)
+    // journal의 @SQLRestriction(is_deleted = false)은 JOIN FETCH로 실제 로드할 때만 보장되고
+    // 단순 JOIN(값만 참조, select 안 함)에는 적용이 안 될 수 있어 j.isDeleted를 명시적으로 검사한다.
+    // (리스트 조회 쿼리들은 JOIN FETCH pr.journal이라 이 문제가 없다)
     @Query("SELECT COUNT(pr) FROM PlaceReview pr " +
             "JOIN pr.journal j " +
             "WHERE pr.place.id = :placeId " +
+            "AND j.isDeleted = false " +
             "AND " + HAS_CONTENT)
     long countByPlaceId(@Param("placeId") Long placeId);
 
