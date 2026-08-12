@@ -84,7 +84,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 바로 그 트랜잭션 안에서 값을 읽어 반환해야 한다.
      */
     @Query("SELECT c.viewCount FROM Course c WHERE c.id = :courseId")
-    int findViewCountById(@Param("courseId") Long courseId);
+    Integer findViewCountById(@Param("courseId") Long courseId);
 
     // like_count는 DB에서 직접 증감시킨다.
     // 엔티티를 읽어 +1 하면 동시 좋아요 시 한쪽 증가분이 유실된다.
