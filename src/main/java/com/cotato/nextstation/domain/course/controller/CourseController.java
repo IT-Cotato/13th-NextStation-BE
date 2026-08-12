@@ -3,9 +3,11 @@ package com.cotato.nextstation.domain.course.controller;
 import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
+import com.cotato.nextstation.domain.course.dto.response.CourseCopyPreviewResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
+import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.domain.course.service.command.CourseLikeCommandService;
 import com.cotato.nextstation.global.common.response.CommonResponse;
 import com.cotato.nextstation.global.security.AuthenticationPrincipal;
@@ -21,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -38,6 +41,8 @@ public class CourseController {
 
     private final CourseCommandService courseCommandService;
     private final CourseLikeCommandService courseLikeCommandService;
+    private final CourseQueryService courseQueryService;
+
     @Operation(
             summary = "코스 생성",
             description = """
@@ -100,6 +105,32 @@ public class CourseController {
             @Valid @RequestBody CourseCopyRequest request) {
         return CommonResponse.success(HttpStatus.CREATED,
                 courseCommandService.copyCourse(principal.memberId(), courseId, request));
+    }
+
+    @Operation(
+            summary = "내 코스로 만들기 화면 조회",
+            description = """
+                    타인의 공개 코스를 내 코스로 가져오기 직전 화면(지도 + 코스 순서)에 필요한 값을 내려준다.
+                    여행일지 상세에서 "내 코스로 만들기"를 눌렀을 때 호출한다.
+                    - 이 화면에는 사진·후기·작성자·태그가 없어 코스 구성만 담는다.
+                    - `name`을 이름 입력칸의 초기값으로 쓰고, 저장할 때 `POST /courses/{courseId}/copy`에 실어 보낸다.
+                    - 순서를 바꿔 저장하려면 `places`의 `placeId`를 원하는 순서로 정렬해 `placeIds`로 보낸다.
+                    - 비공개이거나 존재하지 않는 코스는 404다. 본인 코스인지는 보지 않으므로,
+                      진입 자체는 프론트가 여행일지 상세의 `isMine`으로 막아야 한다(저장은 서버가 400으로 막는다).
+                    """
+    )
+    @SecurityRequirement(name = "accessTokenAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않거나 공개되지 않은 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
+    })
+    @GetMapping("/{courseId}/copy-preview")
+    public CommonResponse<CourseCopyPreviewResponse> getCourseCopyPreview(
+            @Parameter(hidden = true) @AuthenticationPrincipal JwtPrincipal principal,
+            @Parameter(description = "가져올 원본 코스 ID", example = "1")
+            @PathVariable Long courseId) {
+        return CommonResponse.success(courseQueryService.getCourseCopyPreview(courseId));
     }
 
     @Operation(

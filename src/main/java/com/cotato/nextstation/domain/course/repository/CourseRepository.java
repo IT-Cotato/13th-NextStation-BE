@@ -31,9 +31,21 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE c.id = :courseId AND c.memberId = :memberId")
-    Optional<MyCourseDetailView> findMyCourseDetail(@Param("memberId") Long memberId,
+    Optional<CourseDetailView> findMyCourseDetail(@Param("memberId") Long memberId,
                                                     @Param("courseId") Long courseId);
 
+    // "내 코스로 만들기" 준비 화면. 위 코스 확인 화면과 같은 구성이되 대상이 타인의 공개 코스다.
+    // 소유자 조건 대신 공개 조건(Journal INNER JOIN + isPublic)을 걸어, 비공개 코스는 조회되지 않는다.
+    // 존재 여부와 공개 여부를 한 쿼리로 판정하므로 결과가 비면 그대로 404다.
+    @Query("SELECT c.id AS courseId, c.name AS name, " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Journal j ON j.id = c.journalId " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE c.id = :courseId AND j.isPublic = true")
+    Optional<CourseDetailView> findPublicCourseDetail(@Param("courseId") Long courseId);
     // 여행일지 삭제 시 참조를 끊을 코스를 찾는다.
     // 일지는 삭제되면서 member_stamp_id를 비우므로(재작성 허용), 그 뒤에는 일지에서 코스를
     // 역산할 수 없다. 그래서 삭제 시점에 journalId로 직접 찾아야 한다.
@@ -419,7 +431,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         LineCode getLineCode();
     }
 
-    interface MyCourseDetailView {
+    interface CourseDetailView {
         Long getCourseId();
         String getName();
         Long getStationId();

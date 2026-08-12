@@ -3,13 +3,14 @@ package com.cotato.nextstation.domain.course.converter;
 import com.cotato.nextstation.domain.course.dto.response.CourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.MemberCourseCardResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseCopyPreviewResponse;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
-import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
+import com.cotato.nextstation.domain.course.dto.response.CoursePlaceDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
-import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.CourseDetailView;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
@@ -55,8 +56,8 @@ class CourseConverterTest {
         return view;
     }
 
-    private MyCourseDetailView detailView(Long lineId, String lineName, LineCode lineCode) {
-        MyCourseDetailView view = mock(MyCourseDetailView.class);
+    private CourseDetailView detailView(Long lineId, String lineName, LineCode lineCode) {
+        CourseDetailView view = mock(CourseDetailView.class);
         given(view.getCourseId()).willReturn(1L);
         given(view.getName()).willReturn("민성이랑 떠나는 느좋투어");
         given(view.getStationId()).willReturn(6L);
@@ -93,31 +94,44 @@ class CourseConverterTest {
     }
 
     @Test
+    @DisplayName("내 코스로 만들기 화면 응답은 원본 코스 id를 그대로 담는다")
+    void toCourseCopyPreviewResponse() {
+        // when: 이 id로 POST /courses/{courseId}/copy를 호출해야 한다
+        CourseCopyPreviewResponse response = courseConverter.toCourseCopyPreviewResponse(
+                detailView(6L, "6호선", LineCode.LINE_6), List.of());
+
+        // then
+        assertThat(response.courseId()).isEqualTo(1L);
+        assertThat(response.name()).isEqualTo("민성이랑 떠나는 느좋투어");
+        assertThat(response.line().code()).isEqualTo(LineCode.LINE_6);
+    }
+
+    @Test
     @DisplayName("코스 확인 장소 응답에 조회한 장소 정보를 순서와 함께 그대로 담는다")
-    void toMyCoursePlaceResponse() {
+    void toCoursePlaceDetailResponse() {
         // given
         PlaceInfoResponse place = new PlaceInfoResponse(
                 11L, "보문숲길도서관", "혼자 조용히 머물기 좋은 동네 도서관",
                 "CULTURE", "문화공간", "https://img/1.jpg", 127.0345, 37.5804);
 
         // when
-        MyCoursePlaceResponse response = courseConverter.toMyCoursePlaceResponse(place, 2);
+        CoursePlaceDetailResponse response = courseConverter.toCoursePlaceDetailResponse(place, 2);
 
         // then: 필드가 하나라도 누락되면 화면에서 핀/이미지/순서가 어긋난다
-        assertThat(response).isEqualTo(new MyCoursePlaceResponse(
+        assertThat(response).isEqualTo(new CoursePlaceDetailResponse(
                 11L, "보문숲길도서관", "혼자 조용히 머물기 좋은 동네 도서관",
                 "CULTURE", "문화공간", "https://img/1.jpg", 127.0345, 37.5804, 2));
     }
 
     @Test
     @DisplayName("장소 이미지가 없어도 카테고리는 담아 내린다")
-    void toMyCoursePlaceResponse_withoutImage() {
+    void toCoursePlaceDetailResponse_withoutImage() {
         // given: 카테고리 기본 이미지가 아직 없어 imageUrl이 비는 장소
         PlaceInfoResponse place = new PlaceInfoResponse(
                 12L, "보문사", "천년 고찰", "CULTURE", "문화공간", null, 127.0350, 37.5810);
 
         // when
-        MyCoursePlaceResponse response = courseConverter.toMyCoursePlaceResponse(place, 1);
+        CoursePlaceDetailResponse response = courseConverter.toCoursePlaceDetailResponse(place, 1);
 
         // then: 이 경우 프론트가 카테고리로 대체 이미지를 고른다
         assertThat(response.imageUrl()).isNull();
