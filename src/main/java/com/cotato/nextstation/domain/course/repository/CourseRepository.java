@@ -121,12 +121,15 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 공개 노출 조건: journal_id가 있고 그 여행일지가 공개인 코스만
     // Course는 journalId를 Long으로만 들고 있어 Journal을 id로 ad-hoc 조인한다
     // INNER JOIN이라 journalId가 NULL인 코스는 자동 제외된다.
-
-    @Query("SELECT c FROM Course c " +
+    // 카드 제목(name)은 코스 이름이 아니라 작성자가 지은 여행일지 제목(journal.title)이다
+    // (2026-08-12 변경). 공개 코스만 조회하므로 null 걱정이 없다. 스탬프 도메인(Part3)이
+    // CourseQueryService.getPopularCoursesByStation을 통해 이 값을 그대로 소비한다 — 공유 필요.
+    @Query("SELECT c.id AS courseId, j.title AS name, c.viewCount AS viewCount, c.likeCount AS likeCount " +
+            "FROM Course c " +
             "JOIN Journal j ON j.id = c.journalId " +
             "WHERE c.stationId = :stationId AND j.isPublic = true " +
             "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC")
-    List<Course> findPopularPublicCoursesByStationId(@Param("stationId") Long stationId, Pageable pageable);
+    List<PopularCourseView> findPopularPublicCoursesByStationId(@Param("stationId") Long stationId, Pageable pageable);
 
     // 내가 만든 코스 목록 (최신순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
     // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
@@ -434,6 +437,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "AND (:lineId IS NULL OR s.drawLine.id = :lineId) " +
             "ORDER BY s.stationName")
     List<StationView> findStationsWithPublicCourses(@Param("lineId") Long lineId);
+
+    interface PopularCourseView {
+        Long getCourseId();
+        String getName();
+        int getViewCount();
+        int getLikeCount();
+    }
 
     interface ExploreCourseView {
         Long getCourseId();

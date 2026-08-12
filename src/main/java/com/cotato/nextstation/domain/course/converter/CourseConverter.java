@@ -29,6 +29,7 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.CourseDe
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.PopularCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
@@ -281,14 +282,14 @@ public class CourseConverter {
         return DURATION_SHORT;
     }
 
-    public List<PopularCourseResponse> toPopularResponses(List<Course> courses, Set<Long> likedCourseIds) {
+    public List<PopularCourseResponse> toPopularResponses(List<PopularCourseView> courses, Set<Long> likedCourseIds) {
         return courses.stream()
                 .map(course -> new PopularCourseResponse(
-                        course.getId(),
+                        course.getCourseId(),
                         course.getName(),
                         course.getViewCount(),
                         course.getLikeCount(),
-                        likedCourseIds.contains(course.getId())
+                        likedCourseIds.contains(course.getCourseId())
                 ))
                 .toList();
     }
