@@ -63,6 +63,7 @@ class MemberCommandServiceTest {
             "https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/old.jpg";
     private static final String NEW_IMAGE_URL =
             "https://test-bucket.s3.ap-northeast-2.amazonaws.com/images/uploads/profile/1/new.jpg";
+    private static final String KAKAO_IMAGE_URL = "https://k.kakaocdn.net/dn/abc/def/ghi/img_640x640.jpg";
 
     private Member memberWith(String nickname, String profileImageUrl) {
         Member member = Member.builder().email("user@example.com").password("encoded").build();
@@ -131,6 +132,7 @@ class MemberCommandServiceTest {
         // given
         Member member = memberWith("닉네임", OLD_IMAGE_URL);
         given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+        given(profileImageUrlValidator.isOwnS3Object(OLD_IMAGE_URL, MEMBER_ID)).willReturn(true);
 
         // when
         MemberProfileResponse response = memberCommandService.updateMyProfile(MEMBER_ID, null, NEW_IMAGE_URL);
@@ -147,6 +149,7 @@ class MemberCommandServiceTest {
         // given
         Member member = memberWith("닉네임", OLD_IMAGE_URL);
         given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+        given(profileImageUrlValidator.isOwnS3Object(OLD_IMAGE_URL, MEMBER_ID)).willReturn(true);
 
         // when
         MemberProfileResponse response = memberCommandService.updateMyProfile(MEMBER_ID, null, "");
@@ -154,6 +157,21 @@ class MemberCommandServiceTest {
         // then
         assertThat(response.profileImageUrl()).isNull();
         verify(imageCommandService).deleteImage(OLD_IMAGE_URL, MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("기존 이미지가 카카오 CDN 이미지면 S3 삭제를 시도하지 않는다")
+    void updateMyProfile_skipDeletionForExternalImage() {
+        // given
+        Member member = memberWith("닉네임", KAKAO_IMAGE_URL);
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+        given(profileImageUrlValidator.isOwnS3Object(KAKAO_IMAGE_URL, MEMBER_ID)).willReturn(false);
+
+        // when
+        memberCommandService.updateMyProfile(MEMBER_ID, null, NEW_IMAGE_URL);
+
+        // then
+        verify(imageCommandService, never()).deleteImage(anyString(), anyLong());
     }
 
     @Test
