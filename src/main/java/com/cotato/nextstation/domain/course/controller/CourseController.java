@@ -166,7 +166,7 @@ public class CourseController {
     @Operation(
             summary = "코스 좋아요 추가",
             description = """
-                    다른 사람의 코스를 보관함에 좋아요한다.
+                    코스를 보관함에 좋아요한다. 본인이 만든 코스도 좋아요할 수 있다.
                     - 좋아요는 원본을 참조만 하므로, 원본이 삭제되거나 비공개로 바뀌면 목록에서도 빠진다.
                     - 코스를 복사해 내 것으로 만드는 "내 코스로 만들기"와는 다른 기능이다.
                     - 좋아요하면 해당 코스의 좋아요 수가 1 증가한다.
@@ -175,7 +175,6 @@ public class CourseController {
     @SecurityRequirement(name = "accessTokenAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "좋아요 성공 (data 없음)"),
-            @ApiResponse(responseCode = "400", description = "본인이 만든 코스에 좋아요 (`CourseErrorCode.CANNOT_LIKE_OWN_COURSE`)"),
             @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
             @ApiResponse(responseCode = "409", description = "이미 좋아요한 코스 (`CourseErrorCode.DUPLICATE_COURSE_LIKE`)"),
