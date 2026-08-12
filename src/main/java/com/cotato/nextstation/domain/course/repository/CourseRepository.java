@@ -131,9 +131,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 본인 코스이므로 공개 여부는 걸지 않는다. 삭제된 코스는 @SQLRestriction이 제외한다.
     // 호선/역 필터는 둘 다 선택 사항이라 파라미터가 null이면 조건을 건너뛴다.
     //
-    // 호선 필터는 대표 호선이 아니라 역이 속한 호선 전체(StationLine)를 기준으로 판단한다.
-    // 대표 호선은 카드 배지에 뭘 보여줄지 정한 표시용 값이라, 그걸로 걸러내면 환승역 코스가
-    // 실제로 갈 수 있는 다른 호선 탭에서 사라진다(예: 동묘앞역 코스가 6호선 탭에서 누락).
+    // 호선 필터는 역이 속한 호선 전체(StationLine)가 아니라 대표 호선(draw_line) 기준으로 판단한다
+    // (2026-08-12 변경, MVP 단순화). 카드 배지가 대표 호선 하나만 보여주는 이상 소속 호선 전체로
+    // 거르면 "2호선 탭인데 카드는 1호선"처럼 필터-배지 불일치가 생기고, 프론트가 이를 배지 기준으로
+    // 재필터링하면 서버가 계산한 hasNext/커서와도 어긋난다. 환승역 코스가 대표 아닌 호선 탭에서
+    // 안 보이는 것(예: 동묘앞역 코스가 6호선 탭엔 안 뜸)은 감수하기로 함(design-decisions.md 참고).
     @Query("SELECT c.id AS courseId, c.name AS name, c.createdAt AS createdAt, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -141,8 +143,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE c.memberId = :memberId " +
-            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
-            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:lineId IS NULL OR l.id = :lineId) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
             "ORDER BY c.createdAt DESC, c.id DESC")
     List<MyCourseView> findMyCourses(@Param("memberId") Long memberId,
@@ -158,8 +159,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE c.memberId = :memberId " +
-            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
-            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:lineId IS NULL OR l.id = :lineId) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
             "AND (c.createdAt < :createdAt OR (c.createdAt = :createdAt AND c.id < :courseId)) " +
             "ORDER BY c.createdAt DESC, c.id DESC")
@@ -221,13 +221,12 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 내 코스가 하나라도 있는 호선. 코스 없는 호선 칩을 비활성화하는 데 쓴다.
     // 현재 필터와 무관하게 전체 기준으로 조회해야 필터를 바꿔 끼울 수 있다.
     // 페이징으로는 전체 목록을 볼 수 없어 서버가 따로 알려준다.
-    // 호선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
-    // "칩은 비활성인데 필터를 걸면 결과가 나오는" 불일치가 생긴다.
+    // 호선 필터와 같은 기준(대표 호선)으로 조회해야 한다. 기준이 다르면
+    // "칩은 활성인데 필터를 걸면 결과가 없는" 불일치가 생긴다.
     @Query("SELECT DISTINCT l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
             "JOIN Station s ON s.id = c.stationId " +
-            "JOIN StationLine sl ON sl.station.id = s.id " +
-            "JOIN sl.line l " +
+            "JOIN s.drawLine l " +
             "WHERE c.memberId = :memberId " +
             "ORDER BY l.name")
     List<LineView> findAvailableLines(@Param("memberId") Long memberId);
@@ -254,8 +253,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 화면마다 쿼리를 복붙하면 공개 조건이 바뀔 때 한 곳을 빠뜨려 비공개 코스가 새어 나간다.
      * <p>
      * 필터는 전부 선택 사항이라 파라미터가 null이면 조건을 건너뛴다.
-     * 호선 필터는 저장 탭과 같은 기준으로 역이 속한 호선 전체(StationLine)를 본다.
-     * 대표 호선으로 거르면 환승역 코스가 실제로 갈 수 있는 다른 호선 탭에서 사라진다.
+     * 호선 필터는 저장 탭과 같은 기준으로 대표 호선(draw_line)을 본다(2026-08-12 변경, MVP 단순화).
+     * 역이 속한 호선 전체(StationLine)로 걸렀던 이전 방식은 카드 배지(대표 호선만 표시)와
+     * 필터 칩이 어긋나는 문제가 있었다. design-decisions.md 참고.
      * <p>
      * 검색 대상은 코스 이름과 역명뿐이다("동네" 제외 확정). 역명은 역 검색과 같은 규칙으로
      * 꼬리의 "역"을 떼고 비교하며, 검색어 쪽도 서비스에서 같은 규칙으로 다듬어 넘긴다.
@@ -271,8 +271,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE j.isPublic = true " +
-            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
-            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:lineId IS NULL OR l.id = :lineId) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
             "AND (:conceptTourId IS NULL OR c.conceptTourId = :conceptTourId) " +
             "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') ESCAPE '!' " +
@@ -306,8 +305,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE j.isPublic = true " +
-            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
-            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:lineId IS NULL OR l.id = :lineId) " +
             "AND (:stationId IS NULL OR s.id = :stationId) " +
             "AND (:conceptTourId IS NULL OR c.conceptTourId = :conceptTourId) " +
             "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') ESCAPE '!' " +
@@ -352,7 +350,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * {@code line} 테이블 전체를 쓰면 코스가 생길 수 없는 노선까지 칩으로 뜨고,
      * 공개 코스가 있는 노선만 쓰면 데이터가 쌓일 때마다 칩이 늘어나 노선도가 흔들려 보인다.
      * <p>
-     * 소속 호선({@code StationLine}) 기준이라 노선 필터·활성 판정과 기준이 같다.
+     * 이 쿼리만 소속 호선({@code StationLine}) 기준이다 - "이 노선을 지나는 뽑기 역이 하나라도
+     * 있는가"를 물을 뿐 노선 필터·활성 판정(둘 다 대표 호선 기준, 2026-08-12 변경)과는 목적이 달라
+     * 기준을 맞출 필요가 없다. 대표 호선만 봤다면 대표가 아닌 쪽으로만 지나는 노선은 뽑기 역이
+     * 있어도 칩 후보에서 아예 빠진다.
      * 화면에 칩이 있는 노선만 남기는 것은 호출부가 {@code lineCodes}로 정한다.
      * <p>
      * 뽑기 역이 늘어나면 노선도 자연히 늘어나므로 목록을 하드코딩하지 않고 데이터에서 유도한다.
@@ -368,8 +369,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     /**
      * 공개 코스가 하나라도 있는 노선. 칩의 활성/비활성을 가르는 데 쓴다.
      * <p>
-     * 노선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
-     * "칩은 비활성인데 필터를 걸면 결과가 나오는" 불일치가 생긴다.
+     * 노선 필터와 같은 기준(대표 호선)으로 조회해야 한다(2026-08-12 변경). 기준이 다르면
+     * "칩은 활성인데 필터를 걸면 결과가 없는" 불일치가 생긴다.
      * <p>
      * 칩으로 그리지 않는 노선까지 섞여 나오지만, 활성 여부를 가리는 데만 쓰는 값이라
      * 칩에 없는 노선의 id는 조회되지 않아 결과가 달라지지 않는다.
@@ -378,8 +379,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "FROM Course c " +
             "JOIN Journal j ON j.id = c.journalId " +
             "JOIN Station s ON s.id = c.stationId " +
-            "JOIN StationLine sl ON sl.station.id = s.id " +
-            "JOIN sl.line l " +
+            "JOIN s.drawLine l " +
             "WHERE j.isPublic = true " +
             "ORDER BY l.name")
     List<LineView> findLinesWithPublicCourses();
@@ -392,19 +392,21 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * <p>
      * 노선 칩으로 좁힌 범위에서 고르는 목록이라 {@code lineId}만 반영하고, 역·검색어 필터는 반영하지 않는다.
      * 지금 고른 역으로 좁히면 드롭다운에 그 역 하나만 남아 다른 역으로 바꿀 수 없다.
+     * <p>
+     * 노선 필터와 같은 기준(대표 호선)으로 걸러야 한다(2026-08-12 변경). 소속 호선 전체로 걸렀다면
+     * 드롭다운엔 뜨지만 고르면(노선 필터와 함께) 결과가 없는 역이 섞여 나올 수 있다.
      */
     @Query("SELECT s.id AS stationId, s.stationName AS stationName " +
             "FROM Station s " +
             "WHERE s.isDrawable = true " +
-            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
-            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:lineId IS NULL OR s.drawLine.id = :lineId) " +
             "ORDER BY s.stationName")
     List<StationView> findDrawableStations(@Param("lineId") Long lineId);
 
     /**
      * 공개 코스가 하나라도 있는 역. "역 선택" 항목의 활성/비활성을 가르는 데 쓴다.
      * <p>
-     * 노선 필터와 같은 기준(역이 속한 호선 전체)으로 조회해야 한다. 기준이 다르면
+     * 노선 필터와 같은 기준(대표 호선)으로 조회해야 한다(2026-08-12 변경). 기준이 다르면
      * "목록에서 고를 수 있는 역인데 고르면 결과가 없는" 불일치가 생긴다.
      */
     @Query("SELECT DISTINCT s.id AS stationId, s.stationName AS stationName " +
@@ -412,8 +414,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Journal j ON j.id = c.journalId " +
             "JOIN Station s ON s.id = c.stationId " +
             "WHERE j.isPublic = true " +
-            "AND (:lineId IS NULL OR EXISTS (SELECT 1 FROM StationLine sl " +
-            "     WHERE sl.station.id = s.id AND sl.line.id = :lineId)) " +
+            "AND (:lineId IS NULL OR s.drawLine.id = :lineId) " +
             "ORDER BY s.stationName")
     List<StationView> findStationsWithPublicCourses(@Param("lineId") Long lineId);
 
