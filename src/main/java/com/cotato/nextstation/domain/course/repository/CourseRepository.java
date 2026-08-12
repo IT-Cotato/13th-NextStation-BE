@@ -37,7 +37,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // "내 코스로 만들기" 준비 화면. 위 코스 확인 화면과 같은 구성이되 대상이 타인의 공개 코스다.
     // 소유자 조건 대신 공개 조건(Journal INNER JOIN + isPublic)을 걸어, 비공개 코스는 조회되지 않는다.
     // 존재 여부와 공개 여부를 한 쿼리로 판정하므로 결과가 비면 그대로 404다.
-    @Query("SELECT c.id AS courseId, c.name AS name, " +
+    // 이름 입력칸 초기값은 코스 이름(course.name)이 아니라 작성자가 지은 여행일지 제목(journal.title)이다
+    // (2026-08-12 변경). 이 쿼리는 항상 공개(=journal 존재) 코스만 조회하므로 null 걱정이 없다.
+    // 본인 코스 확인(findMyCourseDetail)은 이 결정과 무관해 그대로 course.name을 쓴다.
+    @Query("SELECT c.id AS courseId, j.title AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
