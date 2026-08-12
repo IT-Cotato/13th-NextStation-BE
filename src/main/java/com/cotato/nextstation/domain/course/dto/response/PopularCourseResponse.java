@@ -8,7 +8,7 @@ public record PopularCourseResponse(
         @Schema(description = "코스 ID", example = "1")
         Long courseId,
 
-        @Schema(description = "코스 이름", example = "보문역 코스")
+        @Schema(description = "카드에 표시할 이름. journal.title을 사용한다.", example = "보문역에서 하루")
         String name,
 
         @Schema(description = "조회수", example = "300")

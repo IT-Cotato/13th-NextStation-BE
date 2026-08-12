@@ -29,6 +29,7 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourse
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.PopularCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
 import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
@@ -129,7 +130,11 @@ public class CourseQueryService {
             LikedCourseView last = pageContent.get(pageContent.size() - 1);
             nextCursor = new CursorData(last.getLikeId(), null, last.getLikedAt()).encode();
         }
-        return courseConverter.toLikedListResponse(pageContent, nextCursor, hasNext);
+
+        // 카드 배경은 작성자가 여행일지에 올린 첫 사진이다(둘러보기 카드와 같은 규칙).
+        Map<Long, JournalCardInfoResponse> journalInfos = resolveJournalCardInfos(
+                pageContent.stream().map(LikedCourseView::getJournalId).toList());
+        return courseConverter.toLikedListResponse(pageContent, journalInfos, nextCursor, hasNext);
     }
 
     private List<LikedCourseView> fetchLikedCourses(Long memberId, CursorData cursorData, Pageable pageable) {
@@ -715,19 +720,20 @@ public class CourseQueryService {
     // 역별 인기 코스 상위 limit개
     // 공개된 여행일지가 있는 코스만 노출한다
     // 스탬프 페이지·둘러보기 등 다른 도메인이 Course에 직접 의존하지 않고 이 메서드를 호출한다
+    // 카드 제목은 journal.title을 쓴다 — 소비하는 도메인(스탬프)에 영향 있음, 공유 필요.
     public List<PopularCourseResponse> getPopularCoursesByStation(Long stationId, int limit) {
         return getPopularCoursesByStation(stationId, limit, null);
     }
 
     // memberId를 넘기면 응답의 isLiked가 채워진다. null이면 전부 false.
     public List<PopularCourseResponse> getPopularCoursesByStation(Long stationId, int limit, Long memberId) {
-        List<Course> courses = courseRepository.findPopularPublicCoursesByStationId(stationId, PageRequest.of(0, limit));
+        List<PopularCourseView> courses = courseRepository.findPopularPublicCoursesByStationId(stationId, PageRequest.of(0, limit));
         return courseConverter.toPopularResponses(courses, resolveLikedCourses(memberId, courses));
     }
 
     // 조회한 코스들의 좋아요 여부를 한 번에 조회한다 (코스마다 조회하면 N+1)
-    private Set<Long> resolveLikedCourses(Long memberId, List<Course> courses) {
-        return resolveLikedCourseIds(memberId, courses.stream().map(Course::getId).toList());
+    private Set<Long> resolveLikedCourses(Long memberId, List<PopularCourseView> courses) {
+        return resolveLikedCourseIds(memberId, courses.stream().map(PopularCourseView::getCourseId).toList());
     }
 
     private Course findCourse(Long courseId) {

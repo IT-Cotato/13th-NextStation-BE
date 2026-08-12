@@ -62,10 +62,12 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
     // 좋아요한 코스 목록 (최근 좋아요순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
     // 좋아요는 원본 참조라 원본이 삭제되거나 비공개로 바뀌면 목록에서도 빠져야 한다.
     // Journal INNER JOIN으로 비공개·일지 없는 코스가 걸러지고, 삭제된 코스/일지는 @SQLRestriction이 처리한다.
+    // 카드 제목은 journal.title을 쓴다. 좋아요는 항상 공개(=journal 존재) 코스만 대상이라 null 걱정이 없다.
+    // journalId는 카드 썸네일(여행일지 첫 사진)을 배치 조회하는 데 쓴다.
     // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
     // 대표 호선이 없는 역도 있을 수 있어 LEFT JOIN으로 둔다.
     @Query("SELECT cs.id AS likeId, cs.createdAt AS likedAt, " +
-            "c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+            "c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CourseLike cs " +
@@ -79,7 +81,7 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
 
     // 다음 페이지. 정렬 기준이 좋아요 시각이라 커서도 코스 id가 아닌 course_like.id를 tie-breaker로 쓴다.
     @Query("SELECT cs.id AS likeId, cs.createdAt AS likedAt, " +
-            "c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+            "c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CourseLike cs " +

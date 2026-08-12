@@ -18,7 +18,7 @@ public record ExploreCourseResponse(
                 """, example = "10")
         Long journalId,
 
-        @Schema(description = "코스 이름", example = "민성이랑 떠나는 신림 느좋투어")
+        @Schema(description = "카드에 표시할 이름. journal.title을 사용한다.", example = "민성이랑 떠나는 신림 느좋투어")
         String name,
 
         @Schema(description = "코스가 속한 역 ID", example = "123")
