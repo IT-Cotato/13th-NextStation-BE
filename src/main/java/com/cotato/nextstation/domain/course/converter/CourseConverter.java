@@ -30,12 +30,14 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourse
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
+import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.IntStream;
 
@@ -145,7 +147,9 @@ public class CourseConverter {
                 .toList();
     }
 
+    // imageUrl은 journalId로 배치 조회한 값을 호출부가 넘겨준다(코스마다 조회하면 N+1).
     public LikedCourseListResponse toLikedListResponse(List<LikedCourseView> likedCourses,
+                                                       Map<Long, JournalCardInfoResponse> journalInfos,
                                                        String nextCursor, boolean hasNext) {
         List<CourseCardResponse> cards = likedCourses.stream()
                 .map(liked -> new CourseCardResponse(
@@ -154,9 +158,15 @@ public class CourseConverter {
                         liked.getName(),
                         liked.getStationId(),
                         liked.getStationName(),
-                        toLine(liked.getLineId(), liked.getLineName(), liked.getLineCode())))
+                        toLine(liked.getLineId(), liked.getLineName(), liked.getLineCode()),
+                        resolveJournalImageUrl(journalInfos, liked.getJournalId())))
                 .toList();
         return new LikedCourseListResponse(cards, nextCursor, hasNext);
+    }
+
+    private String resolveJournalImageUrl(Map<Long, JournalCardInfoResponse> journalInfos, Long journalId) {
+        JournalCardInfoResponse info = journalInfos.get(journalId);
+        return (info == null) ? null : info.imageUrl();
     }
 
     public MyCourseListResponse toMyListResponse(List<MyCourseView> myCourses, Set<Long> completedCourseIds,

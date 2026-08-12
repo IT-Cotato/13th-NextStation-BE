@@ -129,7 +129,11 @@ public class CourseQueryService {
             LikedCourseView last = pageContent.get(pageContent.size() - 1);
             nextCursor = new CursorData(last.getLikeId(), null, last.getLikedAt()).encode();
         }
-        return courseConverter.toLikedListResponse(pageContent, nextCursor, hasNext);
+
+        // 카드 배경은 작성자가 여행일지에 올린 첫 사진이다(둘러보기 카드와 같은 규칙).
+        Map<Long, JournalCardInfoResponse> journalInfos = resolveJournalCardInfos(
+                pageContent.stream().map(LikedCourseView::getJournalId).toList());
+        return courseConverter.toLikedListResponse(pageContent, journalInfos, nextCursor, hasNext);
     }
 
     private List<LikedCourseView> fetchLikedCourses(Long memberId, CursorData cursorData, Pageable pageable) {
