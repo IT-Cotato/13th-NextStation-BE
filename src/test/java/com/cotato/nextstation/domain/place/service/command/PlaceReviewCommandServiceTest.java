@@ -11,6 +11,8 @@ import com.cotato.nextstation.domain.place.repository.PlaceRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewImageRepository;
 import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.global.exception.CustomException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +20,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import java.util.List;
 
@@ -54,6 +58,19 @@ class PlaceReviewCommandServiceTest {
 
     private static final Long COURSE_ID = 1L;
     private static final Long PLACE_ID = 10L;
+
+    // 이미지 저장은 이제 트랜잭션 afterCommit에 등록됐다가 실행되므로, 등록이 가능하려면
+    // 스레드에 트랜잭션 동기화가 "활성" 상태여야 한다. 실제 커밋은 없는 순수 단위 테스트라
+    // 여기서 직접 동기화를 켜고, 커밋 시점은 triggerAfterCommit()으로 흉내낸다.
+    @BeforeEach
+    void setUpTransactionSynchronization() {
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void tearDownTransactionSynchronization() {
+        TransactionSynchronizationManager.clearSynchronization();
+    }
 
     private Journal journalFixture() {
         return mock(Journal.class);
@@ -92,6 +109,7 @@ class PlaceReviewCommandServiceTest {
 
         // when
         placeReviewCommandService.createPlaceReviews(journal, COURSE_ID, requests);
+        TransactionSynchronizationUtils.triggerAfterCommit(); // 이미지 저장은 커밋 후 실행되므로 커밋을 흉내낸다
 
         // then
         ArgumentCaptor<List<PlaceReview>> captor = ArgumentCaptor.forClass(List.class);
@@ -116,6 +134,7 @@ class PlaceReviewCommandServiceTest {
 
         // when
         placeReviewCommandService.createPlaceReviews(journal, COURSE_ID, requests);
+        TransactionSynchronizationUtils.triggerAfterCommit();
 
         // then
         verify(placeReviewImageSaver, never()).save(any(), any());
@@ -182,9 +201,10 @@ class PlaceReviewCommandServiceTest {
                 List.of(new PlaceReviewCreateRequest(PLACE_ID, "좋았어요", "broken-image.jpg"));
 
         // when & then: 이미지 저장 실패가 상위로 전파되지 않는다
-        assertThatCode(() ->
-                placeReviewCommandService.createPlaceReviews(journalFixture(), COURSE_ID, requests))
-                .doesNotThrowAnyException();
+        assertThatCode(() -> {
+            placeReviewCommandService.createPlaceReviews(journalFixture(), COURSE_ID, requests);
+            TransactionSynchronizationUtils.triggerAfterCommit();
+        }).doesNotThrowAnyException();
 
         // 리뷰 저장은 이미지 저장보다 먼저 이뤄져, 이미지 실패와 무관하게 호출된다
         verify(placeReviewRepository).saveAll(anyList());
@@ -211,6 +231,7 @@ class PlaceReviewCommandServiceTest {
 
         // when
         placeReviewCommandService.createPlaceReviews(journalFixture(), COURSE_ID, requests);
+        TransactionSynchronizationUtils.triggerAfterCommit();
 
         // then: 실패한 이미지 이후에도 다음 이미지 저장이 계속 시도된다
         verify(placeReviewImageSaver, times(2)).save(any(), any());

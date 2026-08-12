@@ -19,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
@@ -88,11 +90,24 @@ public class PlaceReviewCommandService {
         // 리뷰 일괄 저장
         List<PlaceReview> savedReviews = placeReviewRepository.saveAll(placeReviews);
 
-        // 리뷰 이미지는 리뷰마다 별도 트랜잭션(REQUIRES_NEW)으로 저장한다. 하나가 실패해도
-        // 이미 저장된 리뷰 텍스트와 다른 이미지들이 함께 롤백되지 않게 하기 위함이다.
-        IntStream.range(0, requests.size())
-                .filter(i -> requests.get(i).imageUrl() != null)
-                .forEach(i -> saveReviewImage(savedReviews.get(i), requests.get(i).imageUrl()));
+        // 이 시점의 PlaceReview/Journal은 이 메서드를 감싼 바깥 트랜잭션이 아직 커밋 전이라
+        // 여기서 바로 REQUIRES_NEW로 이미지를 저장하면, 그 새 트랜잭션(=새 커넥션)이 아직
+        // 커밋되지 않은 부모 행을 참조하게 돼 락 대기에 걸린다(바깥 트랜잭션은 이 호출이
+        // 끝나야 커밋되므로, 사실상 자기 자신을 기다리는 셈이 된다). 그래서 이미지 저장은
+        // 바깥 트랜잭션이 실제로 커밋된 뒤(afterCommit)로 미룬다 - 그때는 PlaceReview/Journal이
+        // 이미 다른 트랜잭션에서도 보이는 상태라 REQUIRES_NEW가 안전하다.
+        registerImageSaveAfterCommit(requests, savedReviews);
+    }
+
+    private void registerImageSaveAfterCommit(List<PlaceReviewCreateRequest> requests, List<PlaceReview> savedReviews) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                IntStream.range(0, requests.size())
+                        .filter(i -> requests.get(i).imageUrl() != null)
+                        .forEach(i -> saveReviewImage(savedReviews.get(i), requests.get(i).imageUrl()));
+            }
+        });
     }
 
     // 코스에 속하지 않은 장소는 리뷰를 남길 수 없다. 코스에 속한 placeId 집합과 요청을 대조한다.
