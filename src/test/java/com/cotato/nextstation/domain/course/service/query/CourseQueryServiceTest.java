@@ -23,6 +23,7 @@ import com.cotato.nextstation.domain.course.repository.CourseRepository.CourseDe
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.PopularCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository;
 import com.cotato.nextstation.domain.course.repository.CourseLikeRepository.LikedCourseView;
@@ -536,14 +537,26 @@ class CourseQueryServiceTest {
         verify(memberStampQueryService).getCompletedCourseIds(1L, List.of(3L));
     }
 
+    // 프로젝션은 인터페이스라 mock으로 만든다. name은 코스 이름이 아니라 여행일지 제목(journal.title)이다.
+    private PopularCourseView popularCourseView(Long courseId, String name, int viewCount, int likeCount) {
+        PopularCourseView view = mock(PopularCourseView.class);
+        lenient().when(view.getCourseId()).thenReturn(courseId);
+        lenient().when(view.getName()).thenReturn(name);
+        lenient().when(view.getViewCount()).thenReturn(viewCount);
+        lenient().when(view.getLikeCount()).thenReturn(likeCount);
+        return view;
+    }
+
     @Test
     @DisplayName("역별 인기 코스를 limit 개수만큼 조회해 변환 결과를 반환한다")
     void getPopularCoursesByStation_success() {
         // 인기순 필터/정렬 자체는 리포지토리 쿼리 책임이고,
         // 여기서는 서비스가 limit을 Pageable로 넘기고 변환 결과를 반환하는지 확인한다.
-        List<Course> courses = List.of(course("보문역 코스"), course("성수 코스"));
+        List<PopularCourseView> courses = List.of(
+                popularCourseView(1L, "보문역에서 하루", 300, 128),
+                popularCourseView(2L, "성수 코스", 200, 50));
         List<PopularCourseResponse> responses = List.of(
-                new PopularCourseResponse(1L, "보문역 코스", 300, 128, false),
+                new PopularCourseResponse(1L, "보문역에서 하루", 300, 128, false),
                 new PopularCourseResponse(2L, "성수 코스", 200, 50, false));
         given(courseRepository.findPopularPublicCoursesByStationId(eq(6L), any(Pageable.class))).willReturn(courses);
         given(courseConverter.toPopularResponses(eq(courses), any())).willReturn(responses);
