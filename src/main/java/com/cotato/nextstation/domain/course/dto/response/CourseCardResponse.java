@@ -18,7 +18,10 @@ public record CourseCardResponse(
                 """, example = "10")
         Long journalId,
 
-        @Schema(description = "코스 이름", example = "보문역 환승여행 코스")
+        @Schema(description = """
+                카드에 표시할 이름. 코스 이름(course.name)이 아니라 작성자가 지은 여행일지 제목(journal.title)이다
+                (2026-08-12 변경). 좋아요는 공개 코스만 대상이라 항상 값이 있다.
+                """, example = "민성이랑 떠나는 신림 느좋투어")
         String name,
 
         @Schema(description = "코스가 속한 역 ID", example = "6")
@@ -29,6 +32,12 @@ public record CourseCardResponse(
 
         @Schema(description = "카드 배지에 표시할 역의 대표 호선. 대표 호선이 없는 역이면 null",
                 nullable = true)
-        LineSummaryResponse line
+        LineSummaryResponse line,
+
+        @Schema(description = """
+                카드 배경 이미지. 작성자가 여행일지에 올린 첫 번째 사진이다.
+                아직 사진이 없으면 null이다.
+                """, nullable = true)
+        String imageUrl
 ) {
 }
