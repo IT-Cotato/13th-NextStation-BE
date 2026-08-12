@@ -131,10 +131,25 @@ class CourseLikeCommandServiceTest {
     }
 
     @Test
-    @DisplayName("공개되지 않은 코스는 본인 것이어도 좋아요할 수 없다")
+    @DisplayName("공개되지 않은 코스는 타인 것이어도 좋아요할 수 없다")
     void likeCourse_notPublic() {
-        // given: 일지가 없거나 비공개인 코스(소유자 무관)
+        // given: 타인 코스지만 일지가 없거나 비공개인 경우
         given(courseRepository.findById(1L)).willReturn(Optional.of(course(1L, 2L)));
+        given(courseRepository.existsPublicById(1L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> courseLikeCommandService.likeCourse(1L, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
+        verify(courseLikeRepository, never()).saveAndFlush(any());
+        verify(courseRepository, never()).increaseLikeCount(any());
+    }
+
+    @Test
+    @DisplayName("공개되지 않은 코스는 본인 것이어도 좋아요할 수 없다")
+    void likeCourse_notPublic_ownCourse() {
+        // given: 본인 코스지만 일지가 없거나 비공개인 경우
+        given(courseRepository.findById(1L)).willReturn(Optional.of(course(1L, 1L)));
         given(courseRepository.existsPublicById(1L)).willReturn(false);
 
         // when & then
