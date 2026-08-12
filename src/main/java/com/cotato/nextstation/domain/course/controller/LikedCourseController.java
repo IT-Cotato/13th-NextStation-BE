@@ -38,6 +38,7 @@ public class LikedCourseController {
             summary = "좋아요한 코스 목록 조회",
             description = """
                     내가 좋아요(하트)한 코스를 최근 좋아요순으로 조회한다.
+                    - 카드를 누르면 `journalId`로 여행일지 상세를 연다.
                     - 원본 코스가 삭제되거나 비공개로 바뀌면 목록에서 빠진다(좋아요는 원본 참조).
                     - 화면에 필터 칩이 없어 호선/역 필터를 받지 않는다.
                     - `nextCursor`를 그대로 `cursor`에 넣어 다음 페이지를 요청한다.

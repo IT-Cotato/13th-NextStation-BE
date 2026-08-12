@@ -150,6 +150,7 @@ public class CourseConverter {
         List<CourseCardResponse> cards = likedCourses.stream()
                 .map(liked -> new CourseCardResponse(
                         liked.getCourseId(),
+                        liked.getJournalId(),
                         liked.getName(),
                         liked.getStationId(),
                         liked.getStationName(),
