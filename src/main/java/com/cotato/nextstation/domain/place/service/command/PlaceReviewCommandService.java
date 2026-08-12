@@ -133,7 +133,7 @@ public class PlaceReviewCommandService {
         try {
             placeReviewImageSaver.save(placeReview, imageUrl);
         } catch (Exception e) {
-            log.error("장소 리뷰 이미지 저장 실패: placeReviewId={}, imageUrl={}", placeReview.getId(), imageUrl, e);
+            log.warn("장소 리뷰 이미지 저장 실패: placeReviewId={}, imageUrl={}", placeReview.getId(), imageUrl, e);
         }
     }
 
