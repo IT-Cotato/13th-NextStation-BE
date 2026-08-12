@@ -264,8 +264,16 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 꼬리의 "역"을 떼고 비교하며, 검색어 쪽도 서비스에서 같은 규칙으로 다듬어 넘긴다.
      * <p>
      * 커서(createdAt·courseId)가 null이면 첫 페이지다.
+     * <p>
+     * 카드 제목(name)은 코스 이름(course.name)이 아니라 작성자가 지은 여행일지 제목(journal.title)이다
+     * (2026-08-12 변경). 공개 코스만 조회하므로 null 걱정이 없다.
+     * ⚠️ 검색 매칭(keyword)은 여전히 c.name을 대상으로 한다 — design-decisions.md "코스 검색" 확정 사항
+     * (검색 대상: course.name + station.station_name)과 정면으로 얽혀 있어 이번 변경에서는 건드리지
+     * 않았다. 화면에 보이는 제목(journal.title)과 실제 검색 매칭 대상(course.name)이 달라지므로,
+     * "카드에 보이는 글자로 검색해도 안 걸리는" 케이스가 생길 수 있다 — 검색 대상 자체를 바꿀지는
+     * 별도 확인 필요.
      */
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -298,8 +306,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * <p>
      * 점수는 조회수·좋아요가 바뀌면 함께 변한다. 페이징 도중 순위가 흔들려 같은 코스가
      * 두 번 나오거나 빠질 수 있지만, 목록이 실시간으로 요동치는 화면이 아니라 감수한다.
+     * <p>
+     * 카드 제목(name)은 최신순과 같은 이유로 journal.title이다(2026-08-12 변경). 검색 매칭이
+     * 여전히 c.name인 것도 최신순과 동일 — 위 findExploreCoursesByLatest 주석 참고.
      */
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -333,8 +344,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * "가장 많이 담아둔 코스"라 담은 횟수, 즉 좋아요 수만 본다.
      * <p>
      * 상위 몇 개까지 보여줄지는 서비스가 정한다. 이 쿼리는 정렬만 책임진다.
+     * <p>
+     * 카드 제목(name)은 위 두 목록과 같은 이유로 journal.title이다(2026-08-12 변경).
      */
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
