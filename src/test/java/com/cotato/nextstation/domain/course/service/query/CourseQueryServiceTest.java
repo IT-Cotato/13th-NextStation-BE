@@ -338,7 +338,7 @@ class CourseQueryServiceTest {
 
         ArgumentCaptor<List<LikedCourseView>> contentCaptor = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<String> cursorCaptor = ArgumentCaptor.forClass(String.class);
-        verify(courseConverter).toLikedListResponse(contentCaptor.capture(), cursorCaptor.capture(), eq(true));
+        verify(courseConverter).toLikedListResponse(contentCaptor.capture(), any(), cursorCaptor.capture(), eq(true));
         assertThat(contentCaptor.getValue()).hasSize(2);
 
         // 다음 커서는 마지막 항목 기준(좋아요 시각 + course_like.id)으로 만들어진다
@@ -359,7 +359,7 @@ class CourseQueryServiceTest {
         courseQueryService.getLikedCourses(1L, null, 2);
 
         // then
-        verify(courseConverter).toLikedListResponse(any(), eq(null), eq(false));
+        verify(courseConverter).toLikedListResponse(any(), any(), eq(null), eq(false));
     }
 
     @Test
