@@ -62,8 +62,7 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
     // 좋아요한 코스 목록 (최근 좋아요순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
     // 좋아요는 원본 참조라 원본이 삭제되거나 비공개로 바뀌면 목록에서도 빠져야 한다.
     // Journal INNER JOIN으로 비공개·일지 없는 코스가 걸러지고, 삭제된 코스/일지는 @SQLRestriction이 처리한다.
-    // 카드 제목은 코스 이름(course.name)이 아니라 작성자가 지은 여행일지 제목(journal.title)을 쓴다
-    // (2026-08-12 변경). 좋아요는 항상 공개(=journal 존재) 코스만 대상이라 null 걱정이 없다.
+    // 카드 제목은 journal.title을 쓴다. 좋아요는 항상 공개(=journal 존재) 코스만 대상이라 null 걱정이 없다.
     // journalId는 카드 썸네일(여행일지 첫 사진)을 배치 조회하는 데 쓴다.
     // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
     // 대표 호선이 없는 역도 있을 수 있어 LEFT JOIN으로 둔다.

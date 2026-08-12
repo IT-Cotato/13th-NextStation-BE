@@ -8,10 +8,7 @@ public record PopularCourseResponse(
         @Schema(description = "코스 ID", example = "1")
         Long courseId,
 
-        @Schema(description = """
-                카드에 표시할 이름. 코스 이름(course.name)이 아니라 작성자가 지은 여행일지 제목
-                (journal.title)이다(2026-08-12 변경). 공개 코스만 노출하므로 항상 값이 있다.
-                """, example = "보문역에서 하루")
+        @Schema(description = "카드에 표시할 이름. journal.title을 사용한다.", example = "보문역에서 하루")
         String name,
 
         @Schema(description = "조회수", example = "300")

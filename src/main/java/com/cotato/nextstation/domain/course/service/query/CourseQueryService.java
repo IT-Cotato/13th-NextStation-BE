@@ -720,7 +720,7 @@ public class CourseQueryService {
     // 역별 인기 코스 상위 limit개
     // 공개된 여행일지가 있는 코스만 노출한다
     // 스탬프 페이지·둘러보기 등 다른 도메인이 Course에 직접 의존하지 않고 이 메서드를 호출한다
-    // 카드 제목은 journal.title이다(2026-08-12 변경) — 소비하는 도메인(스탬프)에 영향 있음, 공유 필요.
+    // 카드 제목은 journal.title을 쓴다 — 소비하는 도메인(스탬프)에 영향 있음, 공유 필요.
     public List<PopularCourseResponse> getPopularCoursesByStation(Long stationId, int limit) {
         return getPopularCoursesByStation(stationId, limit, null);
     }

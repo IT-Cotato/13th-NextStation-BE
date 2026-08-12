@@ -14,8 +14,7 @@ public record CourseCopyPreviewResponse(
         Long courseId,
 
         @Schema(description = """
-                이름 입력칸의 초기값. 코스 이름(course.name)이 아니라 원작성자가 지은 여행일지 제목
-                (journal.title)이다(2026-08-12 변경). 사용자가 고치지 않으면 이 값 그대로
+                이름 입력값의 초기값. 여행일지 제목을 가져온다. 사용자가 고치지 않으면 이 값 그대로
                 POST /courses/{courseId}/copy 의 name에 실어 보낸다.
                 """, example = "민성이랑 떠나는 신림 느좋투어")
         String name,
