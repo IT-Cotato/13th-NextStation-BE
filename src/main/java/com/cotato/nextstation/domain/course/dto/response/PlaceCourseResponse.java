@@ -12,7 +12,10 @@ public record PlaceCourseResponse(
         @Schema(description = "코스 ID (누르면 코스 상세로 이동)", example = "1")
         Long courseId,
 
-        @Schema(description = "코스 이름", example = "주연의 보문역 여행")
+        @Schema(description = """
+                카드에 표시할 이름. 코스 이름(course.name)이 아니라 작성자가 지은 여행일지 제목
+                (journal.title)이다(2026-08-12 변경). 공개 코스만 노출하므로 항상 값이 있다.
+                """, example = "주연의 보문역 여행")
         String name,
 
         @Schema(description = "코스가 속한 역 ID", example = "123")
