@@ -191,8 +191,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 한 번에 가져온다(코스마다 조회하면 N+1). journalId는 코스 상세 라우트가 이 값 기준으로 열려
     // 카드 이동에 필수다. imageUrl은 이 쿼리로 가져오지 않고, 서비스에서 journalId를 모아
     // JournalCardQueryService로 배치 조회한다(썸네일이 Journal 쪽 데이터라 여기서 조인하지 않는다).
+    // 카드 제목도 마찬가지로 코스 이름이 아니라 작성자가 지은 여행일지 제목(journal.title)이다
+    // (2026-08-12 변경). 공개 코스만 조회하므로 null 걱정이 없다.
     // 조회 대상 회원의 것이 아니라 요청자가 로그인만 하면 되므로 소유권 검증은 하지 않는다.
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, c.createdAt AS createdAt, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, c.createdAt AS createdAt, " +
             "c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -205,7 +207,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<MemberCourseCardView> findPublicCoursesByMemberId(@Param("memberId") Long memberId, Pageable pageable);
 
     // 다음 페이지. 생성 시각이 같을 수 있어 id를 tie-breaker로 함께 비교한다.
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, c.createdAt AS createdAt, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, c.createdAt AS createdAt, " +
             "c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
