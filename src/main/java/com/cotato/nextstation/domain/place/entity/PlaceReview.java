@@ -43,7 +43,7 @@ public class PlaceReview extends BaseTimeEntity {
     @JoinColumn(name = "journal_id", nullable = false)
     private Journal journal;
 
-    @Column
+    @Column(length = 500)
     private String review;
 
     @Column(name = "like_count", nullable = false)
