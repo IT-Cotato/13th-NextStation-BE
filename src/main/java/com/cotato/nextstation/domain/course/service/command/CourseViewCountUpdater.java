@@ -25,7 +25,7 @@ public class CourseViewCountUpdater {
     private final CourseRepository courseRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int increaseViewCount(Long courseId, Long viewerMemberId) {
+    public Integer increaseViewCount(Long courseId, Long viewerMemberId) {
         courseRepository.increaseViewCount(courseId, viewerMemberId);
         return courseRepository.findViewCountById(courseId);
     }

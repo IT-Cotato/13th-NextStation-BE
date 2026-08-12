@@ -64,7 +64,8 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
     // Journal INNER JOIN으로 비공개·일지 없는 코스가 걸러지고, 삭제된 코스/일지는 @SQLRestriction이 처리한다.
     // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
     // 대표 호선이 없는 역도 있을 수 있어 LEFT JOIN으로 둔다.
-    @Query("SELECT cs.id AS likeId, cs.createdAt AS likedAt, c.id AS courseId, c.name AS name, " +
+    @Query("SELECT cs.id AS likeId, cs.createdAt AS likedAt, " +
+            "c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CourseLike cs " +
@@ -77,7 +78,8 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
     List<LikedCourseView> findLikedCourses(@Param("memberId") Long memberId, Pageable pageable);
 
     // 다음 페이지. 정렬 기준이 좋아요 시각이라 커서도 코스 id가 아닌 course_like.id를 tie-breaker로 쓴다.
-    @Query("SELECT cs.id AS likeId, cs.createdAt AS likedAt, c.id AS courseId, c.name AS name, " +
+    @Query("SELECT cs.id AS likeId, cs.createdAt AS likedAt, " +
+            "c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CourseLike cs " +
@@ -97,6 +99,7 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
         Long getLikeId();
         LocalDateTime getLikedAt();
         Long getCourseId();
+        Long getJournalId();
         String getName();
         Long getStationId();
         String getStationName();

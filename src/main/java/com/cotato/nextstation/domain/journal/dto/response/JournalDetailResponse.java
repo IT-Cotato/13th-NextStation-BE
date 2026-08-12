@@ -27,6 +27,9 @@ public record JournalDetailResponse(
         @Schema(description = "역 이름", example = "보문역")
         String stationName,
 
+        @Schema(description = "여행일지 제목", example = "보문에서 보낸 하루")
+        String journalTitle,
+
         @Schema(description = "코스 ID. 본인 코스면 '내 코스로 만들기' 호출에 쓰지 않는다")
         Long courseId,
 
@@ -38,6 +41,9 @@ public record JournalDetailResponse(
 
         @Schema(description = "이 코스에 좋아요를 눌러 뒀는지 여부")
         boolean isLiked,
+
+        @Schema(description = "이 여행일지의 공개 범위. true면 공개, false면 비공개")
+        boolean isPublic,
 
         @Schema(description = "태그 상위 3개")
         List<String> tags,

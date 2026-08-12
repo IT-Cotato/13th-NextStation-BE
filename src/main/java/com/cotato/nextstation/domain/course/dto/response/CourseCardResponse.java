@@ -12,6 +12,12 @@ public record CourseCardResponse(
         @Schema(description = "코스 ID", example = "1")
         Long courseId,
 
+        @Schema(description = """
+                카드를 눌렀을 때 열 여행일지 ID.
+                좋아요는 공개된 여행일지가 있는 코스에만 걸 수 있어 항상 값이 있다.
+                """, example = "10")
+        Long journalId,
+
         @Schema(description = "코스 이름", example = "보문역 환승여행 코스")
         String name,
 

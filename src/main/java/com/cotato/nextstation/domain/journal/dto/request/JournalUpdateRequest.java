@@ -4,6 +4,7 @@ import com.cotato.nextstation.domain.journal.enums.ImageAction;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.place.dto.request.PlaceReviewUpdateRequest;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -39,7 +40,7 @@ public record JournalUpdateRequest(
         Boolean isPublic,
 
         List<JournalPhotoUpdateRequest> journalPhotos,
-        List<PlaceReviewUpdateRequest> placeReviews
+        List<@Valid PlaceReviewUpdateRequest> placeReviews
 ) {
     @Schema(description = "여행일지 대표 사진 수정 요청")
     public record JournalPhotoUpdateRequest(

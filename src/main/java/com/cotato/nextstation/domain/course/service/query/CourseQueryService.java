@@ -9,7 +9,8 @@ import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreLineResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
-import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseCopyPreviewResponse;
+import com.cotato.nextstation.domain.course.dto.response.CoursePlaceDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
@@ -23,7 +24,7 @@ import com.cotato.nextstation.domain.course.repository.CoursePlaceRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
-import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.CourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
@@ -38,6 +39,7 @@ import com.cotato.nextstation.domain.member.service.query.MemberExistenceQuerySe
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.place.service.query.PlaceInfoQueryService;
 import com.cotato.nextstation.domain.stamp.service.query.MemberStampQueryService;
+import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.error.GlobalErrorCode;
 import com.cotato.nextstation.global.util.CursorData;
@@ -51,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +90,14 @@ public class CourseQueryService {
 
     // 정렬 토글의 첫 항목이자 화면 진입 시 선택돼 있는 값. 토글이 없는 검색 결과도 이 정렬을 따른다.
     private static final CourseSort DEFAULT_SORT = CourseSort.POPULAR;
+
+    // 둘러보기 노선 칩으로 그리는 노선. 화면에 1~9호선 칩만 있어서 그 밖의 노선은 응답에서 뺀다.
+    // 뽑기 역 중 환승역이 경의중앙선·우이신설선에도 속해 있어, 소속 호선을 그대로 내리면
+    // 칩이 없는 노선까지 목록에 섞인다. 그 역들의 코스는 함께 속한 1~9호선 칩에서 그대로 조회된다.
+    // 뽑기 역이 다른 노선으로 늘어나면 프론트 칩과 함께 이 목록도 넓혀야 한다.
+    private static final Set<LineCode> EXPLORE_CHIP_LINE_CODES = EnumSet.of(
+            LineCode.LINE_1, LineCode.LINE_2, LineCode.LINE_3, LineCode.LINE_4, LineCode.LINE_5,
+            LineCode.LINE_6, LineCode.LINE_7, LineCode.LINE_8, LineCode.LINE_9);
 
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
@@ -272,18 +283,21 @@ public class CourseQueryService {
     }
 
     /**
-     * 둘러보기 노선 칩 목록. 코스가 붙을 수 있는 노선을 전부 내려주고, 코스가 없는 노선은
-     * {@code hasCourses = false}로 표시한다.
+     * 둘러보기 노선 칩 목록. 뽑기 역이 속한 노선 중 {@link #EXPLORE_CHIP_LINE_CODES}에 해당하는 것만
+     * 내려주고, 코스가 없는 노선은 {@code hasCourses = false}로 표시한다.
      * <p>
      * 코스 없는 노선을 아예 빼면 데이터가 쌓일 때마다 칩이 늘어나 노선도가 흔들려 보인다.
      * 저장 탭의 호선 필터와 같은 방식으로, 칩은 고정해 두고 비활성 여부만 서버가 알려준다.
+     * <p>
+     * 활성 여부는 노선 필터와 같은 기준(역이 속한 호선 전체)으로 판정한다. 칩보다 넓은 범위가
+     * 나오지만 칩에 있는 노선만 조회하므로 결과에는 영향이 없다.
      */
     public List<ExploreLineResponse> getExploreLines() {
         Set<Long> lineIdsWithCourses = courseRepository.findLinesWithPublicCourses().stream()
                 .map(LineView::getLineId)
                 .collect(Collectors.toSet());
 
-        return courseRepository.findDrawableLines().stream()
+        return courseRepository.findDrawableLines(EXPLORE_CHIP_LINE_CODES).stream()
                 .map(line -> new ExploreLineResponse(line.getLineId(), line.getLineName(), line.getLineCode(),
                         lineIdsWithCourses.contains(line.getLineId())))
                 .toList();
@@ -485,16 +499,33 @@ public class CourseQueryService {
      * 공개 조건은 걸지 않는다. 일지를 아직 안 썼거나 비공개인 코스도 본인에게는 보여야 한다.
      */
     public MyCourseDetailResponse getMyCourseDetail(Long memberId, Long courseId) {
-        MyCourseDetailView course = courseRepository.findMyCourseDetail(memberId, courseId)
+        CourseDetailView course = courseRepository.findMyCourseDetail(memberId, courseId)
                 .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
 
         List<CoursePlace> coursePlaces = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId);
         return courseConverter.toMyCourseDetailResponse(course, resolveCoursePlaces(coursePlaces));
     }
 
+    /**
+     * "내 코스로 만들기" 화면. 타인의 공개 코스를 가져오기 직전에 구성을 확인하는 단계다.
+     * <p>
+     * 여행일지 상세와 같은 코스를 보지만, 이 화면에는 사진·후기·작성자·태그가 없고
+     * 지도와 순서 목록만 있어 코스 구성만 내린다.
+     * <p>
+     * 비공개이거나 없는 코스는 404다(복제와 같은 조건). 본인 코스인지는 보지 않는다 —
+     * 조회는 부작용이 없고, 진입 자체는 프론트가 {@code isMine}으로 막는다.
+     */
+    public CourseCopyPreviewResponse getCourseCopyPreview(Long courseId) {
+        CourseDetailView course = courseRepository.findPublicCourseDetail(courseId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        List<CoursePlace> coursePlaces = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId);
+        return courseConverter.toCourseCopyPreviewResponse(course, resolveCoursePlaces(coursePlaces));
+    }
+
     // 코스에 담긴 장소를 순서대로 채운다.
     // 장소 조회 결과는 요청 순서를 보장하지 않아 id로 묶은 뒤 order_num 순으로 다시 세운다.
-    private List<MyCoursePlaceResponse> resolveCoursePlaces(List<CoursePlace> coursePlaces) {
+    private List<CoursePlaceDetailResponse> resolveCoursePlaces(List<CoursePlace> coursePlaces) {
         if (coursePlaces.isEmpty()) {
             return List.of();
         }
@@ -519,7 +550,7 @@ public class CourseQueryService {
         // 조회되지 않은 장소는 지도 핀도 못 찍고 목록에도 채울 내용이 없어 제외한다.
         return coursePlaces.stream()
                 .filter(coursePlace -> placeById.containsKey(coursePlace.getPlaceId()))
-                .map(coursePlace -> courseConverter.toMyCoursePlaceResponse(
+                .map(coursePlace -> courseConverter.toCoursePlaceDetailResponse(
                         placeById.get(coursePlace.getPlaceId()), coursePlace.getOrderNum()))
                 .toList();
     }

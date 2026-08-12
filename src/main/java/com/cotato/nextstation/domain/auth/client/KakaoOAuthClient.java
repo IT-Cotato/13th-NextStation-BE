@@ -20,6 +20,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 
 // 카카오 OAuth 서버(kauth/kapi.kakao.com)와 직접 통신하는 클라이언트: 인가코드 교환 + 사용자 정보 조회
@@ -39,11 +40,16 @@ public class KakaoOAuthClient {
     private final RestClient restClient;
     private final String clientId;
     private final String clientSecret;
-    private final String redirectUri;
+    private final List<String> redirectUris;
 
     public KakaoOAuthClient(@Value("${kakao.oauth.client-id}") String clientId,
                              @Value("${kakao.oauth.client-secret:}") String clientSecret,
-                             @Value("${kakao.oauth.redirect-uri}") String redirectUri) {
+                             @Value("${kakao.oauth.redirect-uris}") List<String> redirectUris) {
+
+        // 목록이 비면 요청마다 런타임에 터지므로 부팅 시점에 실패시킨다
+        if (redirectUris.isEmpty()) {
+            throw new IllegalStateException("kakao.oauth.redirect-uris가 비어 있습니다.");
+        }
 
         // RestClientAutoConfiguration이 RestClient.Builder 빈을 안 만들어줘서 직접 생성.
         // 기본 factory는 타임아웃이 사실상 무제한이라, 카카오 응답이 느려지면 요청 스레드가 오래 붙잡힐 수 있어 명시적으로 설정한다.
@@ -58,11 +64,14 @@ public class KakaoOAuthClient {
                 .build();
         this.clientId = clientId;
         this.clientSecret = clientSecret;
-        this.redirectUri = redirectUri;
+        this.redirectUris = List.copyOf(redirectUris);
     }
 
-    // code는 1회용/단기 만료라 재사용 시 카카오가 4xx를 반환한다
-    public KakaoTokenResponse exchangeToken(String code) {
+    // code는 1회용/단기 만료라 재사용 시 카카오가 4xx를 반환한다.
+    // redirectUri는 인가코드 발급 때 쓴 값과 완전히 동일해야 하며, 다르면 카카오가 KOE303을 반환한다.
+    public KakaoTokenResponse exchangeToken(String code, String redirectUri) {
+
+        String resolvedRedirectUri = resolveRedirectUri(redirectUri);
 
         // 카카오 토큰 엔드포인트는 JSON이 아니라 form-urlencoded로 받는다
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
@@ -74,7 +83,7 @@ public class KakaoOAuthClient {
             form.add("client_secret", clientSecret);
         }
 
-        form.add("redirect_uri", redirectUri);
+        form.add("redirect_uri", resolvedRedirectUri);
         form.add("code", code);
 
         try {
@@ -97,6 +106,21 @@ public class KakaoOAuthClient {
             log.warn("카카오 토큰 교환 중 통신 오류", e);
             throw new CustomException(GlobalErrorCode.EXTERNAL_API_ERROR);
         }
+    }
+
+    // redirectUri는 선택값이라 없으면 대표 URI로 대체한다.
+    // 값이 온 경우에는 반드시 정확히 일치하는지만 확인한다. prefix 비교로 완화하면
+    // 등록 URI로 시작하는 외부 도메인이 통과해 인가코드가 유출될 수 있다.
+    private String resolveRedirectUri(String redirectUri) {
+
+        if (redirectUri == null || redirectUri.isBlank()) {
+            return redirectUris.get(0);
+        }
+        if (!redirectUris.contains(redirectUri)) {
+            log.warn("허용목록에 없는 redirect_uri로 토큰 교환 시도: redirectUri={}", redirectUri);
+            throw new CustomException(AuthErrorCode.UNREGISTERED_REDIRECT_URI);
+        }
+        return redirectUri;
     }
 
     // 카카오 응답의 error/error_code로 "사용자 인가코드 문제(재사용·만료 등)"와 "우리 앱 설정/연동 문제"를 구분한다.

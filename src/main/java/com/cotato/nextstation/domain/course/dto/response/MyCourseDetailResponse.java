@@ -27,6 +27,6 @@ public record MyCourseDetailResponse(
         LineSummaryResponse line,
 
         @Schema(description = "코스에 담긴 장소 (순서대로)")
-        List<MyCoursePlaceResponse> places
+        List<CoursePlaceDetailResponse> places
 ) {
 }

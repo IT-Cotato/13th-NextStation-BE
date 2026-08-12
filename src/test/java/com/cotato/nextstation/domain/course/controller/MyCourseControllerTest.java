@@ -8,7 +8,7 @@ import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
-import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
+import com.cotato.nextstation.domain.course.dto.response.CoursePlaceDetailResponse;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
 import com.cotato.nextstation.global.exception.CustomException;
 import com.cotato.nextstation.global.exception.GlobalExceptionHandler;
@@ -179,9 +179,9 @@ class MyCourseControllerTest {
                 1L, "민성이랑 떠나는 느좋투어", 6L, "신림역",
                 new LineSummaryResponse(2L, "2호선", LineCode.LINE_2),
                 List.of(
-                        new MyCoursePlaceResponse(11L, "보문숲길도서관", "혼자 조용히 머물기 좋은 동네 도서관",
+                        new CoursePlaceDetailResponse(11L, "보문숲길도서관", "혼자 조용히 머물기 좋은 동네 도서관",
                                 "CULTURE", "문화공간", "https://img/1.jpg", 127.0345, 37.5804, 1),
-                        new MyCoursePlaceResponse(12L, "보문사", "천년 고찰",
+                        new CoursePlaceDetailResponse(12L, "보문사", "천년 고찰",
                                 "CULTURE", "문화공간", null, 127.0350, 37.5810, 2))));
 
         mockMvc.perform(get("/api/v1/members/me/courses/{courseId}", 1L)

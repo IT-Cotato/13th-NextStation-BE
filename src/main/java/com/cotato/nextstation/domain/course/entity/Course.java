@@ -66,6 +66,17 @@ public class Course extends BaseTimeEntity {
         this.name = name;
     }
 
+    // 여행일지를 작성하면 그 일지를 가리킨다. 둘러보기 노출 조건이 이 값을 기준으로 판정한다.
+    public void linkJournal(Long journalId) {
+        this.journalId = journalId;
+    }
+
+    // 여행일지가 삭제되면 참조를 끊는다. 일지가 사라진 코스는 둘러보기에서 빠지고
+    // "내가 만든 코스"에만 남는다 — 코스 자체는 일지와 별개로 존재한다.
+    public void unlinkJournal() {
+        this.journalId = null;
+    }
+
     // soft delete. @SQLRestriction("is_deleted = false")로 이후 조회에서 자동 제외된다.
     public void delete() {
         this.isDeleted = true;

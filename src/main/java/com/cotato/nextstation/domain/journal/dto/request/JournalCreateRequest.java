@@ -58,6 +58,7 @@ public record JournalCreateRequest(
     public record PlaceReviewRequest(
             @NotNull
             Long placeId,
+            @Size(max = 500, message = "장소 리뷰는 최대 500자까지 입력 가능합니다.")
             String review,
             String imageUrl
     ) {}

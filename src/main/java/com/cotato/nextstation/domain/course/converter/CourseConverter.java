@@ -2,6 +2,7 @@ package com.cotato.nextstation.domain.course.converter;
 
 import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCardResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseCopyPreviewResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
@@ -14,7 +15,7 @@ import com.cotato.nextstation.domain.course.dto.response.MemberCourseListRespons
 import com.cotato.nextstation.domain.course.dto.response.MyCourseCardResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
-import com.cotato.nextstation.domain.course.dto.response.MyCoursePlaceResponse;
+import com.cotato.nextstation.domain.course.dto.response.CoursePlaceDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
@@ -24,7 +25,7 @@ import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.ExploreCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.LineView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.StationView;
-import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseDetailView;
+import com.cotato.nextstation.domain.course.repository.CourseRepository.CourseDetailView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MyCourseView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
@@ -101,7 +102,7 @@ public class CourseConverter {
         );
     }
 
-    public MyCourseDetailResponse toMyCourseDetailResponse(MyCourseDetailView course, List<MyCoursePlaceResponse> places) {
+    public MyCourseDetailResponse toMyCourseDetailResponse(CourseDetailView course, List<CoursePlaceDetailResponse> places) {
         return new MyCourseDetailResponse(
                 course.getCourseId(),
                 course.getName(),
@@ -112,8 +113,20 @@ public class CourseConverter {
         );
     }
 
-    public MyCoursePlaceResponse toMyCoursePlaceResponse(PlaceInfoResponse place, int orderNum) {
-        return new MyCoursePlaceResponse(
+    public CourseCopyPreviewResponse toCourseCopyPreviewResponse(CourseDetailView course,
+                                                                 List<CoursePlaceDetailResponse> places) {
+        return new CourseCopyPreviewResponse(
+                course.getCourseId(),
+                course.getName(),
+                course.getStationId(),
+                course.getStationName(),
+                toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
+                places
+        );
+    }
+
+    public CoursePlaceDetailResponse toCoursePlaceDetailResponse(PlaceInfoResponse place, int orderNum) {
+        return new CoursePlaceDetailResponse(
                 place.placeId(),
                 place.placeName(),
                 place.description(),
@@ -137,6 +150,7 @@ public class CourseConverter {
         List<CourseCardResponse> cards = likedCourses.stream()
                 .map(liked -> new CourseCardResponse(
                         liked.getCourseId(),
+                        liked.getJournalId(),
                         liked.getName(),
                         liked.getStationId(),
                         liked.getStationName(),
