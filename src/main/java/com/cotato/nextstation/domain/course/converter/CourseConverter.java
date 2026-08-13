@@ -252,7 +252,7 @@ public class CourseConverter {
                                                      List<String> tags, String imageUrl,
                                                      TravelDuration travelDuration) {
         return new PlaceCourseResponse(
-                course.getCourseId(),
+                course.getJournalId(),
                 course.getName(),
                 course.getStationId(),
                 course.getStationName(),
