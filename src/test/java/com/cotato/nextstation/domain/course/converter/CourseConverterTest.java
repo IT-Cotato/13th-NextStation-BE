@@ -35,6 +35,7 @@ class CourseConverterTest {
     private PlaceCourseView view() {
         PlaceCourseView view = mock(PlaceCourseView.class);
         given(view.getCourseId()).willReturn(10L);
+        given(view.getJournalId()).willReturn(50L);
         given(view.getName()).willReturn("주연의 보문역 여행");
         given(view.getStationId()).willReturn(123L);
         given(view.getStationName()).willReturn("보문역");
@@ -188,7 +189,7 @@ class CourseConverterTest {
                 view(), 4, List.of("자연과함께", "사진찍기좋은"), "cover.jpg", null);
 
         // then
-        assertThat(response.courseId()).isEqualTo(10L);
+        assertThat(response.journalId()).isEqualTo(50L);
         assertThat(response.name()).isEqualTo("주연의 보문역 여행");
         assertThat(response.stationId()).isEqualTo(123L);
         assertThat(response.stationName()).isEqualTo("보문역");
