@@ -13,7 +13,10 @@ public record CourseCopyPreviewResponse(
         @Schema(description = "원본 코스 ID. 저장할 때 POST /courses/{courseId}/copy 에 그대로 쓴다", example = "7")
         Long courseId,
 
-        @Schema(description = "코스 이름. 이름 입력칸의 초기값으로 쓴다", example = "보문역 환승여행 코스")
+        @Schema(description = """
+                이름 입력값의 초기값. 여행일지 제목을 가져온다. 사용자가 고치지 않으면 이 값 그대로
+                POST /courses/{courseId}/copy 의 name에 실어 보낸다.
+                """, example = "민성이랑 떠나는 신림 느좋투어")
         String name,
 
         @Schema(description = "코스가 속한 역 ID", example = "123")

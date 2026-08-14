@@ -327,18 +327,6 @@ class CourseControllerTest {
     }
 
     @Test
-    @DisplayName("본인이 만든 코스를 좋아요하면 400을 반환한다")
-    void likeCourse_ownCourse() throws Exception {
-        willThrow(new CustomException(CourseErrorCode.CANNOT_LIKE_OWN_COURSE))
-                .given(courseLikeCommandService).likeCourse(eq(1L), eq(1L));
-
-        mockMvc.perform(post("/api/v1/courses/{courseId}/likes", 1L)
-                        .header("Authorization", "Bearer " + TOKEN))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_400_CANNOT_LIKE_OWN_COURSE"));
-    }
-
-    @Test
     @DisplayName("좋아요를 취소하면 200을 반환한다")
     void cancelCourseLike_success() throws Exception {
         mockMvc.perform(delete("/api/v1/courses/{courseId}/likes", 1L)

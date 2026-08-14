@@ -29,7 +29,7 @@ import java.util.Set;
 public class KakaoOAuthClient {
 
     private static final String TOKEN_URI = "https://kauth.kakao.com/oauth/token";
-    private static final String USER_INFO_URI = "https://kapi.kakao.com/v2/user/me";
+    private static final String USER_INFO_URI = "https://kapi.kakao.com/v2/user/me?secure_resource=true";
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);

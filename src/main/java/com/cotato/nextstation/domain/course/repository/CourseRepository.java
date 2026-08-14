@@ -37,7 +37,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // "내 코스로 만들기" 준비 화면. 위 코스 확인 화면과 같은 구성이되 대상이 타인의 공개 코스다.
     // 소유자 조건 대신 공개 조건(Journal INNER JOIN + isPublic)을 걸어, 비공개 코스는 조회되지 않는다.
     // 존재 여부와 공개 여부를 한 쿼리로 판정하므로 결과가 비면 그대로 404다.
-    @Query("SELECT c.id AS courseId, c.name AS name, " +
+    // 이름 입력칸 초기값은 journal.title을 쓴다. 이 쿼리는 항상 공개(=journal 존재) 코스만 조회하므로
+    // null 걱정이 없다. 본인 코스 확인(findMyCourseDetail)은 이 결정과 무관해 그대로 course.name을 쓴다.
+    @Query("SELECT c.id AS courseId, j.title AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
@@ -118,12 +120,15 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 공개 노출 조건: journal_id가 있고 그 여행일지가 공개인 코스만
     // Course는 journalId를 Long으로만 들고 있어 Journal을 id로 ad-hoc 조인한다
     // INNER JOIN이라 journalId가 NULL인 코스는 자동 제외된다.
-
-    @Query("SELECT c FROM Course c " +
+    // 카드 제목(name)은 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
+    // 스탬프 도메인(Part3)이 CourseQueryService.getPopularCoursesByStation을 통해
+    // 이 값을 그대로 소비한다 — 공유 필요.
+    @Query("SELECT c.id AS courseId, j.title AS name, c.viewCount AS viewCount, c.likeCount AS likeCount " +
+            "FROM Course c " +
             "JOIN Journal j ON j.id = c.journalId " +
             "WHERE c.stationId = :stationId AND j.isPublic = true " +
             "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC")
-    List<Course> findPopularPublicCoursesByStationId(@Param("stationId") Long stationId, Pageable pageable);
+    List<PopularCourseView> findPopularPublicCoursesByStationId(@Param("stationId") Long stationId, Pageable pageable);
 
     // 내가 만든 코스 목록 (최신순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
     // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
@@ -188,8 +193,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 한 번에 가져온다(코스마다 조회하면 N+1). journalId는 코스 상세 라우트가 이 값 기준으로 열려
     // 카드 이동에 필수다. imageUrl은 이 쿼리로 가져오지 않고, 서비스에서 journalId를 모아
     // JournalCardQueryService로 배치 조회한다(썸네일이 Journal 쪽 데이터라 여기서 조인하지 않는다).
+    // 카드 제목도 마찬가지로 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
     // 조회 대상 회원의 것이 아니라 요청자가 로그인만 하면 되므로 소유권 검증은 하지 않는다.
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, c.createdAt AS createdAt, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, c.createdAt AS createdAt, " +
             "c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -202,7 +208,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<MemberCourseCardView> findPublicCoursesByMemberId(@Param("memberId") Long memberId, Pageable pageable);
 
     // 다음 페이지. 생성 시각이 같을 수 있어 id를 tie-breaker로 함께 비교한다.
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, c.createdAt AS createdAt, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, c.createdAt AS createdAt, " +
             "c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -234,7 +240,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 특정 장소를 담고 있는 공개 코스를 인기순으로 조회한다 (장소 상세 화면 하단).
     // 카드에 필요한 역·대표 호선을 함께 가져온다(코스마다 조회하면 N+1).
     // 노출 조건과 인기순 공식은 위 역별 인기 코스와 같다.
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+    // 카드 제목은 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM CoursePlace cp " +
@@ -261,8 +268,15 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 꼬리의 "역"을 떼고 비교하며, 검색어 쪽도 서비스에서 같은 규칙으로 다듬어 넘긴다.
      * <p>
      * 커서(createdAt·courseId)가 null이면 첫 페이지다.
+     * <p>
+     * 카드 제목(name)은 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
+     * ⚠️ 검색 매칭(keyword)은 여전히 c.name을 대상으로 한다 — design-decisions.md "코스 검색" 확정 사항
+     * (검색 대상: course.name + station.station_name)과 정면으로 얽혀 있어 이번 변경에서는 건드리지
+     * 않았다. 화면에 보이는 제목(journal.title)과 실제 검색 매칭 대상(course.name)이 달라지므로,
+     * "카드에 보이는 글자로 검색해도 안 걸리는" 케이스가 생길 수 있다 — 검색 대상 자체를 바꿀지는
+     * 별도 확인 필요.
      */
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -295,8 +309,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * <p>
      * 점수는 조회수·좋아요가 바뀌면 함께 변한다. 페이징 도중 순위가 흔들려 같은 코스가
      * 두 번 나오거나 빠질 수 있지만, 목록이 실시간으로 요동치는 화면이 아니라 감수한다.
+     * <p>
+     * 카드 제목(name)은 최신순과 같은 이유로 journal.title을 쓴다. 검색 매칭이
+     * 여전히 c.name인 것도 최신순과 동일 — 위 findExploreCoursesByLatest 주석 참고.
      */
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -330,8 +347,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * "가장 많이 담아둔 코스"라 담은 횟수, 즉 좋아요 수만 본다.
      * <p>
      * 상위 몇 개까지 보여줄지는 서비스가 정한다. 이 쿼리는 정렬만 책임진다.
+     * <p>
+     * 카드 제목(name)은 위 두 목록과 같은 이유로 journal.title을 쓴다.
      */
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, c.name AS name, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -414,6 +433,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "AND (:lineId IS NULL OR s.drawLine.id = :lineId) " +
             "ORDER BY s.stationName")
     List<StationView> findStationsWithPublicCourses(@Param("lineId") Long lineId);
+
+    interface PopularCourseView {
+        Long getCourseId();
+        String getName();
+        int getViewCount();
+        int getLikeCount();
+    }
 
     interface ExploreCourseView {
         Long getCourseId();

@@ -73,8 +73,9 @@ class LikedCourseControllerTest {
     void getLikedCourses_success() throws Exception {
         given(courseQueryService.getLikedCourses(1L, null, null)).willReturn(
                 new LikedCourseListResponse(
-                        List.of(new CourseCardResponse(7L, 10L, "보문역 환승여행 코스", 6L, "보문역",
-                                new LineSummaryResponse(6L, "6호선", LineCode.LINE_6))),
+                        List.of(new CourseCardResponse(7L, 10L, "민성이랑 떠나는 신림 느좋투어", 6L, "보문역",
+                                new LineSummaryResponse(6L, "6호선", LineCode.LINE_6),
+                                "https://image.example.com/journal.jpg")),
                         "eyJpZCI6MjB9", true));
 
         mockMvc.perform(get("/api/v1/members/me/liked-courses").header("Authorization", "Bearer " + TOKEN))
@@ -82,11 +83,13 @@ class LikedCourseControllerTest {
                 .andExpect(jsonPath("$.data.courses[0].courseId").value(7))
                 // 카드를 누르면 이 값으로 여행일지 상세를 연다
                 .andExpect(jsonPath("$.data.courses[0].journalId").value(10))
-                .andExpect(jsonPath("$.data.courses[0].name").value("보문역 환승여행 코스"))
+                // 코스 이름(course.name)이 아니라 여행일지 제목(journal.title)이 내려간다
+                .andExpect(jsonPath("$.data.courses[0].name").value("민성이랑 떠나는 신림 느좋투어"))
                 .andExpect(jsonPath("$.data.courses[0].stationName").value("보문역"))
                 .andExpect(jsonPath("$.data.courses[0].line.id").value(6))
                 .andExpect(jsonPath("$.data.courses[0].line.name").value("6호선"))
                 .andExpect(jsonPath("$.data.courses[0].line.code").value("LINE_6"))
+                .andExpect(jsonPath("$.data.courses[0].imageUrl").value("https://image.example.com/journal.jpg"))
                 .andExpect(jsonPath("$.data.nextCursor").value("eyJpZCI6MjB9"))
                 .andExpect(jsonPath("$.data.hasNext").value(true));
     }

@@ -11,6 +11,7 @@ import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.place.dto.response.PlaceInfoResponse;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.MemberCourseCardView;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.CourseDetailView;
+import com.cotato.nextstation.domain.journal.dto.response.JournalCardInfoResponse;
 import com.cotato.nextstation.domain.journal.enums.TravelDuration;
 import com.cotato.nextstation.domain.course.repository.CourseRepository.PlaceCourseView;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
@@ -21,6 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -33,6 +35,7 @@ class CourseConverterTest {
     private PlaceCourseView view() {
         PlaceCourseView view = mock(PlaceCourseView.class);
         given(view.getCourseId()).willReturn(10L);
+        given(view.getJournalId()).willReturn(50L);
         given(view.getName()).willReturn("주연의 보문역 여행");
         given(view.getStationId()).willReturn(123L);
         given(view.getStationName()).willReturn("보문역");
@@ -186,7 +189,7 @@ class CourseConverterTest {
                 view(), 4, List.of("자연과함께", "사진찍기좋은"), "cover.jpg", null);
 
         // then
-        assertThat(response.courseId()).isEqualTo(10L);
+        assertThat(response.journalId()).isEqualTo(50L);
         assertThat(response.name()).isEqualTo("주연의 보문역 여행");
         assertThat(response.stationId()).isEqualTo(123L);
         assertThat(response.stationName()).isEqualTo("보문역");
@@ -199,26 +202,30 @@ class CourseConverterTest {
     }
 
     @Test
-    @DisplayName("좋아요한 코스 카드에 여행일지 ID를 담는다")
+    @DisplayName("좋아요한 코스 카드에 여행일지 ID·제목·대표 사진을 담는다")
     void toLikedListResponse() {
         // given
         LikedCourseView view = mock(LikedCourseView.class);
         given(view.getCourseId()).willReturn(7L);
         given(view.getJournalId()).willReturn(20L);
-        given(view.getName()).willReturn("보문역 환승여행 코스");
+        // name은 코스 이름(course.name)이 아니라 여행일지 제목(journal.title)을 그대로 받는다
+        given(view.getName()).willReturn("민성이랑 떠나는 신림 느좋투어");
         given(view.getStationId()).willReturn(6L);
         given(view.getStationName()).willReturn("보문역");
         given(view.getLineId()).willReturn(6L);
         given(view.getLineName()).willReturn("6호선");
         given(view.getLineCode()).willReturn(LineCode.LINE_6);
+        Map<Long, JournalCardInfoResponse> journalInfos = Map.of(
+                20L, new JournalCardInfoResponse(20L, "journal-cover.jpg", null));
 
         // when
-        LikedCourseListResponse response = courseConverter.toLikedListResponse(List.of(view), "cursor", true);
+        LikedCourseListResponse response = courseConverter.toLikedListResponse(
+                List.of(view), journalInfos, "cursor", true);
 
         // then: journalId가 빠지면 카드를 눌러도 여행일지 상세를 열 수 없다
         assertThat(response.courses()).containsExactly(new CourseCardResponse(
-                7L, 20L, "보문역 환승여행 코스", 6L, "보문역",
-                new LineSummaryResponse(6L, "6호선", LineCode.LINE_6)));
+                7L, 20L, "민성이랑 떠나는 신림 느좋투어", 6L, "보문역",
+                new LineSummaryResponse(6L, "6호선", LineCode.LINE_6), "journal-cover.jpg"));
     }
 
     @Test

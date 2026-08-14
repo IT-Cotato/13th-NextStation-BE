@@ -70,6 +70,10 @@ public class MemberCommandService {
     }
 
     private void scheduleOldImageDeletion(String imageUrl, Long memberId) {
+        if (!profileImageUrlValidator.isOwnS3Object(imageUrl, memberId)) {
+            log.info("외부 CDN 프로필 이미지라 S3 삭제를 건너뛴다: memberId={}", memberId);
+            return;
+        }
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             // 트랜잭션 밖에서 호출된 경우(예: 테스트)를 위한 폴백 — 정상 흐름에서는 항상 @Transactional 안이라 아래 분기를 탄다
             deleteOldImage(imageUrl, memberId);

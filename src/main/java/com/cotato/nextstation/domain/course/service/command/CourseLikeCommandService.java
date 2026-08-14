@@ -24,7 +24,7 @@ public class CourseLikeCommandService {
     private final CourseRepository courseRepository;
     private final CourseLikeRepository courseLikeRepository;
 
-    // 코스 좋아요. 좋아요는 "타인의 공개 코스"만 대상으로 한다.
+    // 코스 좋아요. 본인 코스 포함, "공개 코스"만 대상으로 한다.
     public void likeCourse(Long memberId, Long courseId) {
         validateLikeable(memberId, courseId);
 
@@ -116,14 +116,10 @@ public class CourseLikeCommandService {
 
     private void validateLikeable(Long memberId, Long courseId) {
         // 삭제된 코스는 Course의 @SQLRestriction으로 조회에서 자동 제외된다.
-        Course course = courseRepository.findById(courseId)
+        courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
 
-        if (course.getMemberId().equals(memberId)) {
-            throw new CustomException(CourseErrorCode.CANNOT_LIKE_OWN_COURSE);
-        }
-
-        // 공개되지 않은 코스는 좋아요해도 목록에 뜨지 않으므로 애초에 막는다.
+        // 공개되지 않은 코스는 좋아요해도 목록에 뜨지 않으므로 애초에 막는다. 본인 코스도 예외 없이 적용된다.
         // 남의 비공개 코스가 존재한다는 사실이 드러나지 않도록 404로 응답한다.
         if (!courseRepository.existsPublicById(courseId)) {
             log.warn("공개되지 않은 코스 좋아요 시도: memberId={}, courseId={}", memberId, courseId);
