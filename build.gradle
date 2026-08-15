@@ -15,6 +15,7 @@ java {
 
 repositories {
 	mavenCentral()
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -58,7 +59,10 @@ dependencies {
     // 닉네임 금칙어(비속어) 필터링
     implementation 'io.github.vaneproject:badwordfiltering:1.0.0'
 
-	compileOnly 'org.projectlombok:lombok'
+    // discord
+    implementation 'com.github.napstr:logback-discord-appender:1.0.0'
+
+    compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
 
