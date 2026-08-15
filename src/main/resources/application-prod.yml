@@ -6,7 +6,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: update # TODO: 운영 DB 테이블 전부 생성되면 validate로 되돌리기
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -27,6 +27,8 @@ logging:
   level:
     com.cotato.nextstation: INFO
     org.hibernate.SQL: warn
+  discord-error:
+    webhook-url: ${DISCORD_ERROR_WEBHOOK_URL}
 
 jwt:
   secret: ${JWT_SECRET}
