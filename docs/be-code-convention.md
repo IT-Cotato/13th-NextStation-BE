@@ -837,6 +837,7 @@ class MemberQueryServiceTest {
 - 설정은 `springProfile name="prod"` 안에 두어 로컬에서는 appender 자체가 생성되지 않는다.
 - 웹훅 URL은 `logging.discord-error.webhook-url`(환경변수 `DISCORD_ERROR_WEBHOOK_URL`)로 주입하고, 설정 파일에 값을 직접 적지 않는다.
 - 전송은 `AsyncAppender`로 감싸 요청 스레드를 막지 않게 하고, `ThresholdFilter`로 `ERROR`만 통과시킨다.
+- `AsyncAppender`에는 `neverBlock=true`를 명시한다. `ERROR`는 `discardingThreshold`로 버려지지 않아, 이 설정이 없으면 큐 포화 시 로그를 남긴 요청 스레드가 대기한다. 알림 유실을 감수하고 응답 지연을 막는 선택이며 원본 로그는 콘솔에 남는다.
 - 따라서 **알림이 필요한 상황은 반드시 `ERROR` 레벨로 남겨야 한다.** `warn`으로 남긴 서버 결함은 알림이 오지 않는다.
 
 ---

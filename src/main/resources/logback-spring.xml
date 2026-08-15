@@ -31,6 +31,13 @@
         <appender name="ASYNC_DISCORD" class="ch.qos.logback.classic.AsyncAppender">
             <appender-ref ref="DISCORD"/>
 
+            <!--
+                큐(기본 256) 포화 시 대기하지 않고 이벤트를 버린다.
+                ERROR는 discardingThreshold 대상이 아니라 neverBlock 없이는 요청 스레드가 블로킹된다.
+                알림 유실보다 응답 지연이 치명적이므로 유실을 택한다. 원본 로그는 콘솔에 남는다.
+            -->
+            <neverBlock>true</neverBlock>
+
             <!-- ERROR만 전송 (4xx 비즈니스 예외는 WARN이라 제외) -->
             <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
                 <level>ERROR</level>
