@@ -1,7 +1,9 @@
 package com.cotato.nextstation.domain.auth.service.command;
 
-import com.cotato.nextstation.domain.auth.dto.response.ProfileSetupResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
+import com.cotato.nextstation.domain.auth.service.AuthTokenIssuer;
+import com.cotato.nextstation.domain.auth.service.IssuedTokens;
+import com.cotato.nextstation.domain.auth.service.result.ProfileSetupResult;
 import com.cotato.nextstation.domain.auth.util.SignupTokenClaims;
 import com.cotato.nextstation.domain.member.entity.Gender;
 import com.cotato.nextstation.domain.member.entity.Member;
@@ -34,9 +36,10 @@ public class ProfileSetupCommandService {
     private final NicknameValidator nicknameValidator;
     private final ProfileImageUrlValidator profileImageUrlValidator;
     private final JwtProvider jwtProvider;
+    private final AuthTokenIssuer authTokenIssuer;
 
     @Transactional
-    public ProfileSetupResponse setupProfile(String authorizationHeader, String nickname, String profileImageUrl,
+    public ProfileSetupResult setupProfile(String authorizationHeader, String nickname, String profileImageUrl,
                                               Gender gender, LocalDate birthDate) {
         Long memberId = resolveMemberId(authorizationHeader);
 
@@ -58,7 +61,13 @@ public class ProfileSetupCommandService {
             throw new CustomException(NicknameErrorCode.DUPLICATE_NICKNAME);
         }
 
-        return new ProfileSetupResponse(member.getId(), member.getNickname(), member.getStatus());
+        // 프로필 설정이 회원가입의 마지막 단계이므로, 여기서 바로 로그인 세션을 열어 재로그인을 요구하지 않는다.
+        // signupToken 자체가 이메일 인증/카카오 인증을 통과했다는 증명이라 추가 인증 없이 발급해도 된다.
+        IssuedTokens tokens = authTokenIssuer.issue(memberId);
+
+        log.info("프로필 설정 완료 및 로그인 세션 발급: memberId={}", memberId);
+        return new ProfileSetupResult(member.getId(), member.getNickname(), member.getStatus(),
+                tokens.accessToken(), tokens.refreshToken());
     }
 
     // signupToken 파싱/검증 (purpose=SIGNUP인 JWT만 허용) 후 memberId(subject) 추출
