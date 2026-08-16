@@ -52,6 +52,8 @@ public class ProfileSetupCommandService {
             profileImageUrlValidator.validate(profileImageUrl, memberId);
         }
 
+        claimProfileCompletion(memberId);
+
         member.completeProfile(nickname, profileImageUrl, gender, birthDate);
         try {
             memberRepository.saveAndFlush(member);
@@ -101,7 +103,20 @@ public class ProfileSetupCommandService {
         return authorizationHeader.substring(BEARER_PREFIX.length()).trim();
     }
 
-    // 이미 프로필 설정을 마친 회원의 재요청 차단 (signupToken 재사용 방지 가드)
+    /**
+     * PENDING -> ACTIVE 전환을 조건부 갱신으로 선점한다. 이 전환에 성공한 요청만 프로필을 저장하고 토큰을 발급받는다.
+     * 갱신된 행이 없으면 조회 이후 다른 요청이 먼저 전환을 끝낸 것이므로 재요청과 동일하게 거부한다.
+     * 트랜잭션이 롤백되면 선점도 함께 되돌아가므로, 이후 검증 실패로 실패한 요청이 상태를 붙잡고 있지는 않는다.
+     */
+    private void claimProfileCompletion(Long memberId) {
+        if (memberRepository.activateIfPending(memberId) == 0) {
+            log.warn("동시 요청으로 이미 프로필 설정이 완료되어 상태 선점 실패: memberId={}", memberId);
+            throw new CustomException(AuthErrorCode.PROFILE_ALREADY_COMPLETED);
+        }
+    }
+
+    // 이미 프로필 설정을 마친 회원의 재요청을 쓰기 시도 전에 걸러내는 빠른 경로.
+    // 동시 요청까지 막지는 못하므로 실제 중복 방지는 claimProfileCompletion의 조건부 갱신이 담당한다.
     private void validateProfileNotAlreadyCompleted(Member member) {
         if (member.getStatus() != MemberStatus.PENDING) {
             throw new CustomException(AuthErrorCode.PROFILE_ALREADY_COMPLETED);
