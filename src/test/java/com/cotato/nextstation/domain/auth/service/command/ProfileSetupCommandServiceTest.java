@@ -31,10 +31,12 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class ProfileSetupCommandServiceTest {
@@ -94,6 +96,7 @@ class ProfileSetupCommandServiceTest {
         givenValidToken();
         Member member = pendingMember();
         given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+        given(memberRepository.activateIfPending(MEMBER_ID)).willReturn(1);
         given(authTokenIssuer.issue(MEMBER_ID)).willReturn(new IssuedTokens(ACCESS_TOKEN, REFRESH_TOKEN));
 
         // when
@@ -115,6 +118,7 @@ class ProfileSetupCommandServiceTest {
         // given
         givenValidToken();
         given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
+        given(memberRepository.activateIfPending(MEMBER_ID)).willReturn(1);
         given(authTokenIssuer.issue(MEMBER_ID)).willReturn(new IssuedTokens(ACCESS_TOKEN, REFRESH_TOKEN));
 
         // when
@@ -124,6 +128,25 @@ class ProfileSetupCommandServiceTest {
         // then
         assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
         assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
+    }
+
+    // 조회 시점엔 PENDING이었지만 그 사이 다른 요청이 전환을 끝낸 경우 - 조건부 갱신이 0행을 반환한다.
+    // 이 요청까지 통과하면 프로필이 덮어써지고 로그인 세션도 중복 발급된다.
+    @Test
+    @DisplayName("상태 전환 선점에 실패하면(동시 요청) 예외가 발생하고 토큰이 발급되지 않는다")
+    void setupProfile_concurrentRequest_losesClaim() {
+        // given
+        givenValidToken();
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(pendingMember()));
+        given(memberRepository.activateIfPending(MEMBER_ID)).willReturn(0);
+
+        // when & then
+        assertThatThrownBy(() -> profileSetupCommandService.setupProfile(
+                AUTH_HEADER, "다른닉네임", null, GENDER, BIRTH_DATE))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(AuthErrorCode.PROFILE_ALREADY_COMPLETED.getMessage());
+        then(authTokenIssuer).shouldHaveNoInteractions();
+        then(memberRepository).should(never()).saveAndFlush(any(Member.class));
     }
 
     // 프로필 설정에 실패한 요청까지 세션을 열면 PENDING 회원이 로그인 상태가 되므로, 발급 자체가 일어나지 않아야 한다.
