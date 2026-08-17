@@ -7,7 +7,7 @@ import com.cotato.nextstation.domain.auth.dto.request.PasswordResetSendRequest;
 import com.cotato.nextstation.domain.auth.dto.request.ProfileSetupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupRequest;
 import com.cotato.nextstation.domain.auth.dto.request.SignupVerificationSendRequest;
-import com.cotato.nextstation.domain.auth.dto.response.ProfileSetupResponse;
+import com.cotato.nextstation.domain.auth.service.result.ProfileSetupResult;
 import com.cotato.nextstation.domain.auth.dto.response.SignupResponse;
 import com.cotato.nextstation.domain.auth.exception.AuthErrorCode;
 import com.cotato.nextstation.domain.auth.exception.TermsErrorCode;
@@ -216,12 +216,13 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("정상 요청이면 200과 프로필 설정 결과를 반환한다")
+    @DisplayName("정상 요청이면 200과 프로필 설정 결과·accessToken을 반환하고 refreshToken을 쿠키로 내려준다")
     void setupProfile_success() throws Exception {
         ProfileSetupRequest request = profileSetupRequest("환승러");
-        ProfileSetupResponse response = new ProfileSetupResponse(1L, "환승러", MemberStatus.ACTIVE);
         given(profileSetupCommandService.setupProfile(SIGNUP_TOKEN_HEADER, "환승러", null, Gender.MALE, LocalDate.of(2001, 1, 1)))
-                .willReturn(response);
+                .willReturn(new ProfileSetupResult(1L, "환승러", MemberStatus.ACTIVE, "access-token", "refresh-token"));
+        given(refreshTokenCookieFactory.create("refresh-token"))
+                .willReturn(ResponseCookie.from("refreshToken", "refresh-token").httpOnly(true).build());
 
         mockMvc.perform(post("/api/v1/auth/profile")
                         .header("Authorization", SIGNUP_TOKEN_HEADER)
@@ -231,7 +232,10 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.memberId").value(1L))
                 .andExpect(jsonPath("$.data.nickname").value("환승러"))
-                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.accessToken").value("access-token"))
+                .andExpect(cookie().value("refreshToken", "refresh-token"))
+                .andExpect(cookie().httpOnly("refreshToken", true));
     }
 
     @Test

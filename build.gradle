@@ -15,6 +15,7 @@ java {
 
 repositories {
 	mavenCentral()
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -58,7 +59,10 @@ dependencies {
     // 닉네임 금칙어(비속어) 필터링
     implementation 'io.github.vaneproject:badwordfiltering:1.0.0'
 
-	compileOnly 'org.projectlombok:lombok'
+    // discord
+    implementation 'com.github.napstr:logback-discord-appender:1.0.0'
+
+    compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
 
@@ -91,9 +95,10 @@ tasks.named('test') {
 
 tasks.register('placeGeocodingBatch', JavaExec) {
 	group = 'application'
-	description = '1차 수집 장소 데이터를 카카오 API로 보강하는 1회성 배치 (KAKAO_REST_API_KEY, PLACE_SHEET_CSV_URL 필요)'
+	description = '수집 장소 데이터를 카카오 API로 보강하는 1회성 배치 (KAKAO_REST_API_KEY, PLACE_SHEET_CSV_URL, PLACE_SPREADSHEET_ID 필요)'
 	mainClass = 'com.cotato.nextstation.domain.place.batch.PlaceGeocodingBatch'
 	classpath = sourceSets.main.runtimeClasspath
+	environment dotenv()
 }
 
 tasks.register('placeImageFetchBatch', JavaExec) {
