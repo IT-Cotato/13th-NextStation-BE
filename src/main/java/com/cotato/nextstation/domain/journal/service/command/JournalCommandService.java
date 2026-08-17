@@ -145,7 +145,12 @@ public class JournalCommandService {
 
                     }
                     case UPDATE -> {
-                        // 새 이미지 추가 (photoId 없음)
+                        // 새 이미지 추가 (photoId 없음). imageUrl이 없으면 DB NOT NULL 제약에 그대로
+                        // 부딪혀 500이 나므로, PlaceReviewCommandService.updatePlaceReviews와 같은
+                        // 방식으로 여기서 먼저 400을 던진다.
+                        if (photo.imageUrl() == null) {
+                            throw new CustomException(JournalErrorCode.INVALID_JOURNAL_PHOTO);
+                        }
                         journalImageRepository.save(
                                 JournalImage.builder()
                                         .journal(journal)

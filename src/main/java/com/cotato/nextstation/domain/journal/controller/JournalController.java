@@ -77,8 +77,7 @@ public class JournalController {
                       넣으면 404(JOURNAL_IMAGE_NOT_FOUND)
                     - `imageAction: UPDATE` — photoId 없이 imageUrl만 넣으면 새 사진으로 추가된다(교체가 아니라 추가).
                       기존 사진을 바꾸고 싶으면 기존 photoId를 DELETE로 넣고, 새 imageUrl을 UPDATE로 따로 추가해야 한다.
-                      ⚠️ imageUrl을 누락해도 400으로 막히지 않는다 — DB 제약조건 위반으로 500이 날 수 있으니
-                      반드시 imageUrl을 채워서 보낼 것
+                      imageUrl 누락 시 400(INVALID_JOURNAL_PHOTO)
                     - 대표 사진(첫 번째로 노출되는 사진)은 별도 플래그가 아니라 "가장 먼저 저장된(id가 가장 작은) 사진"으로
                       자동 결정된다. 특정 사진을 대표로 지정하는 기능은 없다.
 
@@ -100,10 +99,10 @@ public class JournalController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
-            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 또는 placeReviews UPDATE인데 imageUrl 누락(INVALID_PLACE_REVIEW_IMAGE)"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, journalPhotos UPDATE인데 imageUrl 누락(INVALID_JOURNAL_PHOTO), "
+                    + "또는 placeReviews UPDATE인데 imageUrl 누락(INVALID_PLACE_REVIEW_IMAGE)"),
             @ApiResponse(responseCode = "403", description = "본인 일지가 아님"),
             @ApiResponse(responseCode = "404", description = "존재하지 않는 여행일지, 존재하지 않는 사진(photoId), 또는 이 일지에 없는 장소 리뷰"),
-            @ApiResponse(responseCode = "500", description = "journalPhotos UPDATE인데 imageUrl 누락 시 발생 가능(앱 레벨 검증 없음, 알려진 이슈)"),
     })
     @SecurityRequirement(name = "accessTokenAuth")
     @PatchMapping("/journals/{journalId}")
