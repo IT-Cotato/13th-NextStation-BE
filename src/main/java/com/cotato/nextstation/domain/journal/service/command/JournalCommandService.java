@@ -46,7 +46,7 @@ public class JournalCommandService {
 
     // 여행일지 작성
     public Long createJournal(Long memberId, JournalCreateRequest request) {
-        // memberStamp 소유권 검증 (반환값은 아래에서 코스에 일지를 연결하는 데 쓴다)
+        // memberStamp 소유권 검증 + courseId 확보 (장소 리뷰의 코스 소속 검증, 코스에 일지 연결하는 데 사용)
         Long courseId = memberStampQueryService.getCourseId(memberId, request.memberStampId());
 
         Member member = memberRepository.getReferenceById(memberId);
@@ -101,7 +101,7 @@ public class JournalCommandService {
                                 .toList();
 
 
-        placeReviewCommandService.createPlaceReviews(journal, reviewRequests);
+        placeReviewCommandService.createPlaceReviews(journal, courseId, reviewRequests);
 
         // 코스에 이 일지를 연결한다. 둘러보기·검색·좋아요·"내 코스로 만들기"가
         // course.journal_id로 공개 여부를 판정하므로, 연결하지 않으면 공개로 써도 어디에도 노출되지 않는다.
