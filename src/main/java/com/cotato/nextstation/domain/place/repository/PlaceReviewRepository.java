@@ -18,12 +18,18 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     String HAS_CONTENT = "((pr.review IS NOT NULL AND TRIM(pr.review) <> '') " +
             "OR EXISTS (SELECT 1 FROM PlaceReviewImage pri WHERE pri.placeReview = pr))";
 
+    // 작성자가 탈퇴(WITHDRAWN)한 리뷰는 노출하지 않는다. 탈퇴는 soft delete라 리뷰 행 자체는
+    // 남아 있지만, 재가입 시 과거 리뷰가 다시 노출되는 걸 막기 위해 조회 시점에 걸러낸다.
+    // m을 JOIN FETCH pr.journal j / JOIN FETCH j.member m으로 이미 로드하는 쿼리에서만 쓸 수 있다.
+    String NOT_WITHDRAWN = "m.status <> com.cotato.nextstation.domain.member.entity.MemberStatus.WITHDRAWN";
+
     // 장소 상세 조회 - 공개(삭제되지 않은 journal) 기준 리뷰 목록 조회
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
+            "AND " + NOT_WITHDRAWN + " " +
             "ORDER BY pr.createdAt DESC")
     List<PlaceReview> findVisibleReviewsByPlaceId(@Param("placeId") Long placeId, Pageable pageable);
 
@@ -44,6 +50,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
+            "AND " + NOT_WITHDRAWN + " " +
             "ORDER BY pr.createdAt DESC, pr.id DESC")
     List<PlaceReview> findByPlaceIdOrderByLatest(@Param("placeId") Long placeId, Pageable pageable);
 
@@ -53,6 +60,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
+            "AND " + NOT_WITHDRAWN + " " +
             "AND (pr.createdAt < :createdAt OR (pr.createdAt = :createdAt AND pr.id < :reviewId)) " +
             "ORDER BY pr.createdAt DESC, pr.id DESC")
     List<PlaceReview> findByPlaceIdOrderByLatestAfterCursor(
@@ -67,6 +75,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
+            "AND " + NOT_WITHDRAWN + " " +
             "ORDER BY pr.likeCount DESC, pr.id DESC")
     List<PlaceReview> findByPlaceIdOrderByRecommend(@Param("placeId") Long placeId, Pageable pageable);
 
@@ -76,6 +85,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
             "JOIN FETCH j.member m " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
+            "AND " + NOT_WITHDRAWN + " " +
             "AND (pr.likeCount < :likeCount OR (pr.likeCount = :likeCount AND pr.id < :reviewId)) " +
             "ORDER BY pr.likeCount DESC, pr.id DESC")
     List<PlaceReview> findByPlaceIdOrderByRecommendAfterCursor(
@@ -92,9 +102,11 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     // (리스트 조회 쿼리들은 JOIN FETCH pr.journal이라 엔티티를 실제로 로드하므로 이 문제가 없다)
     @Query("SELECT COUNT(pr) FROM PlaceReview pr " +
             "JOIN pr.journal j " +
+            "JOIN j.member m " +
             "WHERE pr.place.id = :placeId " +
             "AND j.isDeleted = false " +
-            "AND " + HAS_CONTENT)
+            "AND " + HAS_CONTENT + " " +
+            "AND " + NOT_WITHDRAWN)
     long countByPlaceId(@Param("placeId") Long placeId);
 
     // 여행일지에 연결된 장소 리뷰 리스트
