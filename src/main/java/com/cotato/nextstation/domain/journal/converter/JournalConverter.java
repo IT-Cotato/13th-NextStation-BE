@@ -8,6 +8,7 @@ import com.cotato.nextstation.domain.journal.dto.response.MyJournalListResponse;
 import com.cotato.nextstation.domain.journal.dto.response.MyJournalResponse;
 import com.cotato.nextstation.domain.journal.dto.response.UncompletedJournalListResponse;
 import com.cotato.nextstation.domain.journal.entity.Journal;
+import com.cotato.nextstation.domain.journal.entity.JournalImage;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.CourseSnapshotView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.MyJournalCardView;
 import com.cotato.nextstation.domain.journal.repository.JournalRepository.UncompletedCourseCardView;
@@ -121,7 +122,7 @@ public class JournalConverter {
             boolean isMine,
             boolean isLiked,
             List<String> tags,
-            List<String> imageUrls,
+            List<JournalImage> journalImages,
             List<CoursePlaceInfoResponse> coursePlaces,
             Map<Long, PlaceInfoResponse> placeInfoMap,
             Map<Long, PlaceReview> reviewByPlaceId,
@@ -133,6 +134,12 @@ public class JournalConverter {
 
         List<JournalDetailResponse.VisitedPlaceResponse> visitedPlaces =
                 toVisitedPlaceResponses(coursePlaces, placeInfoMap, reviewByPlaceId, imageUrlByReviewId);
+
+        // PATCH 요청(journalPhotos[].photoId)에서 KEEP/DELETE 대상을 특정할 수 있도록
+        // imageUrl뿐 아니라 photoId도 함께 내려준다.
+        List<JournalDetailResponse.JournalPhotoResponse> photos = journalImages.stream()
+                .map(image -> new JournalDetailResponse.JournalPhotoResponse(image.getId(), image.getImageUrl()))
+                .toList();
 
         return new JournalDetailResponse(
                 journal.getMember().getId(),
@@ -151,7 +158,7 @@ public class JournalConverter {
                 journal.getTravelDuration(),
                 viewCount,
                 courseSnapshot.getLikeCount(),
-                imageUrls,
+                photos,
                 journal.getOverallReview(),
                 visitedPlaces
         );

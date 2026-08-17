@@ -268,11 +268,9 @@ public class JournalQueryService {
         // 8. placeIds → 태그 상위 3개
         List<String> tags = placeInfoQueryService.getTopTagNames(placeIds);
 
-        // 9. journalId → 대표 사진 + 서브 사진
-        List<String> imageUrls = journalImageRepository.findByJournalIdOrderByIdAsc(journalId)
-                .stream()
-                .map(JournalImage::getImageUrl)
-                .toList();
+        // 9. journalId → 대표 사진 + 서브 사진. PATCH 수정 시 journalPhotos[].photoId로 KEEP/DELETE
+        // 대상을 특정해야 해서, imageUrl만 뽑지 않고 엔티티(id 포함)를 그대로 컨버터에 넘긴다.
+        List<JournalImage> journalImages = journalImageRepository.findByJournalIdOrderByIdAsc(journalId);
 
         // 10. journalId → 장소 리뷰 + 리뷰 이미지
         List<PlaceReview> placeReviews = placeReviewRepository.findByJournalId(journalId);
@@ -299,7 +297,7 @@ public class JournalQueryService {
         int viewCount = updatedViewCount != null ? updatedViewCount : courseSnapshot.getViewCount();
 
         return journalConverter.toJournalDetailResponse(
-                journal, line, stationName, courseSnapshot, viewCount, isOwner, isLiked, tags, imageUrls,
+                journal, line, stationName, courseSnapshot, viewCount, isOwner, isLiked, tags, journalImages,
                 coursePlaces, placeInfoMap, reviewByPlaceId, imageUrlByReviewId);
     }
 
