@@ -189,6 +189,7 @@ class MyCourseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.courseId").value(1))
                 .andExpect(jsonPath("$.data.name").value("민성이랑 떠나는 느좋투어"))
+                .andExpect(jsonPath("$.data.shareToken").value("share-token-1"))
                 .andExpect(jsonPath("$.data.line.code").value("LINE_2"))
                 .andExpect(jsonPath("$.data.stationName").value("신림역"))
                 // 지도 핀을 찍으려면 좌표가 반드시 실려야 한다

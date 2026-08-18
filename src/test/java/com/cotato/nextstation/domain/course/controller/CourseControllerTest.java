@@ -93,6 +93,7 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.status").value(201))
                 .andExpect(jsonPath("$.data.courseId").value(1))
                 .andExpect(jsonPath("$.data.name").value("보문역 코스"))
+                .andExpect(jsonPath("$.data.shareToken").value("token-1"))
                 .andExpect(jsonPath("$.data.createdAt").exists());
     }
 
@@ -111,7 +112,8 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.status").value(201))
                 // 응답의 courseId는 원본(9)이 아니라 새로 만들어진 코스(10)여야 한다
                 .andExpect(jsonPath("$.data.courseId").value(10))
-                .andExpect(jsonPath("$.data.name").value("내 보문역 코스"));
+                .andExpect(jsonPath("$.data.name").value("내 보문역 코스"))
+                .andExpect(jsonPath("$.data.shareToken").value("token-10"));
     }
 
     @Test
