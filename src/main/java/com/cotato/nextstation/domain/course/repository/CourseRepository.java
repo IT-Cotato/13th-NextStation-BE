@@ -54,7 +54,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     // 공유 링크로 조회하는 화면. 소유자/공개 여부를 따지지 않는다.
     // courseId 대신 추측 불가능한 shareToken으로 조회해, 링크를 모르는 사람은 다른 사람의
-    // 코스를 ID만 바꿔가며 열람할 수 없다(2026-08-19, courseId 완전공개안에서 변경).
+    // 코스를 ID만 바꿔가며 열람할 수 없다.
     // 삭제된 코스는 Course의 @SQLRestriction으로 자동 제외된다.
     @Query("SELECT c.id AS courseId, c.name AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +

@@ -531,7 +531,7 @@ public class CourseQueryService {
 
     /**
      * 공유 링크로 들어왔을 때의 코스 확인 화면. {@code MyCourseDetailResponse}와 같은 화면 구성이지만
-     * 소유자·로그인 여부를 따지지 않는다(2026-08-19 확정). 대신 courseId가 아닌 추측 불가능한
+     * 소유자·로그인 여부를 따지지 않는다. 대신 courseId가 아닌 추측 불가능한
      * shareToken으로만 조회해, 다른 사람이 courseId를 바꿔가며 남의 코스를 열람할 수 없게 한다.
      */
     public CourseShareResponse getCourseShareDetail(String shareToken) {

@@ -40,7 +40,7 @@ public class Course extends BaseTimeEntity {
     private String name;
 
     // 공유 링크 전용 식별자. courseId(순차 숫자)를 그대로 노출하면 다른 사람의 코스를
-    // ID만 바꿔가며 열람할 수 있어(2026-08-19), 추측 불가능한 별도 값을 발급해 링크에 쓴다.
+    // ID만 바꿔가며 열람할 수 있어, 추측 불가능한 별도 값을 발급해 링크에 쓴다.
     @Column(name = "share_token", nullable = false, unique = true, length = 36)
     private String shareToken;
 
