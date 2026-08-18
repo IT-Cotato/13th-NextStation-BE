@@ -24,7 +24,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // Course는 stationId만 들고 있어(연관관계 미매핑) Station을 id로 ad-hoc 조인한다.
     // 화면 상단 "Next Station" 배지가 호선에 따라 달라져서 대표 호선까지 함께 가져온다.
     // 뽑기 대상이 아닌 역은 대표 호선이 없을 수 있어 LEFT JOIN으로 둔다(목록 카드와 같은 기준).
-    @Query("SELECT c.id AS courseId, c.name AS name, " +
+    // shareToken은 이 화면의 공유하기 버튼이 링크를 만드는 데 쓴다.
+    // CourseDetailView를 함께 쓰는 다른 두 쿼리(findPublicCourseDetail/findShareCourseDetail)는
+    // 이 필드를 선택하지 않는다 — 그쪽 컨버터는 getShareToken()을 호출하지 않아 문제되지 않는다.
+    @Query("SELECT c.id AS courseId, c.name AS name, c.shareToken AS shareToken, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
@@ -48,6 +51,20 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "LEFT JOIN s.drawLine l " +
             "WHERE c.id = :courseId AND j.isPublic = true")
     Optional<CourseDetailView> findPublicCourseDetail(@Param("courseId") Long courseId);
+
+    // 공유 링크로 조회하는 화면. 소유자/공개 여부를 따지지 않는다.
+    // courseId 대신 추측 불가능한 shareToken으로 조회해, 링크를 모르는 사람은 다른 사람의
+    // 코스를 ID만 바꿔가며 열람할 수 없다(2026-08-19, courseId 완전공개안에서 변경).
+    // 삭제된 코스는 Course의 @SQLRestriction으로 자동 제외된다.
+    @Query("SELECT c.id AS courseId, c.name AS name, " +
+            "s.id AS stationId, s.stationName AS stationName, " +
+            "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
+            "FROM Course c " +
+            "JOIN Station s ON s.id = c.stationId " +
+            "LEFT JOIN s.drawLine l " +
+            "WHERE c.shareToken = :shareToken")
+    Optional<CourseDetailView> findShareCourseDetail(@Param("shareToken") String shareToken);
+
     // 여행일지 삭제 시 참조를 끊을 코스를 찾는다.
     // 일지는 삭제되면서 member_stamp_id를 비우므로(재작성 허용), 그 뒤에는 일지에서 코스를
     // 역산할 수 없다. 그래서 삭제 시점에 journalId로 직접 찾아야 한다.
@@ -458,6 +475,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     interface CourseDetailView {
         Long getCourseId();
         String getName();
+        // findMyCourseDetail만 이 필드를 채운다. 다른 쿼리(findPublicCourseDetail/findShareCourseDetail)를
+        // 쓰는 컨버터는 getShareToken()을 호출하지 않으므로 비어 있어도 문제없다.
+        String getShareToken();
         Long getStationId();
         String getStationName();
         Long getLineId();

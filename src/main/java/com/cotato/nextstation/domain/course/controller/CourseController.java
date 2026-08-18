@@ -5,6 +5,7 @@ import com.cotato.nextstation.domain.course.dto.request.CourseCreateRequest;
 import com.cotato.nextstation.domain.course.dto.request.CourseUpdateRequest;
 import com.cotato.nextstation.domain.course.dto.response.CourseCopyPreviewResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseShareResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
 import com.cotato.nextstation.domain.course.service.query.CourseQueryService;
@@ -131,6 +132,31 @@ public class CourseController {
             @Parameter(description = "가져올 원본 코스 ID", example = "1")
             @PathVariable Long courseId) {
         return CommonResponse.success(courseQueryService.getCourseCopyPreview(courseId));
+    }
+
+    @Operation(
+            summary = "공유 링크로 코스 확인",
+            description = """
+                    OS 공유 시트로 전달된 링크를 열었을 때의 코스 확인 화면(지도 + 코스 순서)이다.
+                    - 인증이 필요 없다. 소유자인지도 따지지 않는다.
+                    - courseId가 아닌 shareToken으로 조회한다. 코스 생성 응답(`CourseCreateResponse.shareToken`)과
+                      내가 만든 코스 확인 응답(`MyCourseDetailResponse.shareToken`)에서 얻은 값을 그대로 쓴다.
+                      courseId는 순차 숫자라 그대로 노출하면 다른 사람의 코스를 ID만 바꿔가며 열람할 수 있어
+                      막았다.
+                    - 여행일지·공개 여부와 무관하게 조회된다. 여행 전(일지 없음) 코스도 공유할 수 있어야 하기 때문이다.
+                    - 응답에 회원 식별 정보(작성자, 조회수, 좋아요 수)는 없다.
+                    - 삭제된 코스는 조회되지 않는다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "404", description = "존재하지 않는 코스 (`CourseErrorCode.COURSE_NOT_FOUND`)"),
+    })
+    @GetMapping("/share/{shareToken}")
+    public CommonResponse<CourseShareResponse> getCourseShareDetail(
+            @Parameter(description = "공유 링크 토큰", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+            @PathVariable String shareToken) {
+        return CommonResponse.success(courseQueryService.getCourseShareDetail(shareToken));
     }
 
     @Operation(
