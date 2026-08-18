@@ -149,8 +149,11 @@ public class PlaceReviewCommandService {
                         return new CustomException(PlaceErrorCode.PLACE_REVIEW_NOT_FOUND);
                     });
 
-            // 텍스트는 항상 반영
-            placeReview.update(request.review());
+            // review가 null이면 유지(사진만 바꾸는 요청을 위해 기존 텍스트를 다시 채워 보낼 필요가 없게 함),
+            // 빈 문자열("")을 명시적으로 보내면 텍스트를 비운다.
+            if (request.review() != null) {
+                placeReview.update(request.review());
+            }
 
             // imageAction null이면 KEEP으로 간주
             ImageAction action = request.imageAction() != null
