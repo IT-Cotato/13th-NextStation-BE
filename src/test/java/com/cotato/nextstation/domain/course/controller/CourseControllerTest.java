@@ -1,3 +1,4 @@
+
 package com.cotato.nextstation.domain.course.controller;
 
 import com.cotato.nextstation.domain.course.dto.request.CourseCopyRequest;
@@ -132,9 +133,9 @@ class CourseControllerTest {
     }
 
     @Test
-    @DisplayName("코스 이름이 20자를 넘으면 검증 오류로 400을 반환한다")
+    @DisplayName("코스 이름이 100자를 넘으면 검증 오류로 400을 반환한다")
     void copyCourse_nameTooLong() throws Exception {
-        CourseCopyRequest request = new CourseCopyRequest("가".repeat(21), null);
+        CourseCopyRequest request = new CourseCopyRequest("가".repeat(101), null);
 
         mockMvc.perform(post("/api/v1/courses/{courseId}/copy", 9L)
                         .header("Authorization", "Bearer " + TOKEN)
@@ -258,9 +259,9 @@ class CourseControllerTest {
     }
 
     @Test
-    @DisplayName("코스 이름이 20자를 초과하면 400을 반환한다")
+    @DisplayName("코스 이름이 100자를 초과하면 400을 반환한다")
     void updateCourse_nameTooLong() throws Exception {
-        String tooLongName = "가".repeat(21);
+        String tooLongName = "가".repeat(101);
 
         mockMvc.perform(patch("/api/v1/courses/{courseId}", 1L)
                         .header("Authorization", "Bearer " + TOKEN)
