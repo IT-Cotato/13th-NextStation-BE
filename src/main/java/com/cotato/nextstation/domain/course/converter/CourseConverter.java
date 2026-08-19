@@ -7,6 +7,7 @@ import com.cotato.nextstation.domain.course.dto.response.CourseCreateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseInfoResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceInfoResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseShareResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreStationResponse;
 import com.cotato.nextstation.domain.course.dto.response.ExploreCourseResponse;
@@ -85,7 +86,7 @@ public class CourseConverter {
     }
 
     public CourseCreateResponse toCreateResponse(Course course) {
-        return new CourseCreateResponse(course.getId(), course.getName(), course.getCreatedAt());
+        return new CourseCreateResponse(course.getId(), course.getName(), course.getShareToken(), course.getCreatedAt());
     }
 
     public CourseUpdateResponse toUpdateResponse(Course course) {
@@ -109,6 +110,7 @@ public class CourseConverter {
         return new MyCourseDetailResponse(
                 course.getCourseId(),
                 course.getName(),
+                course.getShareToken(),
                 course.getStationId(),
                 course.getStationName(),
                 toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
@@ -119,6 +121,17 @@ public class CourseConverter {
     public CourseCopyPreviewResponse toCourseCopyPreviewResponse(CourseDetailView course,
                                                                  List<CoursePlaceDetailResponse> places) {
         return new CourseCopyPreviewResponse(
+                course.getCourseId(),
+                course.getName(),
+                course.getStationId(),
+                course.getStationName(),
+                toLine(course.getLineId(), course.getLineName(), course.getLineCode()),
+                places
+        );
+    }
+
+    public CourseShareResponse toCourseShareResponse(CourseDetailView course, List<CoursePlaceDetailResponse> places) {
+        return new CourseShareResponse(
                 course.getCourseId(),
                 course.getName(),
                 course.getStationId(),

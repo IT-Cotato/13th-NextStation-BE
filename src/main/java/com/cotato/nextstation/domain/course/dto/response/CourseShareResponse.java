@@ -5,18 +5,16 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(description = "내가 만든 코스 확인 화면 응답 (지도 + 코스 순서)")
-public record MyCourseDetailResponse(
+// OS 공유 시트로 전달된 링크를 열었을 때 보여주는 화면. 소유자가 아니어도, 로그인하지 않아도 볼 수 있다.
+// "내가 만든 코스 확인"(MyCourseDetailResponse)과 같은 구성이되, 그쪽은 본인 전용이라 별도로 둔다.
+@Schema(description = "공유 링크로 조회하는 코스 확인 화면 응답 (지도 + 코스 순서)")
+public record CourseShareResponse(
 
         @Schema(description = "코스 ID", example = "1")
         Long courseId,
 
         @Schema(description = "코스 이름", example = "민성이랑 떠나는 느좋투어")
         String name,
-
-        @Schema(description = "공유 링크 조회용 토큰. `GET /api/v1/courses/share/{shareToken}`에 쓴다",
-                example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
-        String shareToken,
 
         @Schema(description = "코스가 속한 역 ID", example = "6")
         Long stationId,

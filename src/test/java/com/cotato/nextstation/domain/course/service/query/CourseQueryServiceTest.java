@@ -1126,6 +1126,35 @@ class CourseQueryServiceTest {
     }
 
     @Test
+    @DisplayName("공유 링크로 코스 확인은 소유자·공개 여부를 따지지 않고 shareToken으로만 조회한다")
+    void getCourseShareDetail_success() {
+        // given
+        CourseDetailView view = mock(CourseDetailView.class);
+        given(view.getCourseId()).willReturn(7L);
+        given(courseRepository.findShareCourseDetail("share-token-7")).willReturn(Optional.of(view));
+        given(coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(7L)).willReturn(List.of());
+
+        // when
+        courseQueryService.getCourseShareDetail("share-token-7");
+
+        // then: 소유자 조건도, 공개(journal) 조건도 없이 shareToken만으로 조회한다 (courseId는 노출되지 않는다)
+        verify(courseRepository).findShareCourseDetail("share-token-7");
+        verify(courseConverter).toCourseShareResponse(view, List.of());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 토큰으로 공유 링크를 조회하면 예외가 발생한다")
+    void getCourseShareDetail_notFound() {
+        // given
+        given(courseRepository.findShareCourseDetail("invalid-token")).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> courseQueryService.getCourseShareDetail("invalid-token"))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(CourseErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
+
+    @Test
     @DisplayName("코스 확인은 장소 조회 결과 순서와 무관하게 order_num 순으로 채운다")
     void getMyCourseDetail_ordersPlacesByOrderNum() {
         // given: 코스 순서는 20 -> 10 인데 장소 조회는 10 -> 20 으로 돌려준다

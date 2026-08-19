@@ -11,6 +11,7 @@ import com.cotato.nextstation.domain.course.dto.response.MyCourseDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.MyCourseListResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseCopyPreviewResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceDetailResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseShareResponse;
 import com.cotato.nextstation.domain.course.dto.response.PlaceCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.PopularCourseResponse;
 import com.cotato.nextstation.domain.course.dto.response.LikedCourseListResponse;
@@ -526,6 +527,19 @@ public class CourseQueryService {
 
         List<CoursePlace> coursePlaces = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(courseId);
         return courseConverter.toCourseCopyPreviewResponse(course, resolveCoursePlaces(coursePlaces));
+    }
+
+    /**
+     * 공유 링크로 들어왔을 때의 코스 확인 화면. {@code MyCourseDetailResponse}와 같은 화면 구성이지만
+     * 소유자·로그인 여부를 따지지 않는다. 대신 courseId가 아닌 추측 불가능한
+     * shareToken으로만 조회해, 다른 사람이 courseId를 바꿔가며 남의 코스를 열람할 수 없게 한다.
+     */
+    public CourseShareResponse getCourseShareDetail(String shareToken) {
+        CourseDetailView course = courseRepository.findShareCourseDetail(shareToken)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        List<CoursePlace> coursePlaces = coursePlaceRepository.findByCourseIdOrderByOrderNumAsc(course.getCourseId());
+        return courseConverter.toCourseShareResponse(course, resolveCoursePlaces(coursePlaces));
     }
 
     // 코스에 담긴 장소를 순서대로 채운다.

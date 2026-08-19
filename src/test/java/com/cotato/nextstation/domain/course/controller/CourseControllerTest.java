@@ -8,6 +8,7 @@ import com.cotato.nextstation.domain.station.entity.LineCode;
 import com.cotato.nextstation.domain.station.dto.response.LineSummaryResponse;
 import com.cotato.nextstation.domain.course.dto.response.CoursePlaceDetailResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseCopyPreviewResponse;
+import com.cotato.nextstation.domain.course.dto.response.CourseShareResponse;
 import com.cotato.nextstation.domain.course.dto.response.CourseUpdateResponse;
 import com.cotato.nextstation.domain.course.exception.CourseErrorCode;
 import com.cotato.nextstation.domain.course.service.command.CourseCommandService;
@@ -82,7 +83,7 @@ class CourseControllerTest {
     void createCourse_created() throws Exception {
         CourseCreateRequest request = new CourseCreateRequest("보문역 코스", 1L, List.of(1L, 2L, 3L));
         given(courseCommandService.createCourse(eq(1L), any()))
-                .willReturn(new CourseCreateResponse(1L, "보문역 코스", LocalDateTime.now()));
+                .willReturn(new CourseCreateResponse(1L, "보문역 코스", "token-1", LocalDateTime.now()));
 
         mockMvc.perform(post("/api/v1/courses")
                         .header("Authorization", "Bearer " + TOKEN)
@@ -92,6 +93,7 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.status").value(201))
                 .andExpect(jsonPath("$.data.courseId").value(1))
                 .andExpect(jsonPath("$.data.name").value("보문역 코스"))
+                .andExpect(jsonPath("$.data.shareToken").value("token-1"))
                 .andExpect(jsonPath("$.data.createdAt").exists());
     }
 
@@ -100,7 +102,7 @@ class CourseControllerTest {
     void copyCourse_created() throws Exception {
         CourseCopyRequest request = new CourseCopyRequest("내 보문역 코스", List.of(3L, 1L, 2L));
         given(courseCommandService.copyCourse(eq(1L), eq(9L), any()))
-                .willReturn(new CourseCreateResponse(10L, "내 보문역 코스", LocalDateTime.now()));
+                .willReturn(new CourseCreateResponse(10L, "내 보문역 코스", "token-10", LocalDateTime.now()));
 
         mockMvc.perform(post("/api/v1/courses/{courseId}/copy", 9L)
                         .header("Authorization", "Bearer " + TOKEN)
@@ -110,7 +112,8 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.status").value(201))
                 // 응답의 courseId는 원본(9)이 아니라 새로 만들어진 코스(10)여야 한다
                 .andExpect(jsonPath("$.data.courseId").value(10))
-                .andExpect(jsonPath("$.data.name").value("내 보문역 코스"));
+                .andExpect(jsonPath("$.data.name").value("내 보문역 코스"))
+                .andExpect(jsonPath("$.data.shareToken").value("token-10"));
     }
 
     @Test
@@ -389,6 +392,36 @@ class CourseControllerTest {
 
         mockMvc.perform(get("/api/v1/courses/{courseId}/copy-preview", 7L)
                         .header("Authorization", "Bearer " + TOKEN))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("공유 링크로 코스 확인은 인증 없이도 200과 코스 구성을 반환한다")
+    void getCourseShareDetail_success_withoutAuth() throws Exception {
+        given(courseQueryService.getCourseShareDetail("share-token-7")).willReturn(
+                new CourseShareResponse(7L, "민성이랑 떠나는 느좋투어", 123L, "보문역",
+                        new LineSummaryResponse(6L, "6호선", LineCode.LINE_6),
+                        List.of(new CoursePlaceDetailResponse(11L, "보문숲길도서관",
+                                "혼자 조용히 머물기 좋은 동네 도서관", "CULTURE", "문화공간",
+                                null, 127.0345, 37.5804, 1))));
+
+        mockMvc.perform(get("/api/v1/courses/share/{shareToken}", "share-token-7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.courseId").value(7))
+                .andExpect(jsonPath("$.data.name").value("민성이랑 떠나는 느좋투어"))
+                .andExpect(jsonPath("$.data.stationName").value("보문역"))
+                .andExpect(jsonPath("$.data.line.code").value("LINE_6"))
+                .andExpect(jsonPath("$.data.places[0].orderNum").value(1));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 토큰으로 공유 링크를 조회하면 404를 반환한다")
+    void getCourseShareDetail_notFound() throws Exception {
+        given(courseQueryService.getCourseShareDetail("invalid-token"))
+                .willThrow(new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/courses/share/{shareToken}", "invalid-token"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_ERROR_404_COURSE_NOT_FOUND"));
     }
