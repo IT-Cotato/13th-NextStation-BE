@@ -133,7 +133,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                              @Param("courseIds") Collection<Long> courseIds);
 
     // 역별 인기 공개 코스 조회
-    // 인기순 = view_count + like_count*2, 동률이면 최신순으로 2차 정렬
+    // 인기순 = view_count + like_count*2, 동률이면 최신순(j.createdAt, 여행일지 작성 시점)으로 2차 정렬
+    // (2026-08-21: c.createdAt(코스 저장 시점) → j.createdAt으로 변경. findMostLikedCourses와 같은 이유)
     // 공개 노출 조건: journal_id가 있고 그 여행일지가 공개인 코스만
     // Course는 journalId를 Long으로만 들고 있어 Journal을 id로 ad-hoc 조인한다
     // INNER JOIN이라 journalId가 NULL인 코스는 자동 제외된다.
@@ -144,7 +145,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "FROM Course c " +
             "JOIN Journal j ON j.id = c.journalId " +
             "WHERE c.stationId = :stationId AND j.isPublic = true " +
-            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC")
+            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, j.createdAt DESC")
     List<PopularCourseView> findPopularPublicCoursesByStationId(@Param("stationId") Long stationId, Pageable pageable);
 
     // 내가 만든 코스 목록 (최신순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
@@ -286,6 +287,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * <p>
      * 커서(createdAt·courseId)가 null이면 첫 페이지다.
      * <p>
+     * 커서·정렬 기준의 createdAt은 c.createdAt(코스 저장 시점)이 아니라 j.createdAt(여행일지 작성
+     * 시점)이다(2026-08-21 확정) — 코스는 일지 없이 먼저 생성될 수 있어(design-decisions.md 참고)
+     * 코스 저장 시점 기준이면 한참 뒤에 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
+     * <p>
      * 카드 제목(name)은 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
      * ⚠️ 검색 매칭(keyword)은 여전히 c.name을 대상으로 한다 — design-decisions.md "코스 검색" 확정 사항
      * (검색 대상: course.name + station.station_name)과 정면으로 얽혀 있어 이번 변경에서는 건드리지
@@ -294,7 +299,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 별도 확인 필요.
      */
     @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
-            "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
+            "j.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
@@ -307,9 +312,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "AND (:conceptTourId IS NULL OR c.conceptTourId = :conceptTourId) " +
             "AND (:keyword IS NULL OR c.name LIKE CONCAT('%', :keyword, '%') ESCAPE '!' " +
             "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%') ESCAPE '!') " +
-                        "AND (:createdAt IS NULL OR c.createdAt < :createdAt " +
-            "     OR (c.createdAt = :createdAt AND c.id < :courseId)) " +
-            "ORDER BY c.createdAt DESC, c.id DESC")
+                        "AND (:createdAt IS NULL OR j.createdAt < :createdAt " +
+            "     OR (j.createdAt = :createdAt AND c.id < :courseId)) " +
+            "ORDER BY j.createdAt DESC, c.id DESC")
     List<ExploreCourseView> findExploreCoursesByLatest(@Param("lineId") Long lineId,
                                                        @Param("stationId") Long stationId,
                                                        @Param("keyword") String keyword,
@@ -329,9 +334,12 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * <p>
      * 카드 제목(name)은 최신순과 같은 이유로 journal.title을 쓴다. 검색 매칭이
      * 여전히 c.name인 것도 최신순과 동일 — 위 findExploreCoursesByLatest 주석 참고.
+     * <p>
+     * 동률 tie-break의 createdAt도 최신순과 같은 이유로 j.createdAt(여행일지 작성 시점)이다
+     * (2026-08-21 확정) — findMostLikedCourses 주석 참고.
      */
     @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
-            "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
+            "j.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
@@ -346,8 +354,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "     OR TRIM(TRAILING '역' FROM s.stationName) LIKE CONCAT('%', :keyword, '%') ESCAPE '!') " +
                         "AND (:score IS NULL OR (c.viewCount + c.likeCount * 2) < :score " +
             "     OR ((c.viewCount + c.likeCount * 2) = :score " +
-            "         AND (c.createdAt < :createdAt OR (c.createdAt = :createdAt AND c.id < :courseId)))) " +
-            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC, c.id DESC")
+            "         AND (j.createdAt < :createdAt OR (j.createdAt = :createdAt AND c.id < :courseId)))) " +
+            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, j.createdAt DESC, c.id DESC")
     List<ExploreCourseView> findExploreCoursesByPopular(@Param("lineId") Long lineId,
                                                         @Param("stationId") Long stationId,
                                                         @Param("keyword") String keyword,
@@ -364,12 +372,16 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * "가장 많이 담아둔 코스"라 담은 횟수, 즉 좋아요 수를 1차로 본다.
      * 조회수를 2차 정렬로 반영(2026-08-21 확정) — 좋아요 수가 같으면 더 많이 본(검증된) 코스를 우선한다.
      * <p>
+     * 최신순 tie-break는 c.createdAt(코스 저장 시점)이 아니라 j.createdAt(여행일지 작성 시점)이다
+     * (2026-08-21 확정) — 코스는 일지 없이 먼저 생성될 수 있어(design-decisions.md 참고) 코스 저장
+     * 시점 기준이면 실제로는 한참 뒤에 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
+     * <p>
      * 상위 몇 개까지 보여줄지는 서비스가 정한다. 이 쿼리는 정렬만 책임진다.
      * <p>
      * 카드 제목(name)은 위 두 목록과 같은 이유로 journal.title을 쓴다.
      */
     @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
-            "c.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
+            "j.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
@@ -377,7 +389,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE j.isPublic = true " +
-            "ORDER BY c.likeCount DESC, c.viewCount DESC, c.createdAt DESC, c.id DESC")
+            "ORDER BY c.likeCount DESC, c.viewCount DESC, j.createdAt DESC, c.id DESC")
     List<ExploreCourseView> findMostLikedCourses(Pageable pageable);
 
     /**
