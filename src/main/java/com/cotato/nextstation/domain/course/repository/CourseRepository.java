@@ -358,10 +358,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                                                         Pageable pageable);
 
     /**
-     * 사람들이 많이 찾는 코스 - 좋아요 수 내림차순, 동률이면 최신순.
+     * 사람들이 많이 찾는 코스 - 좋아요 수 내림차순, 동률이면 조회수 내림차순, 그마저 동률이면 최신순.
      * <p>
      * 둘러보기 목록의 "인기순"(조회수 + 좋아요 × 2)과는 다른 기준이다. 화면 부제가
-     * "가장 많이 담아둔 코스"라 담은 횟수, 즉 좋아요 수만 본다.
+     * "가장 많이 담아둔 코스"라 담은 횟수, 즉 좋아요 수를 1차로 본다.
+     * 조회수를 2차 정렬로 반영(2026-08-21 확정) — 좋아요 수가 같으면 더 많이 본(검증된) 코스를 우선한다.
      * <p>
      * 상위 몇 개까지 보여줄지는 서비스가 정한다. 이 쿼리는 정렬만 책임진다.
      * <p>
@@ -376,7 +377,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE j.isPublic = true " +
-            "ORDER BY c.likeCount DESC, c.createdAt DESC, c.id DESC")
+            "ORDER BY c.likeCount DESC, c.viewCount DESC, c.createdAt DESC, c.id DESC")
     List<ExploreCourseView> findMostLikedCourses(Pageable pageable);
 
     /**
