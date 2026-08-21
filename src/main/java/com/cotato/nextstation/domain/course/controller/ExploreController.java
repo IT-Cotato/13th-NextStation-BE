@@ -119,7 +119,7 @@ public class ExploreController {
     @Operation(
             summary = "사람들이 많이 찾는 코스 조회",
             description = """
-                    둘러보기의 "사람들이 많이 찾는 코스"다. 좋아요 수가 많은 순으로, 동률이면 최신순이다.
+                    둘러보기의 "사람들이 많이 찾는 코스"다. 좋아요 수 내림차순, 동률이면 조회수 내림차순, 그마저 동률이면 최신순이다.
                     - **상위 30개까지만** 보여준다. 30번째를 넘어가면 `hasNext`가 false다.
                     - 둘러보기 목록(`GET /api/v1/explore/courses`)의 `sort=POPULAR`(조회수 + 좋아요×2)와는
                       **다른 기준**이다. 여기는 담은 횟수(좋아요 수)만 본다.
