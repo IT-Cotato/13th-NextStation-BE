@@ -134,13 +134,14 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     // 역별 인기 공개 코스 조회
     // 인기순 = view_count + like_count*2, 동률이면 최신순(j.createdAt, 여행일지 작성 시점)으로 2차 정렬
-    // (2026-08-21: c.createdAt(코스 저장 시점) → j.createdAt으로 변경. findMostLikedCourses와 같은 이유)
+    // 코스는 일지 없이 먼저 생성될 수 있어 최신순 기준은 코스 저장 시점(c.createdAt)이 아니라
+    // 여행일지 작성 시점(j.createdAt)으로 잡는다.
     // 공개 노출 조건: journal_id가 있고 그 여행일지가 공개인 코스만
     // Course는 journalId를 Long으로만 들고 있어 Journal을 id로 ad-hoc 조인한다
     // INNER JOIN이라 journalId가 NULL인 코스는 자동 제외된다.
     // 카드 제목(name)은 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
-    // 스탬프 도메인(Part3)이 CourseQueryService.getPopularCoursesByStation을 통해
-    // 이 값을 그대로 소비한다 — 공유 필요.
+    // 스탬프 도메인이 CourseQueryService.getPopularCoursesByStation을 통해
+    // 이 값을 그대로 소비한다 — 정렬 기준을 바꿀 때 함께 공유해야 한다.
     @Query("SELECT c.id AS courseId, j.title AS name, c.viewCount AS viewCount, c.likeCount AS likeCount " +
             "FROM Course c " +
             "JOIN Journal j ON j.id = c.journalId " +
@@ -213,7 +214,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // JournalCardQueryService로 배치 조회한다(썸네일이 Journal 쪽 데이터라 여기서 조인하지 않는다).
     // 카드 제목도 마찬가지로 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
     // 조회 대상 회원의 것이 아니라 요청자가 로그인만 하면 되므로 소유권 검증은 하지 않는다.
-    // 최신순 기준은 j.createdAt(여행일지 작성 시점)이다(2026-08-21 확정) — findMostLikedCourses 주석 참고.
+    // 최신순 기준은 코스 저장 시점(c.createdAt)이 아니라 여행일지 작성 시점(j.createdAt)이다 —
+    // 코스는 일지 없이 먼저 생성될 수 있어 저장 시점 기준이면 한참 뒤에 일지를 쓴 코스가
+    // 방금 저장만 해둔 코스보다 순위에서 밀릴 수 있다.
     @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, j.createdAt AS createdAt, " +
             "c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
@@ -260,7 +263,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 카드에 필요한 역·대표 호선을 함께 가져온다(코스마다 조회하면 N+1).
     // 노출 조건과 인기순 공식은 위 역별 인기 코스와 같다.
     // 카드 제목은 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
-    // 동률 tie-break는 j.createdAt(여행일지 작성 시점)이다(2026-08-21 확정) — findMostLikedCourses 주석 참고.
+    // 동률 tie-break도 코스 저장 시점(c.createdAt)이 아니라 여행일지 작성 시점(j.createdAt)이다 —
+    // 코스는 일지 없이 먼저 생성될 수 있어 저장 시점 기준이면 한참 뒤에 일지를 쓴 코스가
+    // 방금 저장만 해둔 코스보다 순위에서 밀릴 수 있다.
     @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -290,8 +295,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 커서(createdAt·courseId)가 null이면 첫 페이지다.
      * <p>
      * 커서·정렬 기준의 createdAt은 c.createdAt(코스 저장 시점)이 아니라 j.createdAt(여행일지 작성
-     * 시점)이다(2026-08-21 확정) — 코스는 일지 없이 먼저 생성될 수 있어(design-decisions.md 참고)
-     * 코스 저장 시점 기준이면 한참 뒤에 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
+     * 시점)이다 — 코스는 일지 없이 먼저 생성될 수 있어(design-decisions.md 참고) 코스 저장 시점
+     * 기준이면 한참 뒤에 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
      * <p>
      * 카드 제목(name)은 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
      * ⚠️ 검색 매칭(keyword)은 여전히 c.name을 대상으로 한다 — design-decisions.md "코스 검색" 확정 사항
@@ -337,8 +342,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 카드 제목(name)은 최신순과 같은 이유로 journal.title을 쓴다. 검색 매칭이
      * 여전히 c.name인 것도 최신순과 동일 — 위 findExploreCoursesByLatest 주석 참고.
      * <p>
-     * 동률 tie-break의 createdAt도 최신순과 같은 이유로 j.createdAt(여행일지 작성 시점)이다
-     * (2026-08-21 확정) — findMostLikedCourses 주석 참고.
+     * 동률 tie-break의 createdAt도 최신순과 같은 이유로 j.createdAt(여행일지 작성 시점)이다.
      */
     @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "j.createdAt AS createdAt, c.viewCount AS viewCount, c.likeCount AS likeCount, " +
@@ -372,11 +376,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * <p>
      * 둘러보기 목록의 "인기순"(조회수 + 좋아요 × 2)과는 다른 기준이다. 화면 부제가
      * "가장 많이 담아둔 코스"라 담은 횟수, 즉 좋아요 수를 1차로 본다.
-     * 조회수를 2차 정렬로 반영(2026-08-21 확정) — 좋아요 수가 같으면 더 많이 본(검증된) 코스를 우선한다.
+     * 조회수를 2차 정렬로 반영한다 — 좋아요 수가 같으면 더 많이 본(검증된) 코스를 우선한다.
      * <p>
-     * 최신순 tie-break는 c.createdAt(코스 저장 시점)이 아니라 j.createdAt(여행일지 작성 시점)이다
-     * (2026-08-21 확정) — 코스는 일지 없이 먼저 생성될 수 있어(design-decisions.md 참고) 코스 저장
-     * 시점 기준이면 실제로는 한참 뒤에 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
+     * 최신순 tie-break는 c.createdAt(코스 저장 시점)이 아니라 j.createdAt(여행일지 작성 시점)이다 —
+     * 코스는 일지 없이 먼저 생성될 수 있어(design-decisions.md 참고) 코스 저장 시점 기준이면
+     * 실제로는 한참 뒤에 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
      * <p>
      * 상위 몇 개까지 보여줄지는 서비스가 정한다. 이 쿼리는 정렬만 책임진다.
      * <p>
