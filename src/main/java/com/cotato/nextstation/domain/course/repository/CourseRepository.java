@@ -213,7 +213,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // JournalCardQueryService로 배치 조회한다(썸네일이 Journal 쪽 데이터라 여기서 조인하지 않는다).
     // 카드 제목도 마찬가지로 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
     // 조회 대상 회원의 것이 아니라 요청자가 로그인만 하면 되므로 소유권 검증은 하지 않는다.
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, c.createdAt AS createdAt, " +
+    // 최신순 기준은 j.createdAt(여행일지 작성 시점)이다(2026-08-21 확정) — findMostLikedCourses 주석 참고.
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, j.createdAt AS createdAt, " +
             "c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -222,11 +223,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE c.memberId = :memberId AND j.isPublic = true " +
-            "ORDER BY c.createdAt DESC, c.id DESC")
+            "ORDER BY j.createdAt DESC, c.id DESC")
     List<MemberCourseCardView> findPublicCoursesByMemberId(@Param("memberId") Long memberId, Pageable pageable);
 
     // 다음 페이지. 생성 시각이 같을 수 있어 id를 tie-breaker로 함께 비교한다.
-    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, c.createdAt AS createdAt, " +
+    @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, j.createdAt AS createdAt, " +
             "c.likeCount AS likeCount, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -235,8 +236,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE c.memberId = :memberId AND j.isPublic = true " +
-            "AND (c.createdAt < :createdAt OR (c.createdAt = :createdAt AND c.id < :courseId)) " +
-            "ORDER BY c.createdAt DESC, c.id DESC")
+            "AND (j.createdAt < :createdAt OR (j.createdAt = :createdAt AND c.id < :courseId)) " +
+            "ORDER BY j.createdAt DESC, c.id DESC")
     List<MemberCourseCardView> findPublicCoursesByMemberIdAfterCursor(@Param("memberId") Long memberId,
                                                                @Param("createdAt") LocalDateTime createdAt,
                                                                @Param("courseId") Long courseId,
@@ -259,6 +260,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // 카드에 필요한 역·대표 호선을 함께 가져온다(코스마다 조회하면 N+1).
     // 노출 조건과 인기순 공식은 위 역별 인기 코스와 같다.
     // 카드 제목은 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
+    // 동률 tie-break는 j.createdAt(여행일지 작성 시점)이다(2026-08-21 확정) — findMostLikedCourses 주석 참고.
     @Query("SELECT c.id AS courseId, c.journalId AS journalId, j.title AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
@@ -268,7 +270,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "JOIN Station s ON s.id = c.stationId " +
             "LEFT JOIN s.drawLine l " +
             "WHERE cp.placeId = :placeId AND j.isPublic = true " +
-            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, c.createdAt DESC, c.id DESC")
+            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, j.createdAt DESC, c.id DESC")
     List<PlaceCourseView> findPopularPublicCoursesByPlaceId(@Param("placeId") Long placeId, Pageable pageable);
 
     /**
