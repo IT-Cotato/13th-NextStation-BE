@@ -295,8 +295,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 커서(createdAt·courseId)가 null이면 첫 페이지다.
      * <p>
      * 커서·정렬 기준의 createdAt은 c.createdAt(코스 저장 시점)이 아니라 j.createdAt(여행일지 작성
-     * 시점)이다 — 코스는 일지 없이 먼저 생성될 수 있어(design-decisions.md 참고) 코스 저장 시점
-     * 기준이면 한참 뒤에 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
+     * 시점)이다 — 코스는 일지 없이 먼저 생성될 수 있어 코스 저장 시점 기준이면 한참 뒤에
+     * 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
      * <p>
      * 카드 제목(name)은 journal.title을 쓴다. 공개 코스만 조회하므로 null 걱정이 없다.
      * ⚠️ 검색 매칭(keyword)은 여전히 c.name을 대상으로 한다 — design-decisions.md "코스 검색" 확정 사항
@@ -379,8 +379,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      * 조회수를 2차 정렬로 반영한다 — 좋아요 수가 같으면 더 많이 본(검증된) 코스를 우선한다.
      * <p>
      * 최신순 tie-break는 c.createdAt(코스 저장 시점)이 아니라 j.createdAt(여행일지 작성 시점)이다 —
-     * 코스는 일지 없이 먼저 생성될 수 있어(design-decisions.md 참고) 코스 저장 시점 기준이면
-     * 실제로는 한참 뒤에 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
+     * 코스는 일지 없이 먼저 생성될 수 있어 코스 저장 시점 기준이면 실제로는 한참 뒤에
+     * 일지를 쓴 코스가 방금 저장만 해둔 코스보다 밀릴 수 있다.
      * <p>
      * 상위 몇 개까지 보여줄지는 서비스가 정한다. 이 쿼리는 정렬만 책임진다.
      * <p>
