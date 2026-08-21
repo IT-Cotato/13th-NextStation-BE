@@ -146,7 +146,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "FROM Course c " +
             "JOIN Journal j ON j.id = c.journalId " +
             "WHERE c.stationId = :stationId AND j.isPublic = true " +
-            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, j.createdAt DESC")
+            "ORDER BY (c.viewCount + c.likeCount * 2) DESC, j.createdAt DESC, c.id DESC")
     List<PopularCourseView> findPopularPublicCoursesByStationId(@Param("stationId") Long stationId, Pageable pageable);
 
     // 내가 만든 코스 목록 (최신순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
