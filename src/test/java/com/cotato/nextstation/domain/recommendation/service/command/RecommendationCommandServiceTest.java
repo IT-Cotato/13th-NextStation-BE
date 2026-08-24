@@ -131,6 +131,8 @@ class RecommendationCommandServiceTest {
         assertThat(captor.getValue().getResultStationId()).isEqualTo(2L);
         assertThat(captor.getValue().getMemberId()).isEqualTo(memberId);
         assertThat(captor.getValue().isRandom()).isTrue();
+        assertThat(captor.getValue().getDepartureStationId()).isNull();
+        assertThat(captor.getValue().getTravelStyles()).isNull();
     }
 
     @Test
@@ -432,6 +434,30 @@ class RecommendationCommandServiceTest {
         // then
         verify(stationRouteRepository).findReachable(1L, 30);
         verify(stationRouteRepository, never()).findAllFromDeparture(any());
+    }
+
+    @Test
+    @DisplayName("맞춤추천 로그에 선택 조건(출발역·이동시간·태그)이 함께 기록된다")
+    void recommendCustom_recordsSelectedConditions() {
+        // given: 태그는 선택 순서와 무관하게 정렬되어 저장되는지 보려고 역순으로 넣는다
+        List<String> unsortedStyles = List.of("NATURE", "BUDGET");
+        givenDeparture(1L);
+        List<ReachableStationView> routes = List.of(reachableView(2L, 20));
+        given(stationRouteRepository.findReachable(1L, 60)).willReturn(routes);
+        given(stationRepository.findAllById(any())).willReturn(List.of(station(2L, "B역")));
+        given(stationTagCountReader.getPlaceCountsByStationForTags(unsortedStyles)).willReturn(Map.of());
+
+        // when
+        recommendationCommandService.recommendCustom(1L, customRequest(1L, TravelTime.ONE_HOUR, unsortedStyles));
+
+        // then
+        ArgumentCaptor<RecommendationLog> captor = ArgumentCaptor.forClass(RecommendationLog.class);
+        verify(recommendationLogRepository).save(captor.capture());
+        RecommendationLog saved = captor.getValue();
+        assertThat(saved.isRandom()).isFalse();
+        assertThat(saved.getDepartureStationId()).isEqualTo(1L);
+        assertThat(saved.getTravelTime()).isEqualTo(TravelTime.ONE_HOUR);
+        assertThat(saved.getTravelStyles()).isEqualTo("BUDGET,NATURE");
     }
 
     @Test
