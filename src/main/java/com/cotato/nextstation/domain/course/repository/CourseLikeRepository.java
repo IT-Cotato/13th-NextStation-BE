@@ -16,6 +16,12 @@ import java.util.List;
 
 public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
 
+    // 좋아요는 원본 코스를 참조만 할 뿐 복제하지 않는다. 코스 작성자가 탈퇴(WITHDRAWN)하면
+    // 좋아요 목록에서도 그 코스를 빼야 한다 — 그대로 두면 탈퇴한 회원의 코스가 좋아요 탭에
+    // 계속 노출된다. Course는 memberId만 들고 있어(연관관계 미매핑) Member를 id로
+    // ad-hoc 조인해야 쓸 수 있다 (별칭 mem, "JOIN Member mem ON mem.id = c.memberId").
+    String NOT_WITHDRAWN_OWNER = "mem.status <> com.cotato.nextstation.domain.member.entity.MemberStatus.WITHDRAWN";
+
     boolean existsByMemberIdAndCourseId(Long memberId, Long courseId);
 
     // 여러 코스의 좋아요 여부를 한 번에 조회
@@ -56,7 +62,8 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
     @Query("SELECT c.id FROM CourseLike cs " +
             "JOIN Course c ON c.id = cs.courseId " +
             "JOIN Journal j ON j.id = c.journalId " +
-            "WHERE cs.memberId = :memberId AND j.isPublic = true")
+            "JOIN Member mem ON mem.id = c.memberId " +
+            "WHERE cs.memberId = :memberId AND j.isPublic = true AND " + NOT_WITHDRAWN_OWNER)
     List<Long> findVisibleLikedCourseIds(@Param("memberId") Long memberId);
 
     // 좋아요한 코스 목록 (최근 좋아요순). 카드에 필요한 역/대표 호선까지 한 번에 가져온다(코스마다 조회하면 N+1).
@@ -74,8 +81,9 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
             "JOIN Course c ON c.id = cs.courseId " +
             "JOIN Journal j ON j.id = c.journalId " +
             "JOIN Station s ON s.id = c.stationId " +
+            "JOIN Member mem ON mem.id = c.memberId " +
             "LEFT JOIN s.drawLine l " +
-            "WHERE cs.memberId = :memberId AND j.isPublic = true " +
+            "WHERE cs.memberId = :memberId AND j.isPublic = true AND " + NOT_WITHDRAWN_OWNER + " " +
             "ORDER BY cs.createdAt DESC, cs.id DESC")
     List<LikedCourseView> findLikedCourses(@Param("memberId") Long memberId, Pageable pageable);
 
@@ -88,8 +96,9 @@ public interface CourseLikeRepository extends JpaRepository<CourseLike, Long> {
             "JOIN Course c ON c.id = cs.courseId " +
             "JOIN Journal j ON j.id = c.journalId " +
             "JOIN Station s ON s.id = c.stationId " +
+            "JOIN Member mem ON mem.id = c.memberId " +
             "LEFT JOIN s.drawLine l " +
-            "WHERE cs.memberId = :memberId AND j.isPublic = true " +
+            "WHERE cs.memberId = :memberId AND j.isPublic = true AND " + NOT_WITHDRAWN_OWNER + " " +
             "AND (cs.createdAt < :likedAt OR (cs.createdAt = :likedAt AND cs.id < :likeId)) " +
             "ORDER BY cs.createdAt DESC, cs.id DESC")
     List<LikedCourseView> findLikedCoursesAfterCursor(@Param("memberId") Long memberId,
