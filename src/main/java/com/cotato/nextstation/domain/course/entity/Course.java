@@ -36,7 +36,7 @@ public class Course extends BaseTimeEntity {
     @Column(name = "concept_tour_id")
     private Long conceptTourId;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 100)
     private String name;
 
     // 공유 링크 전용 식별자. courseId(순차 숫자)를 그대로 노출하면 다른 사람의 코스를

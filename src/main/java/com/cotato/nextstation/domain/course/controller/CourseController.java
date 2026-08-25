@@ -49,7 +49,7 @@ public class CourseController {
             description = """
                     선택한 장소들로 코스를 생성한다.
                     - 장소는 카테고리 무관 3개 이상 10개 이하, 같은 장소 중복 선택 불가
-                    - 코스 이름은 최대 20자
+                    - 코스 이름은 최대 100자
                     - placeIds 순서대로 order_num이 부여된다
                     - journalId는 여행일지 작성 시, conceptTourId는 관리자 큐레이션으로 추후 채워진다
                     - stationId는 뽑기 대상 역(`is_drawable=true`)만 허용된다
@@ -164,7 +164,7 @@ public class CourseController {
             description = """
                     본인이 만든 코스의 이름·장소 순서를 수정한다. name/placeIds는 각각 선택 사항이며,
                     요청에 있는 필드만 반영한다(둘 다 생략하면 400).
-                    - name: 최대 20자, 공백 불가
+                    - name: 최대 100자, 공백 불가
                     - placeIds: 코스의 기존 장소 구성과 정확히 일치해야 한다(개수·구성 모두). 배열 순서대로 order_num이 재할당된다.
                     - 한 트랜잭션으로 처리되어, 장소 순서 검증에 실패하면 이름 변경도 함께 롤백된다.
                     """
@@ -173,7 +173,7 @@ public class CourseController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "400", description = """
-                    이름·장소 순서 모두 생략, 이름이 공백이거나 20자 초과, 장소가 3개 미만/10개 초과
+                    이름·장소 순서 모두 생략, 이름이 공백이거나 100자 초과, 장소가 3개 미만/10개 초과
                     (`GlobalErrorCode.VALIDATION_ERROR`), 장소 목록이 기존 코스 구성과 불일치
                     (`CourseErrorCode.INVALID_COURSE_PLACES`) 또는 같은 장소 중복 (`CourseErrorCode.DUPLICATE_COURSE_PLACES`)"""),
             @ApiResponse(responseCode = "401", description = "accessToken 누락, 위변조, 또는 만료 (`GlobalErrorCode.UNAUTHORIZED`, `GlobalErrorCode.INVALID_TOKEN`, `GlobalErrorCode.EXPIRED_TOKEN`)"),
