@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.member.service.command;
 
+import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.image.service.command.ImageCommandService;
 import com.cotato.nextstation.domain.member.converter.MemberConverter;
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
@@ -10,6 +11,7 @@ import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.domain.member.util.NicknameValidator;
 import com.cotato.nextstation.domain.member.util.ProfileImageUrlValidator;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,8 @@ public class MemberCommandService {
     private final MemberConverter memberConverter;
     private final NicknameValidator nicknameValidator;
     private final ProfileImageUrlValidator profileImageUrlValidator;
+    private final CourseRepository courseRepository;
+    private final PlaceReviewRepository placeReviewRepository;
     private final ImageCommandService imageCommandService;
 
     // nickname/profileImageUrl 중 요청에 넘어온 필드만 부분 수정한다 (null이면 미변경, profileImageUrl은 빈 문자열이면 제거)
@@ -125,6 +129,14 @@ public class MemberCommandService {
 
         MemberStatus previousStatus = member.getStatus();
         member.withdraw();
+
+        // 이 회원이 남긴 좋아요는 다른 회원의 코스/리뷰에 남아 있는 like_count에 그대로
+        // 잡혀 있다. course_like/place_review_like 행은 유예 기간이 지나야 지워지므로,
+        // 그 전까지 남의 콘텐츠 순위·좋아요 수가 탈퇴 회원의 좋아요까지 포함해 부풀려지지
+        // 않도록 여기서 즉시 감소시킨다. 유예 기간 내 복구되면 restore()에서 되돌린다.
+        courseRepository.decreaseLikeCountForLikesByMember(memberId);
+        placeReviewRepository.decrementLikeCountForLikesByMember(memberId);
+
         log.info("회원 탈퇴 처리 완료: memberId={}, previousStatus={}", memberId, previousStatus);
     }
 
@@ -147,6 +159,11 @@ public class MemberCommandService {
         }
 
         member.restore();
+
+        // withdraw()에서 감소시킨 좋아요 수를 되돌린다.
+        courseRepository.increaseLikeCountForLikesByMember(memberId);
+        placeReviewRepository.incrementLikeCountForLikesByMember(memberId);
+
         log.info("탈퇴 유예 기간 내 계정 복구: memberId={}, restoredStatus={}", memberId, member.getStatus());
         return member.getStatus();
     }

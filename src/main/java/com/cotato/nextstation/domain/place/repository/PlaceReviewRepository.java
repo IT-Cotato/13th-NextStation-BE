@@ -43,6 +43,27 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     @Query("UPDATE PlaceReview pr SET pr.likeCount = CASE WHEN pr.likeCount > 0 THEN pr.likeCount - 1 ELSE 0 END WHERE pr.id = :reviewId")
     void decrementLikeCount(@Param("reviewId") Long reviewId);
 
+    /**
+     * 탈퇴 회원이 좋아요를 눌러둔 리뷰들의 like_count를 일괄 감소시킨다.
+     * <p>
+     * place_review_like 행 자체는 지우지 않는다 — 유예 기간 안에 복구(restore)하면
+     * {@link #incrementLikeCountForLikesByMember}로 원상 복구해야 하는데, 행이 남아 있어야
+     * "이 회원이 어떤 리뷰를 좋아요했었는지"를 다시 알 수 있다. 실제 삭제는 유예 기간이
+     * 지나면 WithdrawnMemberCleaner가 처리한다.
+     */
+    @Modifying
+    @Query("UPDATE PlaceReview pr SET pr.likeCount = CASE WHEN pr.likeCount > 0 THEN pr.likeCount - 1 ELSE 0 END " +
+            "WHERE EXISTS (SELECT 1 FROM PlaceReviewLike prl " +
+            "              WHERE prl.placeReview.id = pr.id AND prl.memberId = :memberId)")
+    void decrementLikeCountForLikesByMember(@Param("memberId") Long memberId);
+
+    // 유예 기간 내 복구 시 위 감소분을 되돌린다.
+    @Modifying
+    @Query("UPDATE PlaceReview pr SET pr.likeCount = pr.likeCount + 1 " +
+            "WHERE EXISTS (SELECT 1 FROM PlaceReviewLike prl " +
+            "              WHERE prl.placeReview.id = pr.id AND prl.memberId = :memberId)")
+    void incrementLikeCountForLikesByMember(@Param("memberId") Long memberId);
+
 
     // 장소 리뷰 목록 - 최신순, 최초 페이지
     @Query("SELECT pr FROM PlaceReview pr " +

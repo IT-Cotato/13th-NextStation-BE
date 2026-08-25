@@ -63,13 +63,17 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // courseId 대신 추측 불가능한 shareToken으로 조회해, 링크를 모르는 사람은 다른 사람의
     // 코스를 ID만 바꿔가며 열람할 수 없다.
     // 삭제된 코스는 Course의 @SQLRestriction으로 자동 제외된다.
+    // 작성자가 탈퇴(WITHDRAWN)했으면 공유 링크로도 열람할 수 없게 막는다. 탈퇴 전에 이미
+    // 뿌려진 링크는 소유자 조건이 없는 이 쿼리만 통과하면 계속 열리므로, 다른 코스 조회
+    // 경로와 마찬가지로 여기도 걸러야 한다.
     @Query("SELECT c.id AS courseId, c.name AS name, " +
             "s.id AS stationId, s.stationName AS stationName, " +
             "l.id AS lineId, l.name AS lineName, l.code AS lineCode " +
             "FROM Course c " +
             "JOIN Station s ON s.id = c.stationId " +
+            "JOIN Member mem ON mem.id = c.memberId " +
             "LEFT JOIN s.drawLine l " +
-            "WHERE c.shareToken = :shareToken")
+            "WHERE c.shareToken = :shareToken AND " + NOT_WITHDRAWN_OWNER)
     Optional<CourseDetailView> findShareCourseDetail(@Param("shareToken") String shareToken);
 
     // 여행일지 삭제 시 참조를 끊을 코스를 찾는다.
@@ -139,6 +143,28 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "            WHERE cs.courseId = c.id AND cs.memberId = :memberId)")
     int decreaseLikeCountAll(@Param("memberId") Long memberId,
                              @Param("courseIds") Collection<Long> courseIds);
+
+    /**
+     * 탈퇴 회원이 좋아요를 눌러둔 코스들의 like_count를 일괄 감소시킨다.
+     * <p>
+     * course_like 행 자체는 지우지 않는다 — 유예 기간 안에 복구(restore)하면
+     * {@link #increaseLikeCountForLikesByMember}로 원상 복구해야 하는데, 행이 남아 있어야
+     * "이 회원이 어떤 코스를 좋아요했었는지"를 다시 알 수 있다. 실제 삭제는 유예 기간이
+     * 지나면 WithdrawnMemberCleaner가 처리한다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Course c SET c.likeCount = c.likeCount - 1 " +
+            "WHERE c.likeCount > 0 " +
+            "AND EXISTS (SELECT 1 FROM CourseLike cs " +
+            "            WHERE cs.courseId = c.id AND cs.memberId = :memberId)")
+    void decreaseLikeCountForLikesByMember(@Param("memberId") Long memberId);
+
+    // 유예 기간 내 복구 시 위 감소분을 되돌린다.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Course c SET c.likeCount = c.likeCount + 1 " +
+            "WHERE EXISTS (SELECT 1 FROM CourseLike cs " +
+            "              WHERE cs.courseId = c.id AND cs.memberId = :memberId)")
+    void increaseLikeCountForLikesByMember(@Param("memberId") Long memberId);
 
     // 역별 인기 공개 코스 조회
     // 인기순 = view_count + like_count*2, 동률이면 최신순(j.createdAt, 여행일지 작성 시점)으로 2차 정렬

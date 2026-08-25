@@ -1,5 +1,6 @@
 package com.cotato.nextstation.domain.member.service.command;
 
+import com.cotato.nextstation.domain.course.repository.CourseRepository;
 import com.cotato.nextstation.domain.image.service.command.ImageCommandService;
 import com.cotato.nextstation.domain.member.converter.MemberConverter;
 import com.cotato.nextstation.domain.member.dto.response.MemberProfileResponse;
@@ -11,6 +12,7 @@ import com.cotato.nextstation.domain.member.exception.NicknameErrorCode;
 import com.cotato.nextstation.domain.member.repository.MemberRepository;
 import com.cotato.nextstation.domain.member.util.NicknameValidator;
 import com.cotato.nextstation.domain.member.util.ProfileImageUrlValidator;
+import com.cotato.nextstation.domain.place.repository.PlaceReviewRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -57,6 +59,12 @@ class MemberCommandServiceTest {
 
     @Mock
     private ImageCommandService imageCommandService;
+
+    @Mock
+    private CourseRepository courseRepository;
+
+    @Mock
+    private PlaceReviewRepository placeReviewRepository;
 
     private static final Long MEMBER_ID = 1L;
     private static final String OLD_IMAGE_URL =
@@ -230,6 +238,9 @@ class MemberCommandServiceTest {
         // then
         assertThat(member.getStatus()).isEqualTo(MemberStatus.WITHDRAWN);
         assertThat(member.getDeletedAt()).isNotNull();
+        // 이 회원이 남의 코스/리뷰에 남겨둔 좋아요가 like_count에서 즉시 빠져야 한다
+        verify(courseRepository).decreaseLikeCountForLikesByMember(1L);
+        verify(placeReviewRepository).decrementLikeCountForLikesByMember(1L);
     }
 
     @Test
@@ -277,6 +288,9 @@ class MemberCommandServiceTest {
 
         // then
         assertThat(member.getDeletedAt()).isEqualTo(firstDeletedAt);
+        // 이미 탈퇴 처리된 회원이라 재요청은 무시되고, 좋아요 수 감소도 다시 일어나지 않는다
+        verify(courseRepository, never()).decreaseLikeCountForLikesByMember(any());
+        verify(placeReviewRepository, never()).decrementLikeCountForLikesByMember(any());
     }
 
     @Test
@@ -305,6 +319,9 @@ class MemberCommandServiceTest {
         assertThat(restored).isEqualTo(MemberStatus.ACTIVE);
         assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
         assertThat(member.getDeletedAt()).isNull();
+        // 탈퇴 시 감소시켰던 좋아요 수를 되돌린다
+        verify(courseRepository).increaseLikeCountForLikesByMember(1L);
+        verify(placeReviewRepository).incrementLikeCountForLikesByMember(1L);
     }
 
     @Test
@@ -336,6 +353,9 @@ class MemberCommandServiceTest {
         // then
         assertThat(restored).isEqualTo(MemberStatus.WITHDRAWN);
         assertThat(member.getDeletedAt()).isNotNull();
+        // 복구되지 않았으니 좋아요 수도 되돌리지 않는다
+        verify(courseRepository, never()).increaseLikeCountForLikesByMember(any());
+        verify(placeReviewRepository, never()).incrementLikeCountForLikesByMember(any());
     }
 
     @Test
@@ -351,5 +371,7 @@ class MemberCommandServiceTest {
         // then
         assertThat(restored).isEqualTo(MemberStatus.ACTIVE);
         assertThat(member.getDeletedAt()).isNull();
+        verify(courseRepository, never()).increaseLikeCountForLikesByMember(any());
+        verify(placeReviewRepository, never()).incrementLikeCountForLikesByMember(any());
     }
 }
