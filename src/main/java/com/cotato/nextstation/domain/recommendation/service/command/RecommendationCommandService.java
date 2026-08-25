@@ -21,6 +21,7 @@ import com.cotato.nextstation.domain.station.repository.StationLineRepository.St
 import com.cotato.nextstation.domain.station.repository.StationRepository;
 import com.cotato.nextstation.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -118,7 +120,9 @@ public class RecommendationCommandService {
         List<Station> finalCandidates = excludeLastRecommended(scoreCandidates, memberId);
 
         Station picked = pickRandom(finalCandidates);
-        recordLog(memberId, picked.getId(), false);
+        recordCustomLog(memberId, picked.getId(), request);
+        log.info("맞춤추천 완료 - memberId: {}, 출발역: {}, 이동시간: {}, 스타일: {}, 추천역: {}",
+                memberId, request.departureStationId(), request.travelTime(), request.travelStyles(), picked.getId());
 
         List<StationLineView> lines = stationLineRepository.findLinesByStationIdIn(List.of(picked.getId()));
         return recommendationConverter.toCustomResponse(picked, lines, durationByStationId.get(picked.getId()));
@@ -210,12 +214,27 @@ public class RecommendationCommandService {
         return stations.get(ThreadLocalRandom.current().nextInt(stations.size()));
     }
 
+    // 랜덤뽑기는 선택 조건이 없어 결과 역만 남긴다.
     private void recordLog(Long memberId, Long stationId, boolean isRandom) {
         recommendationLogRepository.save(
                 RecommendationLog.builder()
                         .memberId(memberId)
                         .resultStationId(stationId)
                         .isRandom(isRandom)
+                        .build()
+        );
+    }
+
+    // 맞춤추천은 어떤 조건이 많이 쓰이는지 집계할 수 있도록 선택 조건까지 함께 남긴다.
+    private void recordCustomLog(Long memberId, Long stationId, CustomRecommendationRequest request) {
+        recommendationLogRepository.save(
+                RecommendationLog.builder()
+                        .memberId(memberId)
+                        .resultStationId(stationId)
+                        .isRandom(false)
+                        .departureStationId(request.departureStationId())
+                        .travelTime(request.travelTime())
+                        .travelStyles(request.travelStyles())
                         .build()
         );
     }
