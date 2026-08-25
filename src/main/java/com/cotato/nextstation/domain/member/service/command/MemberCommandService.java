@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDateTime;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -128,6 +130,16 @@ public class MemberCommandService {
         }
 
         MemberStatus previousStatus = member.getStatus();
+
+        // 상태 전환 자체를 조건부 UPDATE로 한 번 더 원자적으로 선점한다. 위 in-memory 체크만으로는
+        // 동시에 들어온 두 탈퇴 요청이 둘 다 통과할 수 있는데, 그 상태로 아래 좋아요 수 감소까지
+        // 두 번 실행되면 실제로 남아 있어야 할 좋아요까지 같이 깎여 나간다. 이 갱신에서 밀린
+        // 요청은 부수 효과 없이 조용히 끝낸다.
+        if (memberRepository.withdrawIfNotAlready(memberId, LocalDateTime.now()) == 0) {
+            log.info("동시 탈퇴 요청 중 하나가 선점 실패 - 무시: memberId={}", memberId);
+            return;
+        }
+
         member.withdraw();
 
         // 이 회원이 남긴 좋아요는 다른 회원의 코스/리뷰에 남아 있는 like_count에 그대로
@@ -155,6 +167,18 @@ public class MemberCommandService {
         if (!member.isRestorable()) {
             log.warn("복구할 수 없는 회원의 복구 시도: memberId={}, status={}, deletedAt={}",
                     memberId, member.getStatus(), member.getDeletedAt());
+            return member.getStatus();
+        }
+
+        // Member.restore()와 같은 기준(닉네임 유무)으로 목표 상태를 미리 정해, 아래 조건부
+        // UPDATE에 그대로 쓴다.
+        MemberStatus targetStatus = member.getNickname() == null ? MemberStatus.PENDING : MemberStatus.ACTIVE;
+
+        // withdraw()와 같은 이유로 상태 전환을 조건부 UPDATE로 원자적으로 선점한다. 동시에 들어온
+        // 두 복구 요청(예: 중복 로그인 재시도)이 둘 다 통과하면 아래 좋아요 수 복구가 두 번
+        // 실행되어 실제보다 더 많이 늘어난다. 이 갱신에서 밀린 요청은 부수 효과 없이 끝낸다.
+        if (memberRepository.restoreIfWithdrawn(memberId, targetStatus) == 0) {
+            log.info("동시 복구 요청 중 하나가 선점 실패 - 무시: memberId={}", memberId);
             return member.getStatus();
         }
 

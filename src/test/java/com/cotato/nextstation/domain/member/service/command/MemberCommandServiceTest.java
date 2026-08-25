@@ -231,6 +231,7 @@ class MemberCommandServiceTest {
         // given
         Member member = activeMember();
         given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(memberRepository.withdrawIfNotAlready(eq(1L), any(LocalDateTime.class))).willReturn(1);
 
         // when
         memberCommandService.withdraw(1L);
@@ -249,6 +250,7 @@ class MemberCommandServiceTest {
         // given
         Member member = activeMember();
         given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(memberRepository.withdrawIfNotAlready(eq(1L), any(LocalDateTime.class))).willReturn(1);
 
         // when
         memberCommandService.withdraw(1L);
@@ -266,6 +268,7 @@ class MemberCommandServiceTest {
         Member member = Member.builder().email("pending@example.com").password("encoded").build();
         ReflectionTestUtils.setField(member, "id", 1L);
         given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(memberRepository.withdrawIfNotAlready(eq(1L), any(LocalDateTime.class))).willReturn(1);
 
         // when
         memberCommandService.withdraw(1L);
@@ -294,6 +297,23 @@ class MemberCommandServiceTest {
     }
 
     @Test
+    @DisplayName("동시 탈퇴 요청 중 하나가 선점에 실패하면 좋아요 수를 감소시키지 않는다")
+    void withdraw_losesRace_skipsLikeCountAdjustment() {
+        // given: in-memory 체크는 통과했지만(아직 ACTIVE로 보임), 조건부 UPDATE는 이미 다른
+        // 요청이 선점해 0행이 갱신됐다고 가정한다 - 동시에 들어온 탈퇴 요청 케이스를 재현한다.
+        Member member = activeMember();
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(memberRepository.withdrawIfNotAlready(eq(1L), any(LocalDateTime.class))).willReturn(0);
+
+        // when
+        memberCommandService.withdraw(1L);
+
+        // then
+        verify(courseRepository, never()).decreaseLikeCountForLikesByMember(any());
+        verify(placeReviewRepository, never()).decrementLikeCountForLikesByMember(any());
+    }
+
+    @Test
     @DisplayName("존재하지 않는 회원이면 예외가 발생한다")
     void withdraw_memberNotFound() {
         // given
@@ -311,6 +331,7 @@ class MemberCommandServiceTest {
         // given - 3일 전 탈퇴
         Member member = withdrawnMember(LocalDateTime.now().minusDays(3));
         given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(memberRepository.restoreIfWithdrawn(eq(1L), eq(MemberStatus.ACTIVE))).willReturn(1);
 
         // when
         MemberStatus restored = memberCommandService.restore(1L);
@@ -332,6 +353,7 @@ class MemberCommandServiceTest {
         ReflectionTestUtils.setField(member, "id", 1L);
         member.withdraw();
         given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(memberRepository.restoreIfWithdrawn(eq(1L), eq(MemberStatus.PENDING))).willReturn(1);
 
         // when
         MemberStatus restored = memberCommandService.restore(1L);
@@ -354,6 +376,24 @@ class MemberCommandServiceTest {
         assertThat(restored).isEqualTo(MemberStatus.WITHDRAWN);
         assertThat(member.getDeletedAt()).isNotNull();
         // 복구되지 않았으니 좋아요 수도 되돌리지 않는다
+        verify(courseRepository, never()).increaseLikeCountForLikesByMember(any());
+        verify(placeReviewRepository, never()).incrementLikeCountForLikesByMember(any());
+    }
+
+    @Test
+    @DisplayName("동시 복구 요청 중 하나가 선점에 실패하면 좋아요 수를 되돌리지 않는다")
+    void restore_losesRace_skipsLikeCountAdjustment() {
+        // given: isRestorable()은 통과했지만, 조건부 UPDATE는 이미 다른 요청(예: 중복 로그인
+        // 재시도)이 선점해 0행이 갱신됐다고 가정한다.
+        Member member = withdrawnMember(LocalDateTime.now().minusDays(3));
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(memberRepository.restoreIfWithdrawn(eq(1L), eq(MemberStatus.ACTIVE))).willReturn(0);
+
+        // when
+        MemberStatus restored = memberCommandService.restore(1L);
+
+        // then
+        assertThat(restored).isEqualTo(MemberStatus.WITHDRAWN);
         verify(courseRepository, never()).increaseLikeCountForLikesByMember(any());
         verify(placeReviewRepository, never()).incrementLikeCountForLikesByMember(any());
     }
