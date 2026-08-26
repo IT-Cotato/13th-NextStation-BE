@@ -34,4 +34,10 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Query("UPDATE Member m SET m.status = com.cotato.nextstation.domain.member.entity.MemberStatus.ACTIVE "
             + "WHERE m.id = :memberId AND m.status = com.cotato.nextstation.domain.member.entity.MemberStatus.PENDING")
     int activateIfPending(@Param("memberId") Long memberId);
+
+    // 프로필 설정 전 PENDING 상태도 가입으로 카운트
+    @Query("SELECT COUNT(m) FROM Member m WHERE m.createdAt >= :from AND m.createdAt < :to")
+    long countJoinedInPeriod(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    long countByStatusNot(MemberStatus status);
 }

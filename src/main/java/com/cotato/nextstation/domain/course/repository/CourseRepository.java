@@ -549,4 +549,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         Long getStationId();
         String getStationName();
     }
+
+    // 리포트용 코스 저장 수
+    @Query("SELECT COUNT(c) FROM Course c "
+            + "WHERE c.originalCourseId IS NULL AND c.createdAt >= :from AND c.createdAt < :to")
+    long countCreatedInPeriod(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }
