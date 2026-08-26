@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static com.cotato.nextstation.domain.member.repository.MemberRepository.NOT_WITHDRAWN;
+
 public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> {
 
     // 리뷰 텍스트/사진 중 하나라도 있어야 노출 대상이다. 여행일지 작성 시 장소별 리뷰는 선택 입력이라
@@ -18,15 +20,12 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     String HAS_CONTENT = "((pr.review IS NOT NULL AND TRIM(pr.review) <> '') " +
             "OR EXISTS (SELECT 1 FROM PlaceReviewImage pri WHERE pri.placeReview = pr))";
 
-    // 작성자가 탈퇴(WITHDRAWN)한 리뷰는 노출하지 않는다. 탈퇴는 soft delete라 리뷰 행 자체는
-    // 남아 있지만, 재가입 시 과거 리뷰가 다시 노출되는 걸 막기 위해 조회 시점에 걸러낸다.
-    // m을 JOIN FETCH pr.journal j / JOIN FETCH j.member m으로 이미 로드하는 쿼리에서만 쓸 수 있다.
-    String NOT_WITHDRAWN = "m.status <> com.cotato.nextstation.domain.member.entity.MemberStatus.WITHDRAWN";
-
     // 장소 상세 조회 - 공개(삭제되지 않은 journal) 기준 리뷰 목록 조회
+    // NOT_WITHDRAWN은 별칭 "mem"을 요구하므로, 연관관계로 이미 로드하는 Member도
+    // JOIN FETCH j.member mem으로 별칭을 맞춰서 쓴다.
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
-            "JOIN FETCH j.member m " +
+            "JOIN FETCH j.member mem " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
             "AND " + NOT_WITHDRAWN + " " +
@@ -68,7 +67,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     // 장소 리뷰 목록 - 최신순, 최초 페이지
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
-            "JOIN FETCH j.member m " +
+            "JOIN FETCH j.member mem " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
             "AND " + NOT_WITHDRAWN + " " +
@@ -78,7 +77,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     // 장소 리뷰 목록 - 최신순, 커서 이후 페이지
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
-            "JOIN FETCH j.member m " +
+            "JOIN FETCH j.member mem " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
             "AND " + NOT_WITHDRAWN + " " +
@@ -93,7 +92,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     // 장소 리뷰 목록 - 추천순(likeCount 캐시 컬럼 기준), 최초 페이지
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
-            "JOIN FETCH j.member m " +
+            "JOIN FETCH j.member mem " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
             "AND " + NOT_WITHDRAWN + " " +
@@ -103,7 +102,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     // 장소 리뷰 목록 - 추천순, 커서 이후 페이지
     @Query("SELECT pr FROM PlaceReview pr " +
             "JOIN FETCH pr.journal j " +
-            "JOIN FETCH j.member m " +
+            "JOIN FETCH j.member mem " +
             "WHERE pr.place.id = :placeId " +
             "AND " + HAS_CONTENT + " " +
             "AND " + NOT_WITHDRAWN + " " +
@@ -123,7 +122,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, Long> 
     // (리스트 조회 쿼리들은 JOIN FETCH pr.journal이라 엔티티를 실제로 로드하므로 이 문제가 없다)
     @Query("SELECT COUNT(pr) FROM PlaceReview pr " +
             "JOIN pr.journal j " +
-            "JOIN j.member m " +
+            "JOIN j.member mem " +
             "WHERE pr.place.id = :placeId " +
             "AND j.isDeleted = false " +
             "AND " + HAS_CONTENT + " " +

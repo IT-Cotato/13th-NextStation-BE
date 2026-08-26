@@ -11,13 +11,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
-public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> {
+import static com.cotato.nextstation.domain.member.repository.MemberRepository.NOT_WITHDRAWN;
 
-    // 탈퇴(WITHDRAWN)한 회원의 스탬프/방문역은 타인에게 노출하지 않는다. 탈퇴는 soft delete라
-    // 스탬프 행 자체는 남아 있지만, 재가입 시 과거 스탬프가 다시 노출되는 걸 막기 위해
-    // 조회 시점에 걸러낸다. MemberStamp는 memberId만 들고 있어(연관관계 미매핑) Member를 id로
-    // ad-hoc 조인해야 쓸 수 있다 (별칭 mem, "JOIN Member mem ON mem.id = ms.memberId").
-    String NOT_WITHDRAWN = "mem.status <> com.cotato.nextstation.domain.member.entity.MemberStatus.WITHDRAWN";
+public interface MemberStampRepository extends JpaRepository<MemberStamp, Long> {
 
     boolean existsByMemberIdAndId(Long memberId, Long id);
     boolean existsByMemberIdAndCourseId(Long memberId, Long courseId);

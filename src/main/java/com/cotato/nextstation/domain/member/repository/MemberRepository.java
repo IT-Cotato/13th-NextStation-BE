@@ -15,6 +15,18 @@ import java.util.Optional;
 @Repository
 public interface MemberRepository extends JpaRepository<Member, Long> {
 
+    /**
+     * 탈퇴(WITHDRAWN)한 회원의 콘텐츠를 다른 회원에게 노출하지 않기 위한 조건절. 여러 도메인의
+     * 조회 쿼리가 이 조건을 그대로 재사용한다 (PlaceReviewRepository, CourseRepository,
+     * MemberStampRepository, CourseLikeRepository 등).
+     * <p>
+     * 별칭은 반드시 "mem"으로 맞춰야 한다. Member를 memberId만으로 참조하는 엔티티는
+     * {@code JOIN Member mem ON mem.id = ...memberId}로 ad-hoc 조인하고, 실제 연관관계로
+     * 참조하는 엔티티(PlaceReview → Journal → Member)는 {@code JOIN FETCH j.member mem}처럼
+     * 연관관계 조인에 이 별칭을 붙여서 쓴다.
+     */
+    String NOT_WITHDRAWN = "mem.status <> com.cotato.nextstation.domain.member.entity.MemberStatus.WITHDRAWN";
+
     Optional<Member> findByEmail(String email);
 
     boolean existsByEmail(String email);
