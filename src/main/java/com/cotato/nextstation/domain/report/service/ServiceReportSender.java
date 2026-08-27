@@ -49,14 +49,14 @@ public class ServiceReportSender {
     private final JournalRepository journalRepository;
     private final DiscordWebhookClient discordWebhookClient;
 
-    @Scheduled(cron = "0 0 9 * * *")
+    @Scheduled(cron = "${report.cron.daily:0 0 9 * * *}")
     public void sendDailyReport() {
         LocalDate today = LocalDate.now();
         sendReport("일간", today.minusDays(1).atStartOfDay(), today.atStartOfDay());
     }
 
     // 일간 리포트와 전송 시각이 겹치지 않게 10분 늦춘다.
-    @Scheduled(cron = "0 10 9 * * MON")
+    @Scheduled(cron = "${report.cron.weekly:0 10 9 * * MON}")
     public void sendWeeklyReport() {
         LocalDate thisMonday = LocalDate.now().with(DayOfWeek.MONDAY);
         sendReport("주간", thisMonday.minusWeeks(1).atStartOfDay(), thisMonday.atStartOfDay());
