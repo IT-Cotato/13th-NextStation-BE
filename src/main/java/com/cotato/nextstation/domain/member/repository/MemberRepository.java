@@ -47,6 +47,11 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
             + "WHERE m.id = :memberId AND m.status = com.cotato.nextstation.domain.member.entity.MemberStatus.PENDING")
     int activateIfPending(@Param("memberId") Long memberId);
 
+    // 프로필 설정 전 PENDING 상태도 가입으로 카운트
+    @Query("SELECT COUNT(m) FROM Member m WHERE m.createdAt >= :from AND m.createdAt < :to")
+    long countJoinedInPeriod(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    long countByStatusNot(MemberStatus status);
     /**
      * 탈퇴 상태 전환을 선점한다. 갱신된 행 수를 반환하며, 0이면 이미 다른 요청이 탈퇴를 끝낸 것이다.
      * 조회 시점의 status 검사만으로는 동시에 들어온 두 탈퇴 요청이 모두 통과해 코스/리뷰
